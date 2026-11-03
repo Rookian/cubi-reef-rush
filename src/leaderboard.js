@@ -25,9 +25,11 @@ export async function submitScore(entry) {
   try { localStorage.setItem('cubi_name', row.name); } catch (e) {}
   const local = loadLocal(); local.push({ ...row, created_at: new Date().toISOString(), mine: true }); saveLocal(local);
   if (!online()) return { ok: true, online: false };
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/scores`, { method: 'POST', headers: { ...headers(), Prefer: 'return=minimal' }, body: JSON.stringify(row) });
-  if (!r.ok) throw new Error('Could not save online (' + r.status + ')');
-  return { ok: true, online: true };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/scores`, { method: 'POST', headers: { ...headers(), Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    if (!r.ok) { console.warn('Ranking upload failed', r.status, await r.text().catch(() => '')); return { ok: true, online: false, failed: r.status }; }
+    return { ok: true, online: true };
+  } catch (e) { console.warn('Ranking upload failed', e); return { ok: true, online: false, failed: 'network' }; }
 }
 
 export async function topScores(level, limit = 10) {

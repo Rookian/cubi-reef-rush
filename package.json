@@ -2,11 +2,15 @@
   "name": "cubi-reef-rush",
   "version": "0.1.0",
   "private": true,
-  "description": "Cubi's Reef Rush — a cute 3D underwater runner starring Cubi the young yellow boxfish",
+  "description": "Cubi's Reef Rush \u2014 a cute 3D underwater runner starring Cubi the young yellow boxfish",
   "scripts": {
-    "build": "esbuild src/game.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/game.js && esbuild src/editor.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/editor.js && esbuild src/showcase.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/showcase.js",
+    "build": "esbuild src/game.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/game.js && esbuild src/editor.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/editor.js && esbuild src/showcase.js --bundle --format=iife --minify --alias:three/addons=./node_modules/three/examples/jsm --outfile=public/showcase.js && node scripts/stamp.js",
     "serve": "npx http-server public -p 8080 -c-1"
   },
-  "dependencies": { "three": "0.169.0" },
-  "devDependencies": { "esbuild": "0.24.0" }
+  "dependencies": {
+    "three": "0.169.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
 }

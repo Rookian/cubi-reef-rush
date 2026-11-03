@@ -666,7 +666,7 @@ async function showBoard(el, lvl, me) {
   box.innerHTML = boardHTML(rows, me) + `<p class="lbnote">${noteText(online)}</p>`;
 }
 function renderRank(id, res) {
-  const el = $(id);
+  const el = $(id); if (!el) return;
   if (levelIdx < 0) { el.innerHTML = `<div class="score">${res.score} points</div>`; return; }
   el.innerHTML = `<div class="score">${res.score} points</div>
     <form class="saveForm"><input name="n" maxlength="16" autocomplete="nickname" placeholder="Your name" aria-label="Your name" value="${esc(LB.savedName())}"><button type="submit">Save</button></form>
@@ -676,7 +676,7 @@ function renderRank(id, res) {
     e.preventDefault(); const name = LB.cleanName(input.value);
     if (!name) { input.focus(); return; }
     btn.disabled = true; btn.textContent = 'Saving…';
-    try { await LB.submitScore({ ...res, name, level: levelIdx }); form.remove(); sound.start(); showBoard(el, levelIdx, { name, score: res.score }); }
+    try { const r = await LB.submitScore({ ...res, name, level: levelIdx }); form.remove(); sound.start(); if (r.failed) toast('Saved on this device'); showBoard(el, levelIdx, { name, score: res.score }); }
     catch (err) { btn.disabled = false; btn.textContent = 'Retry'; toast('Could not save'); }
   };
   showBoard(el, levelIdx, null);
@@ -689,8 +689,8 @@ function openRanks() {
   $('rankList').innerHTML = '<p>Loading ranking…</p>'; $('rankNote').textContent = STARTER_LEVELS[rankLvl].name;
   LB.topScores(rankLvl).then(({ rows, online }) => { $('rankList').innerHTML = boardHTML(rows, null); $('rankNote').textContent = `${STARTER_LEVELS[rankLvl].name} · ${noteText(online)}`; });
 }
-$('ranksBtn').onclick = () => { rankLvl = Math.max(0, levelIdx); openRanks(); };
-$('ranksClose').onclick = () => { $('ranks').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+if ($('ranksBtn')) $('ranksBtn').onclick = () => { rankLvl = Math.max(0, levelIdx); openRanks(); };
+if ($('ranksClose')) $('ranksClose').onclick = () => { $('ranks').classList.add('hidden'); $('menu').classList.remove('hidden'); };
 // typing a name must not steer Cubi or toggle sound/quality
 addEventListener('keydown', (e) => { if (e.target instanceof HTMLInputElement) e.stopImmediatePropagation(); }, true);
 
