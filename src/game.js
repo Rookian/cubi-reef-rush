@@ -749,7 +749,22 @@ let last = performance.now();
 const tmpV = new THREE.Vector3();
 const camLook = new THREE.Vector3(0, 2, -2);
 camera.position.set(0, 2.8, 3.2);
+// FPS display (toggle with F); counts real frames over half-second windows
+const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; fpsEl.setAttribute('aria-hidden', 'true');
+fpsEl.style.cssText = 'position:fixed;left:76px;bottom:28px;z-index:30;font:700 15px/1 system-ui,sans-serif;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.85);color:#1F7A3A;border:2px solid #3B2614;pointer-events:none;min-width:64px;text-align:center';
+let fpsOn = true; try { fpsOn = localStorage.getItem('cubi_fps') !== 'off'; } catch (e) {}
+fpsEl.style.display = fpsOn ? 'block' : 'none'; document.body.appendChild(fpsEl);
+addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') { fpsOn = !fpsOn; fpsEl.style.display = fpsOn ? 'block' : 'none'; try { localStorage.setItem('cubi_fps', fpsOn ? 'on' : 'off'); } catch (err) {} } });
+let fpsN = 0, fpsT = performance.now();
+function countFps(now) {
+  fpsN++;
+  if (now - fpsT >= 500) {
+    const fps = Math.round(fpsN * 1000 / (now - fpsT)); fpsN = 0; fpsT = now;
+    if (fpsOn) { fpsEl.textContent = fps + ' FPS'; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
+  }
+}
 function frame(now) {
+  countFps(now);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   step(dt);
   renderFrame();
