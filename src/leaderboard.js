@@ -1,7 +1,7 @@
 // Ranking list: online via Supabase (when configured below), otherwise kept on this device.
 // The publishable/anon key is meant to be public: the database only allows reading and adding scores (see supabase.sql).
-export const SUPABASE_URL = '';          // e.g. 'https://abcdxyz.supabase.co'
-export const SUPABASE_KEY = '';          // publishable key ('sb_publishable_…') or legacy anon key
+export const SUPABASE_URL = 'https://nfvfdxzitewjulbyvyep.supabase.co';
+export const SUPABASE_KEY = 'sb_publishable_9n-ztK_-24kc5WTFfMifGQ_AzP1NYAE';
 export const online = () => !!(SUPABASE_URL && SUPABASE_KEY);
 
 const headers = () => {
