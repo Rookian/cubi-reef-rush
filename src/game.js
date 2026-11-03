@@ -330,7 +330,9 @@ let speed = 6, s = 0, pearls = 0, lives = 3, invuln = 0, nextDecor = 0, t = 0, s
 let caught = null; // { shark, t }
 const best = {}; try { Object.assign(best, JSON.parse(localStorage.getItem('cubi_best') || '{}')); } catch (e) {}
 
+let whaleTimes = [];
 function resetWorld() {
+  whaleTimes = [rf(0.15, 0.3), rf(0.55, 0.75)];
   buildZones();
   [...objs].forEach(despawn); objs.length = 0; finishObj = null;
   if (buddy) { scene.remove(buddy); buddy = null; }
@@ -384,7 +386,7 @@ function decorRow(z) {
     for (const sd of [-1, 1]) {
       if (Math.random() < 0.85) spawn('mound', sd * rf(4.6, 5.6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.7) spawn('wall', sd * rf(6.6, 7.6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.25) });
-      if (Math.random() < 0.25) spawn(pick(['heroanem', 'xmas']), sd * rf(4.2, 4.8), 0, z, { solid: false, ry: rf(0, 6), xmas: false });
+      if (Math.random() < 0.45) spawn(pick(['heroanem', 'xmas', 'xmas']), sd * rf(4.2, 4.8), 0, z, { solid: false, ry: rf(0, 6), xmas: false });
     }
     sharedLife(z); return;
   }
@@ -393,7 +395,7 @@ function decorRow(z) {
       if (Math.random() < 0.75) spawn(pick(['mound', 'mound', 'moundbig']), sd * rf(5.2, 9), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.8) spawn('wall', sd * rf(11, 12), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.15) });
       if (Math.random() < 0.3) spawn('heroanem', sd * rf(4.6, 5.4), 0.05, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
-      if (Math.random() < 0.35) spawn('xmas', sd * rf(4.4, 5.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.4), xmas: true });
+      if (Math.random() < 0.6) spawn('xmas', sd * rf(4.4, 5.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.4), xmas: true });
     }
     sharedLife(z);
     return;
@@ -415,7 +417,7 @@ function decorRow(z) {
   }
   if (zone === 'reefbed') {  // swimming right over a rocky reef floor
     if (Math.random() < 0.85) spawn('patch', rf(-3.4, 3.4), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
-    if (Math.random() < 0.35) spawn('xmas', pick([-1, 1]) * rf(3.8, 5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.3), xmas: true });
+    if (Math.random() < 0.6) spawn('xmas', pick([-1, 1]) * rf(3.8, 5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.3), xmas: true });
     if (Math.random() < 0.35) spawn(pick(['xmas', 'heroanem', 'rock']), rf(-3.4, 3.4), 0, z, { solid: false, ry: rf(0, 6), scale: rf(0.6, 0.9), xmas: false });
     for (const sd of [-1, 1]) { if (Math.random() < 0.85) spawn(pick(['mound', 'moundbig']), sd * rf(5, 9), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) }); if (Math.random() < 0.3) spawn('wall', sd * rf(11, 14), 0, z, { solid: false, ry: rf(0, 6) }); }
     sharedLife(z); return;
@@ -446,7 +448,7 @@ function decorRow(z) {
     // little creatures
     if (Math.random() < 0.1) spawn('crab', side * rf(3.9, 5.5), 0, z, { solid: false, ry: rf(-0.5, 0.5) });
     if (Math.random() < 0.12) spawn('heroanem', side * rf(4.4, 5.2), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
-    if (Math.random() < 0.3) spawn('xmas', side * rf(4.3, 6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5), xmas: true });
+    if (Math.random() < 0.5) spawn('xmas', side * rf(4.3, 6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5), xmas: true });
     if (Math.random() < 0.16) spawn('nudi', side * rf(3.7, 5.4), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.5, 2.1) });
     if (Math.random() < 0.07) spawn('seahorse', side * rf(5, 7), rf(1.0, 2.0), z, { solid: false, ry: side > 0 ? -Math.PI / 2 - 0.4 : Math.PI / 2 + 0.4, scale: rf(0.9, 1.2) });
     if (Math.random() < 0.05) spawn('eel', side * rf(5.6, 7.5), 0, z, { solid: false, ry: side > 0 ? -Math.PI / 2 - 0.5 : Math.PI / 2 + 0.5, scale: rf(1, 1.3) });
@@ -479,6 +481,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.012) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whaleshark', -dir * 26, rf(8.5, 10.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.5, 0], maxX: 32 }); }
   else if (Math.random() < 0.01) { const sd = Math.random() < 0.5 ? -1 : 1; spawn('whaleshark', sd * rf(9, 12), rf(7.5, 9.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: 0, swim: [0, -rf(1.8, 2.6)] }); }
   if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3), y0 = rf(4.4, 5.6); for (let k = 0; k < n; k++) spawn('babyturtle', -dir * (10 + k * rf(0.9, 1.6)), y0 + rf(-0.5, 0.5), z - 6 + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
+  if (Math.random() < 0.22) spawn('xmas', side * rf(2.4, 3.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15), xmas: true });
   if (Math.random() < 0.16) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
@@ -715,6 +718,12 @@ function step(dt) {
   t += dt;
   const progress = level.length ? Math.min(1, s / level.length) : 0;
   if (mode === 'play' || mode === 'caught') speed = THREE.MathUtils.lerp(level.speed, level.speedEnd, progress);
+  // the whale shark visits twice per level: glides in from behind-ahead, slowly overtaken by Cubi, high off to one side
+  if (mode === 'play' && whaleTimes.length && progress > whaleTimes[0]) {
+    whaleTimes.shift(); const sd = Math.random() < 0.5 ? -1 : 1;
+    spawn('whaleshark', sd * rf(5.5, 6.5), rf(5.8, 6.6), -46, { solid: false, scale: rf(2.2, 2.5), ry: -sd * 0.12, swim: [-sd * 0.12, -speed * 0.7] });
+    toast('A whale shark is passing by!');
+  }
   else if (mode === 'menu' || mode === 'splash') speed = mode === 'splash' ? 3 : 5;
   else speed = Math.max(0, speed - dt * 6);
   const move = speed * dt;
