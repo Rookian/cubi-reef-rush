@@ -1,5 +1,6 @@
 import { STARTER_LEVELS, normalizeLevel, saveCustom, loadCustom, LANE, countPearls } from './levels.js';
 import { publishLevel, communityOnline } from './community.js';
+import { tr, langSwitch, LANG_CSS, onLangChange } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const cv = $('map'), ctx = cv.getContext('2d');
@@ -98,7 +99,7 @@ function draw() {
   }
   // start & finish
   const band = (z, label, col) => { const y = zToPy(z); ctx.fillStyle = col; ctx.fillRect(l, y - 4, r - l, 8); ctx.fillStyle = '#12324A'; ctx.textAlign = 'center'; ctx.font = '700 14px Fredoka, system-ui'; ctx.fillText(label, cx(), y - 14); ctx.font = '600 12px Fredoka, system-ui'; };
-  band(0, 'START', '#8EDB7A'); band(lv.length, 'FINISH', '#FF7FA8');
+  band(0, 'START', '#8EDB7A'); band(lv.length, document.documentElement.lang === 'de' ? 'ZIEL' : 'FINISH', '#FF7FA8');
   // streams under everything
   for (const it of lv.items.filter(i => i.t === 'stream')) {
     const y0 = zToPy(it.z), y1 = zToPy(it.z + (it.len || 14));
@@ -187,7 +188,7 @@ function buildPalette() {
   }
 }
 function seg(label, opts, val, on) {
-  return `<div class="field"><span>${label}</span><div class="seg">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(val) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
+  return `<div class="field" data-k="${label}"><span>${label}</span><div class="seg">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(val) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
 }
 function panel() {
   const el = $('panel');
@@ -205,7 +206,7 @@ function panel() {
   el.innerHTML = h;
   const keys = { Height: 'y', Count: 'n', Gap: 'gap', Shape: 'dx', Rise: 'dy', Kind: 'kind', Push: 'dir', Length: 'len', Side: 'x', Home: 'home', From: 'from', Thing: 'kind', Who: 'kind' };
   el.querySelectorAll('.field').forEach(f => {
-    const k = keys[f.querySelector('span').textContent];
+    const k = keys[f.dataset.k];
     f.querySelectorAll('button').forEach(b => b.onclick = () => { const v = b.dataset.v; it[k] = isNaN(+v) ? v : +v; save(); panel(); draw(); });
   });
   $('delBtn').onclick = removeSel;
@@ -232,7 +233,7 @@ $('shareBtn').onclick = async () => {
   if (!communityOnline()) { toast('Online sharing is not set up'); return; }
   if (lv.items.length < 3) { toast('Add at least 3 items first'); return; }
   let name = ''; try { name = localStorage.getItem('cubi_name') || ''; } catch (e) {}
-  name = (prompt(`Share "${lv.name}" with all players.\nYour name (shown as the builder):`, name) || '').trim().slice(0, 16);
+  name = (prompt(document.documentElement.lang === 'de' ? `„${lv.name}“ mit allen Spielern teilen.\nDein Name (wird als Erbauer angezeigt):` : `Share "${lv.name}" with all players.\nYour name (shown as the builder):`, name) || '').trim().slice(0, 16);
   if (!name) return;
   try { localStorage.setItem('cubi_name', name); } catch (e) {}
   const b = $('shareBtn'); b.disabled = true; b.textContent = 'Sharing…';
@@ -255,4 +256,7 @@ $('mLoad').onclick = () => {
 };
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('show'), 1400); }
 
+{ const st = document.createElement('style'); st.textContent = LANG_CSS + 'header .langSwitch{margin-left:12px}'; document.head.appendChild(st);
+  const hd = document.querySelector('header'); if (hd) hd.appendChild(langSwitch()); }
+onLangChange(() => { buildPalette(); panel(); draw(); });
 buildPalette(); bindSettings(); panel(); resize(); save();

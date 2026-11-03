@@ -6,6 +6,7 @@ import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
 import * as LB from './leaderboard.js';
 import * as CM from './community.js';
+import { langSwitch, LANG_CSS, onLangChange } from './i18n.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -785,6 +786,15 @@ $('retryBtn').onclick = () => start(level, levelIdx);
 $('nextBtn').onclick = () => start(STARTER_LEVELS[levelIdx + 1], levelIdx + 1);
 [...document.querySelectorAll('.toMenu')].forEach(b => b.onclick = () => { mode = 'menu'; loadLevel(STARTER_LEVELS[0], 0); resetWorld(); buildMenu(); showOnly('menu'); });
 buildMenu();
+// language switch (flags) in the menu card and on the splash screen
+{ const st = document.createElement('style'); st.textContent = LANG_CSS + '#menu .langSwitch{position:absolute;top:12px;right:14px}#menu{position:fixed}#menu h1{padding:0 96px}@media (max-width:480px){#menu h1{padding:0 0 0 0;margin-top:30px}}#splash .langSwitch{position:absolute;top:14px;right:14px;z-index:2}'; document.head.appendChild(st);
+  $('menu').prepend(langSwitch()); }
+onLangChange(() => {
+  buildMenu();
+  if (!$('ranks').classList.contains('hidden')) openRanks();
+  if (!$('community').classList.contains('hidden')) openCommunity();
+  sndUI(); updateHud();
+});
 
 // ------------------------------------------------------------------ splash screen
 const splash = document.createElement('div');
@@ -811,6 +821,7 @@ splash.innerHTML = `
   <button class="tap" id="tapStart">Tap to start</button>
   ${Array.from({ length: 14 }, (_, i) => `<span class="bub" aria-hidden="true" style="left:${(i * 7.3 + 3) % 100}%;width:${10 + (i * 7) % 26}px;height:${10 + (i * 7) % 26}px;animation-duration:${6 + (i * 3) % 7}s;animation-delay:${-(i * 1.3) % 8}s"></span>`).join('')}
 `;
+splash.prepend(langSwitch());
 document.body.appendChild(splash);
 let splashT = 0;
 if (mode === 'splash') $('menu').classList.add('hidden');
