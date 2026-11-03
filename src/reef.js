@@ -267,33 +267,186 @@ export function animateWhale(w, dt) { const u = w.userData; u.t += dt * 0.7; u.t
 // ------------------------------------------------------------------
 // SHIPWRECK with a treasure chest
 // ------------------------------------------------------------------
+// ---- pirate ship building blocks (cute cartoon galleon) ----
+const PW = { wood: '#B8743E', woodD: '#8A5228', woodL: '#D99A5A', band: '#3A2A3A', gold: '#FFC93C', edge: '#3A2414' };
+function flagTexture() {
+  return cached('flagTex', () => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 180; const x = c.getContext('2d');
+    x.fillStyle = '#1E1A2A'; x.fillRect(0, 0, 256, 180);
+    x.fillStyle = '#FFFFFF'; x.strokeStyle = '#FFFFFF'; x.lineCap = 'round';
+    x.lineWidth = 16; x.beginPath(); x.moveTo(80, 120); x.lineTo(176, 160); x.moveTo(176, 120); x.lineTo(80, 160); x.stroke();          // crossbones
+    for (const [bx, by] of [[76, 118], [180, 118], [76, 162], [180, 162]]) { x.beginPath(); x.arc(bx, by, 11, 0, 7); x.fill(); }
+    x.beginPath(); x.ellipse(128, 76, 46, 42, 0, 0, 7); x.fill(); x.fillRect(102, 96, 52, 30);                                          // round cute skull
+    x.fillStyle = '#1E1A2A'; x.beginPath(); x.ellipse(110, 74, 13, 15, 0, 0, 7); x.ellipse(146, 74, 13, 15, 0, 0, 7); x.fill();
+    x.fillStyle = '#FFFFFF'; x.beginPath(); x.arc(114, 69, 4, 0, 7); x.arc(150, 69, 4, 0, 7); x.fill();                                // sparkly eyes
+    x.fillStyle = '#1E1A2A'; x.beginPath(); x.moveTo(128, 88); x.lineTo(122, 98); x.lineTo(134, 98); x.fill();
+    for (let i = 0; i < 4; i++) x.fillRect(108 + i * 11, 112, 4, 12);
+    x.fillStyle = '#FF8FB0'; x.beginPath(); x.ellipse(96, 96, 8, 5, 0, 0, 7); x.ellipse(160, 96, 8, 5, 0, 0, 7); x.fill();              // blush
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  });
+}
+function tatteredFlag(w = 1.6, h = 1.1) {
+  const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(w, 0);
+  for (let i = 1; i <= 6; i++) s.lineTo(w - (i % 2) * 0.18, -h * i / 6);
+  for (let i = 5; i >= 0; i--) s.lineTo(w * i / 6, -h + (i % 2 ? 0.14 : 0));
+  s.closePath();
+  const g = new THREE.ShapeGeometry(s); const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / w, 1 + p.getY(i) / h);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: flagTexture(), side: THREE.DoubleSide }));
+  return m;
+}
+function tatteredSail(w, h, col = '#F2E3C0') {
+  const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2 - 0.1, -h * 0.7);
+  const n = 7; for (let i = 0; i <= n; i++) { const x = w / 2 - 0.1 - (w - 0.2) * i / n; s.lineTo(x, -h * (i % 2 ? 1 : 0.72) + (i % 3) * 0.08); }
+  s.lineTo(-w / 2, -h * 0.6); s.closePath();
+  s.holes.push(Object.assign(new THREE.Path(), {}).absarc(w * 0.18, -h * 0.4, h * 0.09, 0, Math.PI * 2, true));
+  return new THREE.Mesh(new THREE.ShapeGeometry(s), toon(col, { side: THREE.DoubleSide }));
+}
+function cannon() {
+  const g = new THREE.Group();
+  const barrel = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.8, 14), toon('#3A3A4A')), 0.02, '#14141E');
+  barrel.rotation.x = Math.PI / 2; barrel.position.z = 0.4; g.add(barrel);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.04, 6, 14), toon('#5A5A6A')); rim.position.z = 0.8; g.add(rim);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), basic('#0A0A10')); hole.position.z = 0.83; g.add(hole);
+  return g;
+}
+function barrel() {
+  const pts = []; for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(new THREE.Vector2(0.28 + Math.sin(t * Math.PI) * 0.06, t * 0.7)); }
+  const b = outline(new THREE.Mesh(new THREE.LatheGeometry(pts, 16), toon('#B87A44')), 0.025, PW.edge);
+  for (const y of [0.15, 0.55]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.315, 0.025, 6, 18), toon('#5A5A6A')); h.rotation.x = Math.PI / 2; h.position.y = y; b.add(h); }
+  const lid = new THREE.Mesh(new THREE.CircleGeometry(0.28, 16), toon('#8A5228')); lid.rotation.x = -Math.PI / 2; lid.position.y = 0.7; b.add(lid);
+  return b;
+}
+function anchor() {
+  const g = new THREE.Group(); const m = toon('#5A6070'); const e = '#20242E';
+  const shank = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.4, 8), m), 0.02, e); shank.position.y = 0.7; g.add(shank);
+  const ring = outline(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 8, 16), m), 0.015, e); ring.position.y = 1.5; g.add(ring);
+  const stock = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8), m), 0.015, e); stock.rotation.z = Math.PI / 2; stock.position.y = 1.2; g.add(stock);
+  const arm = outline(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 8, 20, Math.PI), m), 0.02, e); arm.rotation.z = Math.PI; arm.position.y = 0.5; g.add(arm);
+  for (const sx of [-1, 1]) { const f = outline(new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.28, 3), m), 0.015, e); f.position.set(sx * 0.5, 0.55, 0); g.add(f); }
+  return g;
+}
+function wheel() {
+  const g = new THREE.Group(); const m = toon(PW.woodL);
+  g.add(outline(new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 8, 24), m), 0.015, PW.edge));
+  for (let i = 0; i < 8; i++) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 6), m); sp.rotation.z = i * Math.PI / 8 * 2 / 2 * 2 / 2 + i * Math.PI / 8; g.add(sp); }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 12), toon(PW.gold)); hub.rotation.x = Math.PI / 2; g.add(hub);
+  return g;
+}
+// side profile of a galleon hull: low bow (−x), high stern castle (+x). Optional burst hole.
+function hullShape(L, H, hole) {
+  const s = new THREE.Shape();
+  s.moveTo(-L / 2, H * 0.55);                                    // bow tip
+  s.quadraticCurveTo(-L / 2 + 0.6, H * 0.15, -L / 2 + 2.0, 0.0);
+  s.lineTo(L / 2 - 2.2, 0.0);
+  s.quadraticCurveTo(L / 2 - 0.4, 0.15, L / 2, H * 0.55);         // stern bottom curve
+  s.lineTo(L / 2 + 0.2, H * 1.05); s.lineTo(L / 2 - 2.8, H * 1.05); // stern castle top
+  s.lineTo(L / 2 - 2.8, H * 0.82); s.lineTo(-L / 2 + 1.6, H * 0.82); // main deck rail
+  s.lineTo(-L / 2 + 1.6, H * 0.92); s.lineTo(-L / 2 + 0.2, H * 0.92);
+  s.closePath();
+  if (hole) {
+    const [cx, cy, rx, ry] = hole; const p = new THREE.Path(); const n = 22;
+    for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; const j = i % 2 ? 1.0 : 1.22 + ((i * 37) % 7) * 0.03; const x = cx + Math.cos(a) * rx * j, y = cy + Math.sin(a) * ry * j; if (i === 0) p.moveTo(x, y); else p.lineTo(x, y); }
+    s.holes.push(p);
+  }
+  return s;
+}
+function hullTexture() {
+  return cached('hullTex', () => {
+    const W = 1024, Ht = 512, c = document.createElement('canvas'); c.width = W; c.height = Ht; const x = c.getContext('2d');
+    // v=0 bottom … v=1 top of the stern castle
+    const yv = (v) => Ht - v * Ht;
+    const grd = x.createLinearGradient(0, Ht, 0, 0); grd.addColorStop(0, '#6A3A1E'); grd.addColorStop(0.5, '#A8622E'); grd.addColorStop(1, '#C47A3A');
+    x.fillStyle = grd; x.fillRect(0, 0, W, Ht);
+    // planks with staggered joints and nail dots
+    const ph = Ht * 0.07;
+    for (let k = 0, y = Ht; y > 0; k++, y -= ph) {
+      x.fillStyle = k % 2 ? 'rgba(255,220,170,0.10)' : 'rgba(60,30,10,0.10)'; x.fillRect(0, y - ph, W, ph);
+      x.fillStyle = '#4A2410'; x.fillRect(0, y - 3, W, 4);
+      for (let j = (k % 2) * 60; j < W; j += 120) { x.fillRect(j, y - ph, 3, ph); x.fillStyle = '#3A1A08'; x.beginPath(); x.arc(j + 10, y - ph / 2, 3, 0, 7); x.fill(); x.fillStyle = '#4A2410'; }
+    }
+    // weathering: mossy green near the keel, barnacle dots
+    const mg = x.createLinearGradient(0, Ht, 0, Ht * 0.7); mg.addColorStop(0, 'rgba(70,140,90,0.55)'); mg.addColorStop(1, 'rgba(70,140,90,0)'); x.fillStyle = mg; x.fillRect(0, Ht * 0.7, W, Ht * 0.3);
+    for (let i = 0; i < 120; i++) { x.fillStyle = i % 3 ? 'rgba(235,230,215,0.9)' : 'rgba(255,170,200,0.9)'; x.beginPath(); x.arc(Math.random() * W, Ht - Math.random() * Ht * 0.28, 2 + Math.random() * 4, 0, 7); x.fill(); }
+    // black gunport band with a red stripe, gold trim along the rail
+    x.fillStyle = '#231824'; x.fillRect(0, yv(0.58), W, Ht * 0.11);
+    x.fillStyle = '#D8323A'; x.fillRect(0, yv(0.62), W, Ht * 0.035);
+    x.fillStyle = '#FFC93C'; x.fillRect(0, yv(0.765), W, Ht * 0.03); x.fillRect(0, yv(0.47), W, Ht * 0.018);
+    x.fillStyle = '#8A1E2A'; x.fillRect(0, yv(0.86), W, Ht * 0.06);  // red castle band
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  });
+}
+function hullMesh(L, H, D, hole) {
+  const geo = new THREE.ExtrudeGeometry(hullShape(L, H, hole), { depth: D, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.18, bevelSegments: 3, curveSegments: 10 });
+  geo.translate(0, 0, -D / 2);
+  const p = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) / L + 0.5) * (L / 9), p.getY(i) / (H * 1.08));
+  const tex = hullTexture(); tex.wrapS = THREE.RepeatWrapping;
+  const mat = toon('#ffffff'); mat.map = tex;
+  return outline(new THREE.Mesh(geo, mat), 0.05, PW.edge);
+}
+function decorateHull(g, L, H, D, holeX, skipR) {
+  // gunports with cannons poking out
+  for (let x = -L / 2 + 2.4; x < L / 2 - 3; x += 1.7) {
+    if (skipR && Math.abs(x - holeX) < skipR) continue;
+    const port = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.42), basic('#1A1020')); port.position.set(x, H * 0.56, D / 2 + 0.26); g.add(port);
+    const c = cannon(); c.position.set(x, H * 0.56, D / 2 + 0.1); c.scale.setScalar(0.8); g.add(c);
+  }
+  // stern windows glowing a little
+  for (let k = 0; k < 3; k++) { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.4), basic('#FFD86B')); w.position.set(L / 2 - 2.3 + k * 0.7, H * 0.93, D / 2 + 0.26); g.add(w); const f = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.4), basic(PW.edge)); f.position.copy(w.position).add(V(0, 0, 0.005)); g.add(f); }
+  // bowsprit
+  const bs = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.13, 3, 8), toon(PW.woodD)), 0.025, PW.edge); bs.rotation.z = Math.PI / 2 - 0.35; bs.position.set(-L / 2 - 0.9, H * 1.1, 0); g.add(bs);
+  // ship wheel on the stern castle
+  const wh = wheel(); wh.position.set(L / 2 - 1.6, H * 1.05 + 0.55, 0); wh.rotation.y = Math.PI / 2; g.add(wh);
+  // barnacles + coral + seaweed reclaiming the wreck
+  const R = rng(Math.floor((holeX + 5) * 13));
+  const solid = [], plates = [], soft = [];
+  for (let i = 0; i < 9; i++) { const x = -L / 2 + 1 + R() * (L - 2); if (skipR && Math.abs(x - holeX) < skipR + 0.3) continue; addCoral(R, x, (x > L / 2 - 2.8 ? H * 1.05 : H * 0.82) + 0.15, (R() - 0.5) * D * 0.7, solid, plates, 1.1, soft); }
+  g.add(coralMeshes(solid, plates, '#3A2440', soft));
+  const weed = new THREE.MeshBasicMaterial({ color: '#3FBF7F', side: THREE.DoubleSide });
+  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.9 + R() * 0.8), weed); const x = -L / 2 + 1.5 + R() * (L - 3); b.position.set(x, H * 0.82 - 0.5, D / 2 + 0.3); g.add(b); }
+}
+function brokenMast(h, g, x, z, lean, withFlag, base = 0) {
+  const mast = new THREE.Group(); mast.position.set(x, base, z); mast.rotation.z = lean; g.add(mast);
+  const m = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, h, 10), toon(PW.woodD)), 0.035, PW.edge); m.position.y = h / 2; mast.add(m);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 5), toon(PW.woodL)); tip.position.y = h + 0.1; tip.rotation.z = 0.4; mast.add(tip); // splintered top
+  const yard = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3, 8), toon(PW.woodD)), 0.025, PW.edge); yard.rotation.z = Math.PI / 2 + 0.25; yard.position.y = h * 0.78; mast.add(yard);
+  const sail = tatteredSail(2.8, Math.min(2.6, h * 0.5)); sail.position.set(0, h * 0.77, 0.12); sail.rotation.z = 0.25; mast.add(sail);
+  const crow = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.3, 12, 1, true), toon(PW.woodL, { side: THREE.DoubleSide })), 0.02, PW.edge); crow.position.y = h * 0.9; mast.add(crow);
+  if (withFlag) { const f = tatteredFlag(1.5, 1.0); f.position.set(0.1, h + 0.0, 0); f.userData.flag = true; mast.add(f); }
+  // a few dangling ropes
+  const rope = basic('#C8A878');
+  for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, h * 0.6, 4), rope); r.position.set(-0.6 + i * 0.6, h * 0.45, 0.05); r.rotation.z = 0.25 + i * 0.1; mast.add(r); }
+  return mast;
+}
+
+// ------------------------------------------------------------------
+// PIRATE SHIPWRECK (decor beside the lane): burst in two, half sunk, treasure spilling
+// ------------------------------------------------------------------
 export function makeShipwreck() {
   const g = new THREE.Group();
-  const edge = '#3A2414';
-  // hull from a side profile, extruded and rounded
-  const s = new THREE.Shape();
-  s.moveTo(-3.4, 1.6); s.lineTo(3.0, 1.6); s.quadraticCurveTo(3.9, 1.5, 4.1, 2.3); s.lineTo(3.2, 0.3); s.quadraticCurveTo(2.2, -0.5, 0, -0.55); s.quadraticCurveTo(-2.6, -0.5, -3.4, 0.2); s.closePath();
-  let hullG = new THREE.ExtrudeGeometry(s, { depth: 2.2, bevelEnabled: true, bevelThickness: 0.35, bevelSize: 0.3, bevelSegments: 4, curveSegments: 14 });
-  hullG.translate(0, 0, -1.1); hullG.deleteAttribute('uv');
-  paintGradient(hullG, '#ffffff', '#ffffff', 'y', 0, 1, (c, i, pos) => { const y = pos.getY(i); c.set(y > 1.3 ? '#C98A50' : '#A8683A'); if (Math.abs(((y + 3) * 2.2) % 1 - 0.5) < 0.07) c.set('#7A4A24'); });
-  const hull = outline(new THREE.Mesh(hullG, toon('#ffffff', { vertexColors: true })), 0.06, edge);
-  hull.rotation.z = 0.22; hull.position.y = 0.2; hull.castShadow = true; g.add(hull);
-  // deck, portholes, mast
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.08, 2.4), toon('#D9A86A')); deck.position.set(0.1, 1.68, 0); hull.add(deck);
-  for (let i = 0; i < 4; i++) { const ph = outline(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.06, 8, 20), toon('#FFD23F')), 0.02, edge); ph.position.set(-2 + i * 1.3, 0.9, 1.45); hull.add(ph); const gl = new THREE.Mesh(new THREE.CircleGeometry(0.18, 18), basic('#3A6A8A')); gl.position.set(-2 + i * 1.3, 0.9, 1.44); hull.add(gl); }
-  const mast = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 4.2, 10), toon('#A8683A')), 0.03, edge); mast.position.set(0.4, 3.4, 0); mast.rotation.z = -0.35; hull.add(mast);
-  const yard = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.4, 8), toon('#A8683A')), 0.025, edge); yard.rotation.z = Math.PI / 2 + 0.2; yard.position.set(0.9, 4.6, 0); hull.add(yard);
-  // tattered sail
-  const ss = new THREE.Shape(); ss.moveTo(-1.1, 0); ss.lineTo(1.1, 0); ss.lineTo(0.9, -1.4); ss.lineTo(0.5, -1.1); ss.lineTo(0.2, -1.6); ss.lineTo(-0.3, -1.2); ss.lineTo(-0.7, -1.5); ss.lineTo(-1.0, -1.1); ss.closePath();
-  const sail = new THREE.Mesh(new THREE.ShapeGeometry(ss), toon('#F2E3C0', { side: THREE.DoubleSide })); sail.position.set(0.9, 4.55, 0.05); sail.rotation.z = 0.2; hull.add(sail);
-  // corals and seaweed have claimed the wreck
-  const deco = [[-2.4, 1.75, 0.5, COR.pink], [1.9, 1.75, -0.6, COR.purple], [-0.8, 1.75, -0.7, COR.yellow]];
-  deco.forEach(([x, y, z, col]) => { const c = outline(new THREE.Mesh(cached('wb0', () => branchGeo(20, 0.12, 0.6, 3, 2.0)), toon(col[0])), 0.03, col[1]); c.position.set(x, y, z); c.scale.setScalar(0.8); hull.add(c); });
-  // treasure chest beside the wreck
-  const chest = makeChest(); chest.position.set(-4.6, 0, 1.6); chest.rotation.y = 0.5; g.add(chest);
+  const L = 9, H = 2.6, D = 2.2;
+  // stern half (big, tilted) and bow half, split by a jagged break
+  const stern = new THREE.Group(); stern.position.set(2.2, -0.3, 0); stern.rotation.set(0, 0, 0.12); g.add(stern);
+  const sHull = hullMesh(L, H, D, [-L / 2 + 0.6, H * 0.45, 0.9, 0.7]); stern.add(sHull);
+  decorateHull(stern, L, H, D, -L / 2 + 0.6, 1.2);
+  brokenMast(4.2, stern, 0.6, 0, -0.18, true, H * 0.8);
+  const bow = new THREE.Group(); bow.position.set(-4.6, -0.6, 0.8); bow.rotation.set(0.1, 0.5, -0.32); g.add(bow);
+  const bHull = hullMesh(5, H, D, null); bHull.scale.x = 1; bow.add(bHull);
+  brokenMast(2.4, bow, 0.2, 0, 0.5, false, H * 0.8);
+  // splinters around the break
+  const R = rng(4);
+  for (let i = 0; i < 10; i++) { const sp = outline(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.8 + R() * 1.2, 0.1), toon(PW.woodL)), 0.02, PW.edge); sp.position.set(-2.3 + R() * 1.2, R() * 1.5, (R() - 0.5) * 2); sp.rotation.set(R() - 0.5, R() * 3, R() * 1.6 - 0.8); g.add(sp); }
+  // loot on the sand: chest, barrels, anchor, cannonballs
+  const chest = makeChest(); chest.position.set(-1.6, 0, 2.4); chest.rotation.y = 0.4; g.add(chest);
+  for (const [x, z, ry, lie] of [[1.2, 2.6, 0.3, 0], [2.0, 2.3, 1.2, 1], [-3.2, 2.2, 0.8, 1]]) { const b = barrel(); b.position.set(x, lie ? 0.3 : 0, z); b.rotation.set(lie ? Math.PI / 2 : 0, ry, 0); g.add(b); }
+  const an = anchor(); an.position.set(5.4, 0.1, 2.0); an.rotation.set(0, 0.6, 1.2); g.add(an);
+  const ballM = toon('#2E2E3A');
+  for (let i = 0; i < 5; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), ballM); b.position.set(0.2 + i * 0.3, 0.14, 2.9 + (i % 2) * 0.2); g.add(b); }
   g.userData = { chest };
   return g;
 }
+
 export function makeChest() {
   const g = new THREE.Group(); const edge = '#3A2414';
   const box = outline(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.6, 0.7), toon('#B5703A')), 0.035, edge); box.position.y = 0.3; g.add(box);
@@ -312,40 +465,38 @@ export function makeChest() {
 }
 
 // ------------------------------------------------------------------
-// SWIM-THROUGH SHIPWRECK lying across the lane, with a hole to go through
-// hole: centre x, and the gap is ~2.6 wide and 2.4 tall around y=2.4
+// SWIM-THROUGH PIRATE SHIP lying across the lane — burst open, swim through the hole
 // ------------------------------------------------------------------
-export const GATE = { halfW: 1.35, y0: 1.2, y1: 3.6, len: 16, height: 5.2, depth: 1.4 };
+export const GATE = { halfW: 1.35, y0: 1.2, y1: 3.6, len: 18, height: 5.2, depth: 1.6 };
 export function makeWreckGate(holeX = 0) {
-  const g = new THREE.Group(); const edge = '#3A2414';
-  const wood = toon('#B87A44'), dark = toon('#8A5430'), light = toon('#D9A86A');
+  const g = new THREE.Group();
   const L = GATE.len, H = GATE.height, D = GATE.depth;
-  const box = (x0, x1, y0, y1, mat, th = 0.05) => { const m = outline(new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, D), mat), th, edge); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0); g.add(m); return m; };
-  const hx0 = holeX - GATE.halfW, hx1 = holeX + GATE.halfW;
-  box(-L / 2, hx0, 0, H, wood);                 // hull left of the hole
-  box(hx1, L / 2, 0, H, wood);                  // hull right of the hole
-  box(hx0, hx1, GATE.y1, H, wood);              // above the hole
-  box(hx0, hx1, 0, GATE.y0, wood);              // below the hole
-  // planks and a dark keel stripe
-  for (let y = 0.6; y < H; y += 0.65) {
-    const segs = (y > GATE.y0 - 0.05 && y < GATE.y1 + 0.05) ? [[-L / 2, hx0], [hx1, L / 2]] : [[-L / 2, L / 2]];
-    for (const [a, b] of segs) { const p = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.06, D + 0.04), dark); p.position.set((a + b) / 2, y, 0); g.add(p); }
+  const hcx = holeX, hcy = (GATE.y0 + GATE.y1) / 2;
+  const hull = hullMesh(L, H, D, [hcx, hcy, GATE.halfW + 0.35, (GATE.y1 - GATE.y0) / 2 + 0.3]);
+  hull.position.y = 0; g.add(hull);
+  decorateHull(g, L, H, D, holeX, GATE.halfW + 1.0);
+  // splintered planks bent outward around the burst hole
+  const R = rng(Math.floor(holeX * 10) + 77);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2, rx = GATE.halfW + 0.45, ry = (GATE.y1 - GATE.y0) / 2 + 0.4;
+    const sp = outline(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5 + R() * 0.6, 0.1), toon(i % 2 ? PW.woodL : PW.wood)), 0.02, PW.edge);
+    sp.position.set(hcx + Math.cos(a) * rx, hcy + Math.sin(a) * ry, D / 2 + 0.15 + R() * 0.2);
+    sp.rotation.set(-0.5 - R() * 0.4, 0, a + Math.PI / 2 + (R() - 0.5) * 0.6); g.add(sp);
   }
-  const rail = outline(new THREE.Mesh(new THREE.BoxGeometry(L + 0.4, 0.25, D + 0.4), light), 0.04, edge); rail.position.y = H + 0.1; g.add(rail);
-  // broken frame around the hole, splinters
-  const frameM = toon('#6A3C1E');
-  [[hx0, (GATE.y0 + GATE.y1) / 2, 0.18, GATE.y1 - GATE.y0], [hx1, (GATE.y0 + GATE.y1) / 2, 0.18, GATE.y1 - GATE.y0], [holeX, GATE.y1, hx1 - hx0, 0.18], [holeX, GATE.y0, hx1 - hx0, 0.18]].forEach(([x, y, w, h]) => {
-    const f = outline(new THREE.Mesh(new THREE.BoxGeometry(w, h, D + 0.12), frameM), 0.03, edge); f.position.set(x, y, 0); g.add(f); });
-  const R = rng(Math.floor(holeX * 100) + 7);
-  for (let i = 0; i < 7; i++) { const sp = outline(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.5 + R() * 0.4, 4), frameM), 0.02, edge); const onTop = i < 4; sp.position.set(hx0 + R() * (hx1 - hx0), onTop ? GATE.y1 - 0.15 : GATE.y0 + 0.15, D / 2 * (R() < 0.5 ? 1 : -1) * 0.6); sp.rotation.z = onTop ? Math.PI + (R() - 0.5) * 0.5 : (R() - 0.5) * 0.5; g.add(sp); }
-  // portholes, an anchor and coral/seaweed growing on the wreck
-  for (let x = -L / 2 + 1.2; x < L / 2 - 1; x += 2.1) { if (x > hx0 - 0.6 && x < hx1 + 0.6) continue; const ph = outline(new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 20), toon('#FFD23F')), 0.02, edge); ph.position.set(x, 3.4, D / 2 + 0.05); g.add(ph); const gl = new THREE.Mesh(new THREE.CircleGeometry(0.24, 18), basic('#2E5A78')); gl.position.set(x, 3.4, D / 2 + 0.04); g.add(gl); }
-  const cols = [COR.pink, COR.purple, COR.yellow, COR.orange, COR.teal];
-  for (let i = 0; i < 6; i++) { const x = -L / 2 + 1 + R() * (L - 2); if (Math.abs(x - holeX) < GATE.halfW + 0.5) continue; const c = cols[i % cols.length]; const m = outline(new THREE.Mesh(cheapBranch(R), toon(c[0])), 0.03, c[1]); m.position.set(x, H + 0.2, (R() - 0.5) * 0.8); m.scale.setScalar(1.2 + R() * 0.6); g.add(m); }
-  const mast = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 5, 10), dark), 0.04, edge); mast.position.set(holeX + (holeX > 0 ? -4 : 4), H + 2.2, 0); mast.rotation.z = holeX > 0 ? 0.5 : -0.5; g.add(mast);
-  // lanterns glowing at the hole so it reads as "go here"
-  for (const sx of [-1, 1]) { const lan = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8), new THREE.MeshBasicMaterial({ color: '#FFE48A' })); lan.position.set(holeX + sx * (GATE.halfW + 0.35), GATE.y1 - 0.2, D / 2 + 0.15); g.add(lan);
-    const gs = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture(false), color: '#FFD86B', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); gs.scale.setScalar(1.2); gs.position.copy(lan.position); g.add(gs); }
+  // the inside of the hull is dark, with a glimpse of treasure through the hole
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(L - 1, H * 0.8), basic('#2A1A20')); inner.position.set(0, H * 0.4, -D / 2 + 0.05); g.add(inner);
+  // lanterns either side of the hole so it reads as "swim here"
+  for (const sx of [-1, 1]) {
+    const lp = V(hcx + sx * (GATE.halfW + 0.75), GATE.y1 + 0.2, D / 2 + 0.35);
+    const cage = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.36, 6), toon('#3A3A4A')), 0.015, '#14141E'); cage.position.copy(lp); g.add(cage);
+    const lan = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshBasicMaterial({ color: '#FFE48A' })); lan.position.copy(lp); g.add(lan);
+    const gs = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture(false), color: '#FFD86B', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); gs.scale.setScalar(1.4); gs.position.copy(lp); g.add(gs);
+  }
+  // broken mast flying the jolly roger, leaning away from the hole
+  brokenMast(5.0, g, holeX > 0 ? holeX - 4.5 : holeX + 4.5, 0, holeX > 0 ? 0.22 : -0.22, true, H * 0.8);
+  brokenMast(3.2, g, holeX > 0 ? holeX - 8 : holeX + 8 > L / 2 - 3 ? L / 2 - 3.5 : holeX + 8, 0, 0.4, false, H * 0.8);
+  const an = anchor(); an.position.set(holeX > 0 ? -L / 2 + 2 : L / 2 - 2, 0.2, D / 2 + 0.7); an.rotation.set(0.2, 0.4, 0.9); g.add(an);
+  for (let i = 0; i < 3; i++) { const b = barrel(); b.position.set(holeX + (i - 1) * 1.2 + (holeX > 0 ? -4 : 4), 0.3, D / 2 + 1.1); b.rotation.set(Math.PI / 2, R() * 3, 0); g.add(b); }
   return g;
 }
 

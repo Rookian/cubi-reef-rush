@@ -40,7 +40,8 @@ if (which === 'newlife') {
 if (which === 'icon') {
   scene.background = null; scene.fog = null; floor.visible = false; renderer.setClearColor(0x000000, 0);
   const k = q.get('k'); let o;
-  if (k === 'wreckgate') { o = add(RF.makeWreckGate(0), 0, 0, 0, 0); cam.position.set(0, 4, 22); cam.lookAt(0, 3, 0); }
+  if (k === 'wreckgate') { o = add(RF.makeWreckGate(0), 0, 0, 0, 0.25); cam.position.set(0, 4.5, 20); cam.lookAt(0, 3, 0); }
+  if (k === 'wreck') { o = add(RF.makeShipwreck(), 0, 0, 0, -0.35); cam.position.set(0, 4, 15); cam.lookAt(0, 1.8, 0); }
   if (k === 'moray') { o = add(RF.makeMoray('rock'), 0, 0, 0, 0.9); RF.setMoray(o, 0.6, 1); cam.position.set(1, 2.2, 6); cam.lookAt(0.6, 1.0, 0.8); }
   if (k === 'moraytube') { o = add(RF.makeMoray('tube'), 0, 0, 0, 0.9); RF.setMoray(o, 0.5, 1); cam.position.set(2, 2.5, 7); cam.lookAt(0.6, 1.6, 0.6); }
   if (k === 'kraken') { o = add(RF.makeKraken(), 0, 0, 0, 0); cam.position.set(0, 1, 7); cam.lookAt(0, 0.4, 0); }
