@@ -733,9 +733,13 @@ if (BLOOM) {
   composer.addPass(new OutputPass());
 }
 renderer.info.autoReset = false;
-function renderFrame() { renderer.info.reset(); if (composer) composer.render(); else renderer.render(scene, camera); }
+// quality: HQ = bloom + sharper resolution, LQ = no bloom, 1x resolution (toggle with Q)
+let hq = true; try { hq = localStorage.getItem('cubi_hq') !== 'low'; } catch (e) {}
+const PR_CAP = matchMedia('(pointer: coarse)').matches ? 1.25 : 1.5;
+function renderFrame() { renderer.info.reset(); if (composer && hq) composer.render(); else renderer.render(scene, camera); }
 function resize() {
   const w = innerWidth, h = innerHeight;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hq ? PR_CAP : 1));
   renderer.setSize(w, h, false);
   if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
   camera.aspect = w / h;
@@ -751,23 +755,26 @@ const camLook = new THREE.Vector3(0, 2, -2);
 camera.position.set(0, 2.8, 3.2);
 // FPS display (toggle with F); counts real frames over half-second windows
 const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; fpsEl.setAttribute('aria-hidden', 'true');
-fpsEl.style.cssText = 'position:fixed;left:76px;bottom:28px;z-index:30;font:700 15px/1 system-ui,sans-serif;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.85);color:#1F7A3A;border:2px solid #3B2614;pointer-events:none;min-width:64px;text-align:center';
+fpsEl.style.cssText = 'position:fixed;left:76px;bottom:28px;z-index:30;font:700 15px/1 system-ui,sans-serif;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.85);color:#1F7A3A;border:2px solid #3B2614;pointer-events:none;min-width:64px;white-space:nowrap;text-align:center';
 let fpsOn = true; try { fpsOn = localStorage.getItem('cubi_fps') !== 'off'; } catch (e) {}
 fpsEl.style.display = fpsOn ? 'block' : 'none'; document.body.appendChild(fpsEl);
 addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') { fpsOn = !fpsOn; fpsEl.style.display = fpsOn ? 'block' : 'none'; try { localStorage.setItem('cubi_fps', fpsOn ? 'on' : 'off'); } catch (err) {} } });
-let fpsN = 0, fpsT = performance.now();
+let fpsN = 0, fpsT = performance.now(), workMs = 0;
+addEventListener('keydown', (e) => { if (e.key === 'q' || e.key === 'Q') { hq = !hq; try { localStorage.setItem('cubi_hq', hq ? 'high' : 'low'); } catch (err) {} resize(); toast(hq ? 'High quality' : 'Fast mode'); } });
 function countFps(now) {
   fpsN++;
   if (now - fpsT >= 500) {
-    const fps = Math.round(fpsN * 1000 / (now - fpsT)); fpsN = 0; fpsT = now;
-    if (fpsOn) { fpsEl.textContent = fps + ' FPS'; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
+    const fps = Math.round(fpsN * 1000 / (now - fpsT)); const ms = workMs / Math.max(1, fpsN); fpsN = 0; fpsT = now; workMs = 0;
+    if (fpsOn) { fpsEl.textContent = `${fps} FPS · ${ms.toFixed(1)} ms · ${hq ? 'HQ' : 'Fast'}`; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
   }
 }
 function frame(now) {
   countFps(now);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const w0 = performance.now();
   step(dt);
   renderFrame();
+  workMs += performance.now() - w0;
   requestAnimationFrame(frame);
 }
 function step(dt) {
