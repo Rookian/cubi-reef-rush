@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { plastic as toon, paintGradient, outline } from './materials.js';
-import { makeEye, placeEye, smooth, basic, decal } from './models.js';
+import { makeEye, placeEye, smooth, basic, decal, makeTurtle, animateTurtle, makeBubbleCoral, makeBranchCoral, COR } from './models.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // lathe body: f(t) gives radius along the length (t: 0 = tail, 1 = snout); head ends up at -Z
@@ -195,4 +195,47 @@ export function animateShrimp(s, dt) {
   u.hop = Math.max(0, u.hop - dt * 2.5);
   u.rig.position.y = Math.sin(u.hop * Math.PI) * 0.12 + Math.sin(u.t * 2) * 0.01;
   u.fan.rotation.x = 1.6 - u.hop * 0.8;
+}
+
+// =====================================================================
+// GRAZING TURTLE — rests on the reef, nose down, nibbling a sponge/soft-coral clump; crumbs drift up.
+// Looks up when Cubi swims close.
+// =====================================================================
+const FOOD = [COR.orange, COR.pink, COR.purple, COR.yellow];
+export function makeGrazer(seed = 0) {
+  const g = new THREE.Group();
+  const baby = seed % 4 === 3;
+  const tu = makeTurtle(baby); const ts = baby ? 0.55 : 0.85;
+  tu.scale.setScalar(ts); tu.position.set(0, 0.42 * ts / 0.85, 0.15); tu.rotation.x = -0.18; g.add(tu);
+  const food = new THREE.Group(); food.position.set(0, 0, -1.55 * ts); g.add(food);
+  const fc = FOOD[seed % FOOD.length];
+  const k = baby ? 0.75 : 1;
+  const bub = makeBubbleCoral(0.55 * k, seed + 2, fc); food.add(bub);
+  const br = makeBranchCoral(FOOD[(seed + 1) % FOOD.length], seed + 5, 0.38 * k); br.position.set(0.38 * k, 0, 0.1); food.add(br);
+  const br2 = makeBranchCoral(FOOD[(seed + 2) % FOOD.length], seed + 9, 0.3 * k); br2.position.set(-0.36 * k, 0, 0.15); food.add(br2);
+  const crumbM = new THREE.MeshToonMaterial({ color: fc[0] });
+  const crumbs = [];
+  for (let i = 0; i < 10; i++) { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 0), crumbM); c.visible = false; g.add(c); crumbs.push({ m: c, life: 0, v: new THREE.Vector3() }); }
+  g.userData = { tu, head: tu.userData.head, food, crumbs, t: Math.random() * 10, look: 0, nextCrumb: 0, ts };
+  return g;
+}
+export function animateGrazer(g, dt, near) {
+  const u = g.userData; u.t += dt;
+  animateTurtle(u.tu, dt * 0.45);                                   // lazy paddling to hold position
+  u.look += ((near ? 1 : 0) - u.look) * Math.min(1, dt * 3);
+  const c = u.t % 3.4;
+  let rx, chew = 0;
+  if (c < 0.6) rx = -0.5 * (c / 0.6);                               // dip down to the coral
+  else if (c < 2.1) { rx = -0.5 + Math.sin(u.t * 13) * 0.07; chew = 1; }   // nibble nibble
+  else { const k = Math.min(1, (c - 2.1) / 0.5); rx = -0.5 + k * 0.55; chew = 0.4; }   // lift, chew
+  u.head.rotation.x = THREE.MathUtils.lerp(rx, 0.35, u.look);
+  u.head.rotation.y = Math.sin(u.t * 0.7) * 0.15 * (1 - u.look);
+  u.head.scale.y = u.head.scale.x * (1 - chew * 0.06 * Math.max(0, Math.sin(u.t * 16)));
+  u.nextCrumb -= dt;
+  if (chew === 1 && !near && u.nextCrumb < 0) {
+    u.nextCrumb = 0.25 + Math.random() * 0.3;
+    const cr = u.crumbs.find(q => q.life <= 0);
+    if (cr) { cr.life = 1.6; cr.m.visible = true; cr.m.position.set((Math.random() - 0.5) * 0.3, 0.4 * u.ts / 0.85 + 0.15, -1.45 * u.ts); cr.v.set((Math.random() - 0.5) * 0.25, 0.25 + Math.random() * 0.2, (Math.random() - 0.5) * 0.25); }
+  }
+  u.crumbs.forEach(q => { if (q.life <= 0) return; q.life -= dt; q.m.position.addScaledVector(q.v, dt); q.m.rotation.x += dt * 3; q.m.scale.setScalar(Math.max(0.01, Math.min(1, q.life))); if (q.life <= 0) q.m.visible = false; });
 }

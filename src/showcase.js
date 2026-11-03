@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as M from './models.js';
 import * as RF from './reef.js';
 import * as CR from './critters.js';
+import { glowAll, glowU } from './materials.js';
 import { makeRenderer, setupScene, makeFloor } from './env.js';
 
 const q = new URLSearchParams(location.search);
@@ -14,7 +15,7 @@ const { floor, caus } = makeFloor(); scene.add(floor);
 const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 500);
 const items = [];
 const anim = [];
-function add(obj, x, y, z, ry = 0) { obj.position.set(x, y, z); obj.rotation.y = ry; scene.add(obj); items.push(obj); return obj; }
+function add(obj, x, y, z, ry = 0) { if (!location.search.includes('noglow')) glowAll(obj); obj.position.set(x, y, z); obj.rotation.y = ry; scene.add(obj); items.push(obj); return obj; }
 
 const ang = (+q.get('angle') || 0) * Math.PI / 180;
 if (which === 'cubi') { const c = add(M.makeCubi(), 0, 1.2, 0, ang); anim.push(dt => M.animateFish(c, dt, 0.3)); cam.position.set(0, 1.5, 4.2); cam.lookAt(0, 1.15, 0); }
@@ -54,6 +55,12 @@ if (which === 'lush') {
   add(RF.makeFluffyAnemone(0, 1.5), -0.2, 0, 1.3, 0); add(RF.makeFluffyAnemone(3, 1.2), 4.3, 0, 1.0, 0);
   const sw = add(M.makeSchool('chromis', 26, 18, 'plain', 0.36), 0.5, 3.3, -1.5, -0.7); anim.push(dt => { RF.reefClock.value += dt; M.animateSchool(sw, dt); });
   cam.position.set(0, 2.6, 8.5); cam.lookAt(0, 1.0, 0);
+}
+if (which === 'grazers') {
+  const a = add(CR.makeGrazer(0), -1.6, 0, 0, Math.PI * 0.62), b2 = add(CR.makeGrazer(1), 1.8, 0, -0.5, -Math.PI * 0.6), c3 = add(CR.makeGrazer(3), 0.2, 0, 1.6, Math.PI * 0.85);
+  for (let i = 0; i < 70; i++) [a, b2, c3].forEach((g, k) => CR.animateGrazer(g, 1 / 60 + k * 0.004, false));
+  anim.push(dt => [a, b2, c3].forEach(g => CR.animateGrazer(g, dt, false)));
+  cam.position.set(0, 2.4, 5.5); cam.lookAt(0, 0.4, 0);
 }
 if (which === 'small') {
   const list = [];

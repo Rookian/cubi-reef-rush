@@ -713,7 +713,7 @@ export function reefFishGeometries(shape, pal, pattern) {
   const [rx, ry, rz] = REEF_SHAPES[shape];
   const big = shape === 'grouper' || shape === 'parrot';
   const fine = ['regal', 'idol', 'humbug', 'ytail'].includes(pattern);
-  let body = new THREE.SphereGeometry(1, big ? 36 : fine ? 28 : 12, big ? 26 : fine ? 20 : 9); body.scale(rx, ry, rz);
+  let body = new THREE.SphereGeometry(1, big ? 36 : fine ? 28 : 16, big ? 26 : fine ? 20 : 12); body.scale(rx * 1.22, ry, rz);
   const p = body.attributes.position;
   if (shape === 'idol') for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z < -rz * 0.4) { const k = (-z / rz - 0.4) / 0.6; p.setY(i, p.getY(i) * (1 - 0.65 * k)); p.setZ(i, z - k * k * rz * 0.45); } }
   for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z > 0) { const k = z / rz; p.setY(i, p.getY(i) * (1 - 0.4 * k * k)); p.setX(i, p.getX(i) * (1 - 0.3 * k * k)); } }
@@ -772,14 +772,26 @@ export function reefFishGeometries(shape, pal, pattern) {
   const res = { body: bodyAll, hull, ink: mergeGeometries(ink), len: rz };
   return (fishGeoCache[key] = res);
 }
-// tail wag in the vertex shader, phase per instance
-function bendMaterial(mat, amp = 0.35) {
+// whole-body swimming wave (head -> tail), phase per instance; amplitude grows toward the tail
+const SWIM_GLSL = (len, amp) => `
+      float ph = float(gl_InstanceID) * 1.37; float sp = 6.5 + mod(float(gl_InstanceID), 4.0) * 1.1;
+      float zn = transformed.z / ${len.toFixed(3)};
+      float env = ${len.toFixed(3)} * (0.035 + pow(max(0.0, zn + 0.45), 2.0) * ${(amp * 0.55).toFixed(3)});
+      float wv = sin(uT * sp - zn * 3.2 + ph);
+      transformed.x += wv * env;
+      transformed.z -= abs(wv) * env * 0.15 * step(0.0, zn);`;
+function bendMaterial(mat, amp = 0.35, len = 0.4, rim = false) {
+  mat.customProgramCacheKey = () => 'fishbend' + len.toFixed(3) + amp + rim + mat.type;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uT = { value: 0 }; mat.userData.sh = sh;
-    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      float ph = float(gl_InstanceID) * 1.37; float sp = 7.0 + mod(float(gl_InstanceID), 4.0) * 1.6;
-      float bz = max(0.0, transformed.z);
-      transformed.x += sin(uT * sp + ph) * bz * bz * ${amp.toFixed(2)} * 4.0;`);
+    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>` + SWIM_GLSL(len, amp));
+    // rounder, glossier 3D look: soft rim light + a small specular highlight
+    if (rim) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
+      { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
+        float fr = pow(1.0 - clamp(abs(dot(nn, vv)), 0.0, 1.0), 2.6);
+        float hs = pow(max(dot(nn, normalize(vec3(-0.35, 0.8, 0.5))), 0.0), 28.0);
+        outgoingLight += fr * 0.32 * vec3(0.75, 0.92, 1.0) + hs * 0.38; }
+      #include <opaque_fragment>`);
     if (mat.userData.hull) sh.vertexShader = sh.vertexShader.replace('transformed += normalize(normal) * uThick;', '');
   };
   return mat;
@@ -794,14 +806,12 @@ export function makeSchool(shape, n, pal, pattern, size) {
   size ??= n === 1 ? 1.7 + R() * 0.7 : n < 5 ? 0.9 + R() * 0.7 : n < 10 ? 0.6 + R() * 0.6 : 0.45 + R() * 0.35;
   const G = reefFishGeometries(shape, pal, pattern);
   const g = new THREE.Group();
-  const bodyMat = bendMaterial(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap: fishGradient(), side: THREE.DoubleSide }));
+  const bodyMat = bendMaterial(new THREE.MeshToonMaterial({ color: '#ffffff', vertexColors: true, gradientMap: fishGradient(), side: THREE.DoubleSide }), 0.35, G.len, true);
   const hullMat = new THREE.MeshBasicMaterial({ color: OUTLINE, side: THREE.BackSide });
   hullMat.onBeforeCompile = (sh) => { sh.uniforms.uT = { value: 0 }; hullMat.userData.sh = sh; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      transformed += normalize(normal) * 0.012;
-      float ph = float(gl_InstanceID) * 1.37; float sp = 7.0 + mod(float(gl_InstanceID), 4.0) * 1.6; float bz = max(0.0, transformed.z);
-      transformed.x += sin(uT * sp + ph) * bz * bz * 1.4;`); };
-  hullMat.customProgramCacheKey = () => 'schoolhull';
-  const inkMat = bendMaterial(new THREE.MeshBasicMaterial({ vertexColors: true }));
+      transformed += normalize(normal) * 0.012;` + SWIM_GLSL(G.len, 0.35)); };
+  hullMat.customProgramCacheKey = () => 'schoolhull' + G.len.toFixed(3);
+  const inkMat = bendMaterial(new THREE.MeshBasicMaterial({ vertexColors: true }), 0.35, G.len);
   const meshes = [new THREE.InstancedMesh(G.hull, hullMat, n), new THREE.InstancedMesh(G.body, bodyMat, n), new THREE.InstancedMesh(G.ink, inkMat, n)];
   meshes.forEach(m => { m.frustumCulled = false; g.add(m); });
   const spread = 0.55 + Math.sqrt(n) * 0.45 * size;
@@ -816,7 +826,7 @@ export function makeSchool(shape, n, pal, pattern, size) {
   return g;
 }
 let _fishGrad = null;
-function fishGradient() { if (_fishGrad) return _fishGrad; const d = new Uint8Array([190, 190, 190, 255, 238, 238, 238, 255, 255, 255, 255, 255]); _fishGrad = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); _fishGrad.minFilter = _fishGrad.magFilter = THREE.NearestFilter; _fishGrad.generateMipmaps = false; _fishGrad.needsUpdate = true; return _fishGrad; }
+function fishGradient() { if (_fishGrad) return _fishGrad; const d = new Uint8Array([150, 150, 150, 255, 214, 214, 214, 255, 255, 255, 255, 255]); _fishGrad = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); _fishGrad.minFilter = _fishGrad.magFilter = THREE.NearestFilter; _fishGrad.generateMipmaps = false; _fishGrad.needsUpdate = true; return _fishGrad; }
 let _toonRef = null; function toonGradientRef() { if (!_toonRef) _toonRef = toon('#fff').gradientMap; return _toonRef; }
 const _sm = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _sv = new THREE.Vector3(), _ss = new THREE.Vector3(), _se = new THREE.Euler();
 export function animateSchool(g, dt) {
@@ -826,17 +836,19 @@ export function animateSchool(g, dt) {
   u.fish.forEach((f, i) => {
     // each fish wanders on its own little path, and now and then darts off
     f.nextDart -= dt;
-    if (f.nextDart < 0) { f.nextDart = 1.5 + Math.random() * 4; f.dart.set((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.4).multiplyScalar(u.size); }
-    f.dart.multiplyScalar(Math.pow(0.35, dt));
+    f.dartT ||= new THREE.Vector3(); f.vel ||= new THREE.Vector3();
+    if (f.nextDart < 0) { f.nextDart = 1.5 + Math.random() * 4; f.dartT.set((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.4).multiplyScalar(u.size); }
+    f.dartT.multiplyScalar(Math.pow(0.4, dt));
+    f.dart.lerp(f.dartT, 1 - Math.pow(0.02, dt));                  // ease into the dart instead of jumping
     _sv.set(
       f.o.x + Math.sin(t * f.f[0] + f.ph[0]) * f.a + Math.sin(t * f.f[3] * 1.7 + f.ph[3]) * f.a * 0.35,
       f.o.y + Math.sin(t * f.f[1] + f.ph[1]) * f.a * 0.5,
       f.o.z + Math.cos(t * f.f[2] + f.ph[2]) * f.a + Math.sin(t * f.f[3] + f.ph[1]) * f.a * 0.3,
     ).addScaledVector(f.dart, -0.6);
     if (dt > 0) {
-      const vx = (_sv.x - f.prev.x) / dt, vy = (_sv.y - f.prev.y) / dt;
-      f.yaw += (THREE.MathUtils.clamp(-vx * 0.35, -0.9, 0.9) - f.yaw) * Math.min(1, dt * 4);
-      f.pitch += (THREE.MathUtils.clamp(vy * 0.3, -0.5, 0.5) - f.pitch) * Math.min(1, dt * 4);
+      f.vel.lerp(_ss.set((_sv.x - f.prev.x) / dt, (_sv.y - f.prev.y) / dt, 0), 1 - Math.pow(0.002, dt));
+      f.yaw += (THREE.MathUtils.clamp(-f.vel.x * 0.35, -0.9, 0.9) - f.yaw) * (1 - Math.pow(0.03, dt));
+      f.pitch += (THREE.MathUtils.clamp(f.vel.y * 0.3, -0.45, 0.45) - f.pitch) * (1 - Math.pow(0.03, dt));
     }
     f.prev.copy(_sv);
     _sq.setFromEuler(_se.set(f.pitch, f.yaw, -f.yaw * 0.3)); _ss.setScalar(f.s);
@@ -877,7 +889,7 @@ export function makeTurtle(baby = false) {
   for (const [sx, z, len, w] of [[-1, -0.55, 0.85, 0.4], [1, -0.55, 0.85, 0.4], [-1, 0.6, 0.45, 0.28], [1, 0.6, 0.45, 0.28]]) {
     const piv = new THREE.Group(); piv.position.set(sx * 0.7, 0.02, z); const f = flip(len, w); if (sx < 0) f.scale.x = -1; f.rotation.y = sx * 0.4 * (z < 0 ? 1 : -1.5); piv.add(f); rig.add(piv); flippers.push({ piv, sx, front: z < 0 });
   }
-  root.userData = { rig, flippers, t: Math.random() * 10 };
+  root.userData = { rig, flippers, head: headG, t: Math.random() * 10 };
   return root;
 }
 export function animateTurtle(tu, dt) {

@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import * as M from './models.js';
 import * as RF from './reef.js';
 import * as CR from './critters.js';
+import { glowAll, glowU } from './materials.js';
+import { sound } from './audio.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { makeRenderer, setupScene, makeFloor, rayTexture } from './env.js';
 import { STARTER_LEVELS, normalizeLevel, countPearls, loadCustom, LANE, HAZARDS } from './levels.js';
 
@@ -232,6 +238,7 @@ const KINDS = {
   hammer: { make: () => CR.makeHammerhead(), shape: () => [] },
   seasnake: { make: () => CR.makeSeaSnake(), shape: () => [] },
   babyturtle: { make: () => M.makeTurtle(true), shape: () => [] },
+  grazer: { make: () => CR.makeGrazer(ri(0, 7)), shape: () => [] },
   shrimp: { make: () => CR.makeShrimp(ri(0, 3)), shape: () => [] },
   magnifica: { make: () => anemK(RF.makeMagnifica(ri(0, 3), rf(1.5, 2.0))), shape: () => [] },
   gigantea: { make: () => anemK(RF.makeGigantea(ri(0, 3), rf(1.6, 2.1))), shape: () => [] },
@@ -268,11 +275,12 @@ function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 function rf(a, b) { return a + Math.random() * (b - a); }
 
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
+const NOGLOW = ['bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
   if (kind === 'heroanem' && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
   let mesh = pool.pop();
-  if (!mesh) { mesh = KINDS[kind].make(); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
+  if (!mesh) { mesh = KINDS[kind].make(); if (!NOGLOW.includes(kind)) glowAll(mesh); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
   const s = opt.scale ?? 1;
   mesh.scale.setScalar(s);
   mesh.rotation.set(0, opt.ry ?? 0, 0);
@@ -482,6 +490,7 @@ function sharedLife(z, bg) {
   else if (Math.random() < 0.01) { const sd = Math.random() < 0.5 ? -1 : 1; spawn('whaleshark', sd * rf(9, 12), rf(7.5, 9.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: 0, swim: [0, -rf(1.8, 2.6)] }); }
   if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3), y0 = rf(4.4, 5.6); for (let k = 0; k < n; k++) spawn('babyturtle', -dir * (10 + k * rf(0.9, 1.6)), y0 + rf(-0.5, 0.5), z - 6 + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
   if (Math.random() < 0.22) spawn('xmas', side * rf(2.4, 3.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15), xmas: true });
+  if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
   if (Math.random() < 0.16) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
@@ -538,13 +547,14 @@ function hurt(msg = 'Ouch!') {
   if (buddy) {
     const b = buddy; buddy = null;
     objs.push({ kind: 'flee', mesh: b, x: b.position.x, y: b.position.y, z: b.position.z, shapes: [], noPool: true, flee: P.x > 0 ? -1 : 1 });
-    invuln = 1.2; toast('Buddy saved you!'); updateHud(); return true;
+    invuln = 1.2; sound.hurt(); toast('Buddy saved you!'); updateHud(); return true;
   }
-  lives--; invuln = 1.6; updateHud();
+  lives--; invuln = 1.6; updateHud(); sound.hurt();
   if (lives <= 0) gameOver(); else toast(msg);
   return true;
 }
 function bump(o) { // corals & rocks: soft nudge, no damage
+  if (t - (bump.last || -9) > 0.5) { bump.last = t; sound.bump(); }
   const side = P.x >= o.x ? 1 : -1;
   P.vx += side * 9; P.tx = THREE.MathUtils.clamp(P.tx + side * 1.1, B.minX, B.maxX);
   shake = Math.max(shake, 0.12);
@@ -555,7 +565,7 @@ function bump(o) { // corals & rocks: soft nudge, no damage
 function useToxin() {
   if (mode === 'caught') { releaseFromShark(); return; }
   if (mode !== 'play' || toxin.cd > 0) return;
-  toxin.cd = toxin.CD;
+  toxin.cd = toxin.CD; sound.toxin();
   puffCloud(P.x, P.y, 0, 1);
   // scare everything nearby
   for (const o of objs) {
@@ -611,6 +621,9 @@ addEventListener('keydown', (e) => {
   if (k.startsWith('arrow')) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+const sndBtn = $('soundBtn'); const sndUI = () => { sndBtn.textContent = sound.on ? '🔊' : '🔇'; sndBtn.setAttribute('aria-label', sound.on ? 'Mute sound (M)' : 'Turn sound on (M)'); }; sndUI();
+sndBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound.toggle(); sndUI(); });
+addEventListener('keydown', (e) => { if (e.key === 'm' || e.key === 'M') { sound.toggle(); sndUI(); } });
 $('toxinBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); useToxin(); });
 
 // ------------------------------------------------------------------ HUD & menus
@@ -621,14 +634,16 @@ function updateHud() {
   $('buddy').classList.toggle('on', !!buddy);
 }
 function toast(txt) { const el = $('toast'); el.textContent = txt; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
-function showOnly(id) { ['menu', 'over', 'win'].forEach(k => $(k).classList.toggle('hidden', k !== id)); $('hud').classList.toggle('hidden', !!id); $('toxinBtn').classList.toggle('hidden', !!id); }
+function showOnly(id) {
+  if (id === 'menu') sound.setMode('menu'); ['menu', 'over', 'win'].forEach(k => $(k).classList.toggle('hidden', k !== id)); $('hud').classList.toggle('hidden', !!id); $('toxinBtn').classList.toggle('hidden', !!id); }
 function gameOver() {
+  sound.over(); sound.setMode('over');
   mode = 'over'; stars.visible = true; caught = null; $('caught').classList.remove('show');
   $('overText').textContent = `${level.name}: ${Math.floor(s)} of ${level.length} m · ${pearls} pearls`;
   setTimeout(() => { if (mode === 'over') { showOnly('over'); stars.visible = false; startParty(); } }, 1400);
 }
 function win() {
-  mode = 'win'; startParty();
+  mode = 'win'; startParty(); sound.win(); sound.setMode('win');
   const key = level.name; const prev = best[key] || 0;
   if (pearls > prev) { best[key] = pearls; try { localStorage.setItem('cubi_best', JSON.stringify(best)); } catch (e) {} }
   const ratio = pearlTotal ? pearls / pearlTotal : 1;
@@ -640,7 +655,7 @@ function win() {
   setTimeout(() => { if (mode === 'win') showOnly('win'); }, 1200);
 }
 function start(lv, idx) {
-  if (typeof splash !== 'undefined' && splash.isConnected) { splash.remove(); } loadLevel(lv, idx); mode = 'play'; resetWorld(); showOnly(null); toast(level.name); updateHud(); }
+  if (typeof splash !== 'undefined' && splash.isConnected) { splash.remove(); } loadLevel(lv, idx); mode = 'play'; sound.start(); sound.setMode('play'); resetWorld(); showOnly(null); toast(level.name); updateHud(); }
 function buildMenu() {
   const list = $('levels'); list.innerHTML = '';
   const add = (lv, idx, label) => {
@@ -694,9 +709,23 @@ addEventListener('keydown', (e) => { if (mode === 'splash' && (e.key === 'Enter'
 if (/[?&]play=custom/.test(location.search)) { const c = loadCustom(); if (c) setTimeout(() => start(c, -1), 50); }
 
 // ------------------------------------------------------------------ resize
+// soft bloom: only the brightest, glowing colours (coral tips, anemones, fish) get a halo of their own colour
+const BLOOM = !/[?&]nobloom/.test(location.search);
+let composer = null, bloomPass = null;
+if (BLOOM) {
+  const rt = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: 4 });
+  composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.35, 0.93);
+  composer.addPass(bloomPass);
+  composer.addPass(new OutputPass());
+}
+renderer.info.autoReset = false;
+function renderFrame() { renderer.info.reset(); if (composer) composer.render(); else renderer.render(scene, camera); }
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
   camera.aspect = w / h;
   camera.fov = w / h < 0.8 ? 70 : w / h < 1.2 ? 64 : 56;
   camera.updateProjectionMatrix();
@@ -711,10 +740,11 @@ camera.position.set(0, 2.8, 3.2);
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   step(dt);
-  renderer.render(scene, camera);
+  renderFrame();
   requestAnimationFrame(frame);
 }
 function step(dt) {
+  glowU.uGlowT.value += dt;
   t += dt;
   const progress = level.length ? Math.min(1, s / level.length) : 0;
   if (mode === 'play' || mode === 'caught') speed = THREE.MathUtils.lerp(level.speed, level.speedEnd, progress);
@@ -722,7 +752,7 @@ function step(dt) {
   if (mode === 'play' && whaleTimes.length && progress > whaleTimes[0]) {
     whaleTimes.shift(); const sd = Math.random() < 0.5 ? -1 : 1;
     spawn('whaleshark', sd * rf(5.5, 6.5), rf(5.8, 6.6), -46, { solid: false, scale: rf(2.2, 2.5), ry: -sd * 0.12, swim: [-sd * 0.12, -speed * 0.7] });
-    toast('A whale shark is passing by!');
+    toast('A whale shark is passing by!'); sound.whale();
   }
   else if (mode === 'menu' || mode === 'splash') speed = mode === 'splash' ? 3 : 5;
   else speed = Math.max(0, speed - dt * 6);
@@ -885,6 +915,7 @@ function step(dt) {
       else if (o.kind === 'whale') RF.animateWhale(o.mesh, dt);
       else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
       else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
+      else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
       else if (o.kind === 'shrimp' && o.z > -25) CR.animateShrimp(o.mesh, dt);
       else if (o.kind === 'hammer') CR.animateHammerhead(o.mesh, dt);
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
@@ -914,7 +945,7 @@ function step(dt) {
     if (mode === 'play' && Math.abs(o.z) < 2.4) {
       if (o.pearl && !o.hit) {
         const dx = P.x - o.x, dy = P.y - o.y, dz = o.z;
-        if (dx * dx + dy * dy + dz * dz < 0.9) { o.hit = true; pearls++; cubi.userData.chomp = 0.3; updateHud(); o.z = 99; }
+        if (dx * dx + dy * dy + dz * dz < 0.9) { o.hit = true; pearls++; sound.pearl(); cubi.userData.chomp = 0.3; updateHud(); o.z = 99; }
       } else if (!o.hit && o.shapes.length && hitShape(o)) {
         o.hit = true;
         if (o.hazard) hurt(); else if (o.bump) bump(o);
@@ -962,7 +993,7 @@ function nearestBubble(pos, maxD) {
   for (const b of blubs) { if (b.life <= 0.15 || !b.m.visible) continue; const d = b.m.position.distanceTo(pos); if (d < bd) { bd = d; best = b; } }
   return best;
 }
-function popBubble(b) { b.life = 0; b.m.visible = false; popHeart(b.m.position.x, b.m.position.y + 0.1, b.m.position.z, 0.35); }
+function popBubble(b) { sound.pop(); b.life = 0; b.m.visible = false; popHeart(b.m.position.x, b.m.position.y + 0.1, b.m.position.z, 0.35); }
 const _pt = new THREE.Vector3(), _cv = new THREE.Vector3();
 function updateParty(dt) {
   const pt = (party.t += dt);
@@ -971,7 +1002,7 @@ function updateParty(dt) {
   cubi.rotation.y = angLerp(cubi.rotation.y, Math.PI + Math.sin(pt * 0.6) * 0.25, 1 - Math.pow(0.001, dt));
   cubi.rotation.z = Math.sin(pt * 1.3) * 0.05; cubi.rotation.x = 0;
   cubi.position.x = P.x; cubi.position.y = P.y + Math.sin(pt * 1.6) * 0.05;
-  if (pt > 1.0 && (party.nextBlow ??= 1.0) < pt) { party.nextBlow = pt + 0.9 + Math.random() * 0.6; cubi.userData.chomp = 0.3; emitBlubAt(P.x + (Math.random() - 0.5) * 0.2, P.y - 0.05, 0.75); }
+  if (pt > 1.0 && (party.nextBlow ??= 1.0) < pt) { party.nextBlow = pt + 0.9 + Math.random() * 0.6; cubi.userData.chomp = 0.3; sound.blub(); emitBlubAt(P.x + (Math.random() - 0.5) * 0.2, P.y - 0.05, 0.75); }
   let target;
   const bub = pt > 1.3 && nearestBubble(c.position, 3.5);
   if (bub) { target = _pt.copy(bub.m.position).add(new THREE.Vector3(0.18, -0.05, 0)); if (c.position.distanceTo(bub.m.position) < 0.32) { popBubble(bub); party.happy = pt; } }
@@ -1032,7 +1063,7 @@ function updateCrosser(o, dt) {
   if (o.sick) { o.mesh.rotation.y = o.flee > 0 ? -Math.PI / 2 : Math.PI / 2; return; }
   if (!o.go) {
     o.x = -o.crosser * 12;
-    if (o.z > -24) { o.go = true; o.vx = o.crosser * 12 / (24 / Math.max(speed, 2)); if (mode === 'play') toast(o.warn); }
+    if (o.z > -24) { o.go = true; o.vx = o.crosser * 12 / (24 / Math.max(speed, 2)); if (mode === 'play') { toast(o.warn); sound.warn(); } }
   } else o.x += o.vx * dt;
   if (mode === 'play' && invuln <= 0 && Math.abs(o.z) < 1.6) {
     const s = o.s, cx = o.x + o.crosser * o.cOff * s, along = THREE.MathUtils.clamp(P.x - cx, -o.halfL * s, o.halfL * s);
@@ -1140,11 +1171,12 @@ function updateStream(o) {
 
 loadLevel(STARTER_LEVELS[0], 0);
 resetWorld();
-if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderer.render(scene, camera);
+if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
+window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
 window.__game = {
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
-  sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderer.render(scene, camera); },
+  sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, objs: objs.length }),
   breakdown: () => { const r = {}; objs.forEach(o => { let n = 0, tr = 0; o.mesh.traverse(m => { if (m.isMesh || m.isPoints || m.isLineSegments || m.isSprite) { n++; const gg = m.geometry; if (gg) tr += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); } }); r[o.kind] = r[o.kind] || [0, 0, 0]; r[o.kind][0]++; r[o.kind][1] += n; r[o.kind][2] += Math.round(tr); }); return r; },
 };

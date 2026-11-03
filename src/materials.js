@@ -108,3 +108,25 @@ export function finMesh(len, spread, lobes, color, rayColor, edge = OUTLINE, edg
   }
   return g;
 }
+
+// ------------------------------------------------------------------
+// Living glow: vivid colours give off a soft light of their own (scaled by saturation, so
+// rocks, sand, eyes and white stripes stay as they are), with a slow shimmer.
+// ------------------------------------------------------------------
+export const glowU = { uGlowT: { value: 0 }, uGlowK: { value: 0.4 } };
+export function glowify(mat) {
+  if (!mat || !mat.isMeshToonMaterial || mat.userData.glow || mat.userData.noGlow) return;
+  mat.userData.glow = true;
+  const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey;
+  const prevStr = prevKey === THREE.Material.prototype.customProgramCacheKey ? prev.toString() : null;
+  mat.onBeforeCompile = function (sh, r) {
+    prev.call(this, sh, r);
+    Object.assign(sh.uniforms, glowU);
+    sh.fragmentShader = 'uniform float uGlowT, uGlowK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      { vec3 gc = diffuseColor.rgb; float sat = max(gc.r, max(gc.g, gc.b)) - min(gc.r, min(gc.g, gc.b));
+        totalEmissiveRadiance += gc * uGlowK * smoothstep(0.3, 0.8, sat) * (1.0 + 0.2 * sin(uGlowT * 1.3 + vViewPosition.x * 0.45 + vViewPosition.y * 0.7)); }`);
+  };
+  mat.customProgramCacheKey = function () { return (prevStr ?? prevKey.call(this)) + '|glow'; };
+  mat.needsUpdate = true;
+}
+export function glowAll(obj) { obj.traverse(m => { if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach(glowify); }); return obj; }
