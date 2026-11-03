@@ -134,6 +134,7 @@ export const sound = {
   },
   bump() { if (!ok()) return; blip(T(), 220, 160, 0.12, 0.09, sfxBus); },
   blub() { if (!ok()) return; const f = 350 + Math.random() * 200; blip(T(), f, f * 2.4, 0.1, 0.09, sfxBus); },
+  boop() { if (!ok()) return; const t = T(); blip(t, 520, 760, 0.1, 0.06, sfxBus); kalimba(79 + Math.floor(Math.random() * 3) * 2, t + 0.02, 0.07, sfxBus, false); },
   pop() { if (!ok()) return; const t = T(); blip(t, 900, 1800, 0.12, 0.04, sfxBus); kalimba(84 + Math.floor(Math.random() * 3) * 2, t + 0.03, 0.08, sfxBus, false); },
   warn() { if (!ok()) return; const t = T(); kalimba(81, t, 0.14, sfxBus, false); kalimba(81, t + 0.16, 0.14, sfxBus, false); },
   whale() {   // a soft, far-away whale-shark "hum"

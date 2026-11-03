@@ -8,7 +8,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { makeRenderer, setupScene, makeFloor, rayTexture } from './env.js';
+import { makeRenderer, setupScene, makeFloor, rayTexture, causticClock } from './env.js';
 import { STARTER_LEVELS, normalizeLevel, countPearls, loadCustom, LANE, HAZARDS } from './levels.js';
 
 // ------------------------------------------------------------------ setup
@@ -146,6 +146,12 @@ const blubRing = new THREE.MeshBasicMaterial({ color: '#5FB8D8', side: THREE.Bac
 const blubs = [];
 for (let i = 0; i < 12; i++) { const m = new THREE.Mesh(blubGeo, blubMat); const r = new THREE.Mesh(blubGeo, blubRing); r.scale.setScalar(1.18); m.add(r); m.visible = false; scene.add(m); blubs.push({ m, life: 0, vx: 0 }); }
 let blubNext = 0;
+function emitPartyBubble(x, y, z) {
+  const b = blubs.find(q => q.life <= 0) || blubs[blubNext++ % blubs.length];
+  b.m.visible = true; b.party = true; b.life = 9; b.vx = Math.random(); b.nudges = 0; b.maxN = 2 + Math.floor(Math.random() * 3);
+  b.pv = (b.pv || new THREE.Vector3()).set((Math.random() - 0.5) * 0.4, 0.5, 0.15); b.r = 0.1 + Math.random() * 0.04;
+  b.m.position.set(x, y, z); b.m.scale.setScalar(b.r);
+}
 function emitBlubAt(x, y, z) { for (let k = 0; k < 2; k++) { const b = blubs[blubNext++ % blubs.length]; b.m.visible = true; b.life = 1.3; b.vx = (Math.random() - 0.5) * 0.3; b.m.position.set(x + (Math.random() - 0.5) * 0.15, y + k * 0.12, z); b.m.scale.setScalar(0.06 + Math.random() * 0.03); } }
 function emitBlub(n = 1) {
   const head = new THREE.Vector3(0, -0.12, -0.62).applyMatrix4(cubi.matrixWorld);
@@ -177,7 +183,7 @@ function startParty() {
   clown.scale.setScalar(1.15);
   party = { clown, t: 0, own, lastHeart: 0 };
 }
-function endParty() { if (party) { scene.remove(party.clown); party = null; } hearts.forEach(h => { h.life = 0; h.m.visible = false; }); }
+function endParty() { blubs.forEach(b => { if (b.party) { b.party = false; b.life = 0; b.m.visible = false; } }); if (party) { scene.remove(party.clown); party = null; } hearts.forEach(h => { h.life = 0; h.m.visible = false; }); }
 const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
 // marine snow
@@ -347,7 +353,7 @@ function resetWorld() {
   endParty(); ink.level = 0;
   s = 0; pearls = 0; lives = 3; invuln = 0; nextDecor = 0; shake = 0; caught = null; toxin.cd = 0;
   P.x = 0; P.y = 2.4; P.vx = P.vy = 0; P.tx = 0; P.ty = 2.4;
-  cubi.rotation.set(0, 0, 0); cubi.scale.setScalar(1); stars.visible = false; cubi.visible = true;
+  cubi.rotation.order = 'XYZ'; cubi.rotation.set(0, 0, 0); cubi.scale.setScalar(1); stars.visible = false; cubi.visible = true;
   for (let z = -SPAWN_AHEAD; z < 6; z += 3.5) decorRow(z);
   wreckDone = false;
   if (mode === 'menu' || mode === 'splash') spawn('wreck', 7.5, 0, -16, { solid: false, ry: 0.5, scale: 0.9 });
@@ -744,7 +750,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 function step(dt) {
-  glowU.uGlowT.value += dt;
+  glowU.uGlowT.value += dt; causticClock.value += dt;
   t += dt;
   const progress = level.length ? Math.min(1, s / level.length) : 0;
   if (mode === 'play' || mode === 'caught') speed = THREE.MathUtils.lerp(level.speed, level.speedEnd, progress);
@@ -816,7 +822,7 @@ function step(dt) {
   }
 
   // Cubi pose
-  cubi.position.set(P.x, P.y, mode === 'caught' ? 0.55 : 0);
+  if (!party) cubi.position.set(P.x, P.y, mode === 'caught' ? 0.55 : 0);
   if (mode === 'over' && !party) { cubi.rotation.z += dt * 2.2; cubi.rotation.x = Math.sin(t * 3) * 0.2; }
   else if (mode === 'over') { /* end scene */ }
   else if (mode === 'menu') cubi.rotation.set(Math.sin(t * 1.1) * 0.08, Math.PI + Math.sin(t * 0.6) * 0.45, Math.sin(t * 0.9) * 0.06);
@@ -847,7 +853,20 @@ function step(dt) {
   cubi.updateMatrixWorld();
   if (cubi.userData.blub && cubi.visible && Math.random() < 0.6) emitBlub(1 + (Math.random() < 0.3 ? 1 : 0));
   if (cubi.userData.chomp > 0.28) emitBlub(3);
-  blubs.forEach(b => { if (b.life <= 0) { b.m.visible = false; return; } b.life -= dt; b.m.position.y += dt * 0.9; b.m.position.x += Math.sin(t * 6 + b.vx * 10) * dt * 0.15 + b.vx * dt; b.m.position.z += move * 0.85; if (b.life < 0.2) b.m.scale.multiplyScalar(1 + dt * 4); });
+  blubs.forEach(b => {
+    if (b.party) {
+      if (b.life <= 0) { b.m.visible = false; b.party = false; return; }
+      b.life -= dt; const p = b.m.position;
+      p.addScaledVector(b.pv, dt); b.pv.multiplyScalar(Math.pow(0.45, dt));
+      p.y += dt * 0.18; p.x += Math.sin(t * 2 + b.vx * 10) * dt * 0.08;
+      if (p.x < P.x - 2.4 || p.x > P.x + 2.4) { b.pv.x = -b.pv.x * 0.7; p.x = THREE.MathUtils.clamp(p.x, P.x - 2.4, P.x + 2.4); }
+      if (p.z < -2.2 || p.z > 0.9) { b.pv.z = -b.pv.z * 0.7; p.z = THREE.MathUtils.clamp(p.z, -2.2, 0.9); }
+      if (p.y < P.y - 1.1 || p.y > P.y + 2.3) { b.pv.y = -b.pv.y * 0.7; p.y = THREE.MathUtils.clamp(p.y, P.y - 1.1, P.y + 2.3); }
+      b.m.scale.setScalar(b.r * (1 + Math.sin(t * 5 + b.vx * 20) * 0.04));
+      if (b.life <= 0) popBubble(b);
+      return;
+    }
+    if (b.life <= 0) { b.m.visible = false; return; } b.life -= dt; b.m.position.y += dt * 0.9; b.m.position.x += Math.sin(t * 6 + b.vx * 10) * dt * 0.15 + b.vx * dt; b.m.position.z += move * 0.85; if (b.life < 0.2) b.m.scale.multiplyScalar(1 + dt * 4); });
 
   // toxin
   if (toxin.cd > 0) toxin.cd = Math.max(0, toxin.cd - dt);
@@ -993,30 +1012,72 @@ function nearestBubble(pos, maxD) {
   for (const b of blubs) { if (b.life <= 0.15 || !b.m.visible) continue; const d = b.m.position.distanceTo(pos); if (d < bd) { bd = d; best = b; } }
   return best;
 }
-function popBubble(b) { sound.pop(); b.life = 0; b.m.visible = false; popHeart(b.m.position.x, b.m.position.y + 0.1, b.m.position.z, 0.35); }
+function popBubble(b) { sound.pop(); b.life = 0; b.party = false; if (party && party.cur === b) party.cur = null; b.m.visible = false; popHeart(b.m.position.x, b.m.position.y + 0.1, b.m.position.z, 0.35); }
 const _pt = new THREE.Vector3(), _cv = new THREE.Vector3();
+const _hv = new THREE.Vector3(), _cv2 = new THREE.Vector3();
+// face along a velocity (models look down -Z), with pitch and a gentle bank into turns
+function steerFace(obj, v, st, dt, bankK = 0.35) {
+  obj.rotation.order = 'YXZ';
+  const sp = Math.hypot(v.x, v.z);
+  if (sp > 0.05) {
+    const yaw = Math.atan2(-v.x, -v.z), prev = obj.rotation.y;
+    obj.rotation.y = angLerp(prev, yaw, 1 - Math.pow(0.02, dt));
+    const turn = Math.atan2(Math.sin(obj.rotation.y - prev), Math.cos(obj.rotation.y - prev)) / Math.max(dt, 1e-3);
+    st.bank = THREE.MathUtils.lerp(st.bank || 0, THREE.MathUtils.clamp(-turn * bankK, -0.5, 0.5), 1 - Math.pow(0.05, dt));
+  }
+  obj.rotation.x = THREE.MathUtils.lerp(obj.rotation.x, THREE.MathUtils.clamp(v.y * 0.35, -0.45, 0.45), 1 - Math.pow(0.05, dt));
+  obj.rotation.z = st.bank || 0;
+}
 function updateParty(dt) {
   const pt = (party.t += dt);
   const c = party.clown;
-  // Cubi faces the camera and blows bubbles; the clownfish chases them and pops them, keeping a friendly gap
-  cubi.rotation.y = angLerp(cubi.rotation.y, Math.PI + Math.sin(pt * 0.6) * 0.25, 1 - Math.pow(0.001, dt));
-  cubi.rotation.z = Math.sin(pt * 1.3) * 0.05; cubi.rotation.x = 0;
-  cubi.position.x = P.x; cubi.position.y = P.y + Math.sin(pt * 1.6) * 0.05;
-  if (pt > 1.0 && (party.nextBlow ??= 1.0) < pt) { party.nextBlow = pt + 0.9 + Math.random() * 0.6; cubi.userData.chomp = 0.3; sound.blub(); emitBlubAt(P.x + (Math.random() - 0.5) * 0.2, P.y - 0.05, 0.75); }
+  party.cx ??= THREE.MathUtils.clamp(P.x, -0.3, 0.3); party.cy ??= THREE.MathUtils.clamp(P.y, 1.8, 3.0);
+  party.cubiSt ||= {}; party.clownSt ||= { v: new THREE.Vector3() };
+  // Cubi: slow, lazy loops through the scene (toward the camera, sideways, away) so we see it from every side
+  const w = 0.42, k = Math.min(1, pt / 1.5);
+  _hv.set(party.cx + Math.sin(pt * w) * 1.3 * k, party.cy + Math.sin(pt * w * 2) * 0.3 * k + Math.sin(pt * 1.6) * 0.04, -0.35 * k - Math.cos(pt * w) * 0.85 * k + (1 - k) * cubi.position.z);
+  const cv = _cv2.copy(_hv).sub(cubi.position).divideScalar(Math.max(dt, 1e-3));
+  cubi.position.lerp(_hv, 1 - Math.pow(0.02, dt));
+  if (pt > 0.3) steerFace(cubi, cv, party.cubiSt, dt, 0.3);
+  P.x = party.cx; P.y = party.cy;                           // bubbles stay around the centre of the stage
+  // blow a bubble every now and then (from Cubi's mouth, wherever it is facing)
+  const live = blubs.filter(b => b.party && b.life > 0).length;
+  if (pt > 1.0 && (party.nextBlow ??= 1.0) < pt && live < 4) {
+    party.nextBlow = pt + 1.4 + Math.random() * 1.0; cubi.userData.chomp = 0.3; sound.blub();
+    cubi.updateMatrixWorld(); const mouth = new THREE.Vector3(0, -0.12, -0.7).applyMatrix4(cubi.matrixWorld);
+    emitPartyBubble(mouth.x, mouth.y, mouth.z);
+  }
+  // clownfish: pick a bubble, boop it away, follow it, boop again ... until it bursts; then the next one
   let target;
-  const bub = pt > 1.3 && nearestBubble(c.position, 3.5);
-  if (bub) { target = _pt.copy(bub.m.position).add(new THREE.Vector3(0.18, -0.05, 0)); if (c.position.distanceTo(bub.m.position) < 0.32) { popBubble(bub); party.happy = pt; } }
-  else target = _pt.set(P.x + 1.35 + Math.sin(pt * 0.8) * 0.2, P.y + 0.3 + Math.sin(pt * 1.4) * 0.15, 0.3);
-  // never bump into Cubi
-  _cv.copy(target).sub(cubi.position); if (_cv.length() < 1.5) target.copy(cubi.position).addScaledVector(_cv.normalize(), 1.5);
-  const prev = c.position.clone();
-  c.position.lerp(target, 1 - Math.pow(pt < 1.3 ? 0.02 : 0.08, dt));
-  const vx = (c.position.x - prev.x) / Math.max(dt, 1e-3);
-  // face the camera, just leaning gently toward where it swims (no spinning)
-  c.rotation.y = angLerp(c.rotation.y, pt < 1.3 ? Math.PI / 2 : Math.PI - THREE.MathUtils.clamp(vx * 0.35, -0.6, 0.6), 1 - Math.pow(0.002, dt));
+  if (party.cur && !(party.cur.party && party.cur.life > 0)) party.cur = null;
+  if (!party.cur && pt > 1.3) { let bd = 9; for (const b of blubs) if (b.party && b.life > 0 && b.m.position.distanceTo(cubi.position) > 0.7) { const d = b.m.position.distanceTo(c.position); if (d < bd) { bd = d; party.cur = b; } } }
+  const bub = party.cur;
+  if (bub) {
+    const bp = bub.m.position;
+    party.dir ||= new THREE.Vector3();
+    if (!bub.dirSet) { bub.dirSet = true; const away = bp.x >= party.cx ? 1 : -1; party.dir.set(away * (0.6 + Math.random() * 0.5) * (Math.abs(bp.x - party.cx) > 2.2 ? -1 : 1), 0.3 + Math.random() * 0.6, (Math.random() - 0.5) * 0.6).normalize(); }
+    target = _pt.copy(bp).addScaledVector(party.dir, -0.32);
+    if (c.position.distanceTo(bp) < 0.38 && pt > (party.nextBoop || 0)) {
+      party.nextBoop = pt + 0.45; party.happy = pt;
+      if (++bub.nudges >= bub.maxN) popBubble(bub);
+      else { bub.pv.copy(party.dir).multiplyScalar(1.2 + Math.random() * 0.6); sound.boop(); bub.dirSet = false; }
+    }
+  } else {
+    // no bubble: swim a playful little orbit around Cubi
+    const a = pt * 0.9;
+    target = _pt.set(cubi.position.x + Math.cos(a) * 1.4, cubi.position.y + 0.35 + Math.sin(a * 1.7) * 0.25, cubi.position.z + Math.sin(a) * 0.9);
+  }
+  // natural steering (spring + drag) instead of snapping, and never overlap Cubi
+  const st = party.clownSt, kS = pt < 1.3 ? 3 : bub ? 9 : 5;
+  st.v.addScaledVector(_cv2.copy(target).sub(c.position), kS * dt).multiplyScalar(Math.pow(bub ? 0.12 : 0.2, dt));
+  if (st.v.length() > 3.2) st.v.setLength(3.2);
+  c.position.addScaledVector(st.v, dt);
+  _cv2.copy(c.position).sub(cubi.position); const dd = _cv2.length();
+  if (dd < 1.0) { c.position.copy(cubi.position).addScaledVector(_cv2.normalize(), 1.0); st.v.addScaledVector(_cv2, 1.5); }
+  steerFace(c, st.v, st, dt, 0.4);
   const wig = party.happy && pt - party.happy < 0.5 ? Math.sin((pt - party.happy) * 30) * 0.2 : 0;
-  c.rotation.z = wig; c.rotation.x = 0;
-  M.animateFish(c, dt, 0.5 + Math.min(0.5, Math.abs(vx) * 0.3));
+  c.rotation.z += wig;
+  M.animateFish(c, dt, 0.4 + Math.min(0.6, st.v.length() * 0.25));
 }
 function updateHearts(dt) {
   hearts.forEach(h => {

@@ -64,7 +64,7 @@ export function causticTexture(seed = 1) {
       if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
     }
     const e = Math.sqrt(d2) - Math.sqrt(d1);
-    const v = Math.max(0, 1 - e / 5); const b = Math.pow(v, 2.6) * 255;
+    const v = Math.max(0, 1 - e / 9); const b = Math.pow(v, 1.7) * 255;
     const k = (y * S + x) * 4; img.data[k] = b; img.data[k + 1] = b; img.data[k + 2] = b; img.data[k + 3] = 255;
   }
   g.putImageData(img, 0, 0);
@@ -80,10 +80,23 @@ export function rayTexture() {
   const t = new THREE.CanvasTexture(c); return t;
 }
 
+export const causticClock = { value: 0 };
 export function makeFloor() {
   const sand = sandTexture(); sand.repeat.set(10, 50);
   const caus = causticTexture(3); caus.repeat.set(22, 110);
-  const mat = new THREE.MeshLambertMaterial({ map: sand, color: new THREE.Color('#F4E0B4'), emissive: new THREE.Color('#CFFAFF'), emissiveMap: caus, emissiveIntensity: 0.22 });
+  const mat = new THREE.MeshLambertMaterial({ map: sand, color: new THREE.Color('#F4E0B4'), emissive: new THREE.Color('#CFFAFF'), emissiveMap: caus, emissiveIntensity: 0.34 });
+  // natural caustics: two soft light webs drift and wobble in different directions; only where they overlap
+  // does light gather (like real sunlight through waves). Fades out with distance so it never reads as tiles.
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uCT = causticClock;
+    sh.fragmentShader = 'uniform float uCT;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `
+      { vec2 u = vEmissiveMapUv;
+        float a = texture2D(emissiveMap, u + vec2(sin(u.y * 1.9 + uCT * 0.7) * 0.035, uCT * 0.035)).r;
+        float b = texture2D(emissiveMap, u * 0.77 + vec2(0.41 - uCT * 0.028, cos(u.x * 1.4 + uCT * 0.55) * 0.045)).r;
+        float cst = min(a, b) * 1.6;
+        float fade = 1.0 - smoothstep(9.0, 34.0, length(vViewPosition));
+        totalEmissiveRadiance *= cst * fade; }`);
+  };
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 300, 1, 1), mat);
   floor.rotation.x = -Math.PI / 2; floor.position.z = -120; floor.receiveShadow = true;
   return { floor, sand, caus };
