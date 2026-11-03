@@ -4,6 +4,7 @@ import * as RF from './reef.js';
 import * as CR from './critters.js';
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
+import * as LB from './leaderboard.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -647,11 +648,57 @@ function updateHud() {
 }
 function toast(txt) { const el = $('toast'); el.textContent = txt; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
 function showOnly(id) {
+  ['ranks'].forEach(k => $(k).classList.add('hidden'));
   if (id === 'menu') sound.setMode('menu'); ['menu', 'over', 'win'].forEach(k => $(k).classList.toggle('hidden', k !== id)); $('hud').classList.toggle('hidden', !!id); $('toxinBtn').classList.toggle('hidden', !!id); }
+// ------------------------------------------------------------------ ranking
+const esc = (t) => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function boardHTML(rows, me) {
+  if (!rows.length) return '<ol class="board"><li><span class="n">No scores yet. Be the first!</span></li></ol>';
+  let marked = false;
+  return '<ol class="board">' + rows.map(r => { const isMe = !marked && me && r.name === me.name && r.score === me.score; if (isMe) marked = true;
+    return `<li class="${isMe ? 'me' : ''}"><span class="n">${esc(r.name)}</span><span class="p">${r.pearls} 🫧${r.won ? ' ✓' : ''}</span><b>${r.score}</b></li>`; }).join('') + '</ol>';
+}
+const noteText = (isOnline) => isOnline ? 'World ranking' : (LB.online() ? 'Offline: showing scores from this device' : 'Ranking on this device');
+async function showBoard(el, lvl, me) {
+  const box = el.querySelector('.boardBox'); if (!box) return;
+  box.innerHTML = '<p>Loading ranking…</p>';
+  const { rows, online } = await LB.topScores(lvl);
+  box.innerHTML = boardHTML(rows, me) + `<p class="lbnote">${noteText(online)}</p>`;
+}
+function renderRank(id, res) {
+  const el = $(id);
+  if (levelIdx < 0) { el.innerHTML = `<div class="score">${res.score} points</div>`; return; }
+  el.innerHTML = `<div class="score">${res.score} points</div>
+    <form class="saveForm"><input name="n" maxlength="16" autocomplete="nickname" placeholder="Your name" aria-label="Your name" value="${esc(LB.savedName())}"><button type="submit">Save</button></form>
+    <div class="boardBox"></div>`;
+  const form = el.querySelector('form'), input = form.querySelector('input'), btn = form.querySelector('button');
+  form.onsubmit = async (e) => {
+    e.preventDefault(); const name = LB.cleanName(input.value);
+    if (!name) { input.focus(); return; }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try { await LB.submitScore({ ...res, name, level: levelIdx }); form.remove(); sound.start(); showBoard(el, levelIdx, { name, score: res.score }); }
+    catch (err) { btn.disabled = false; btn.textContent = 'Retry'; toast('Could not save'); }
+  };
+  showBoard(el, levelIdx, null);
+}
+let rankLvl = 0;
+function openRanks() {
+  ['menu', 'over', 'win'].forEach(k => $(k).classList.add('hidden')); $('ranks').classList.remove('hidden');
+  const tabs = $('rankTabs'); tabs.innerHTML = '';
+  STARTER_LEVELS.forEach((lv, i) => { const b = document.createElement('button'); b.textContent = `Level ${i + 1}`; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(i === rankLvl)); b.onclick = () => { rankLvl = i; openRanks(); }; tabs.appendChild(b); });
+  $('rankList').innerHTML = '<p>Loading ranking…</p>'; $('rankNote').textContent = STARTER_LEVELS[rankLvl].name;
+  LB.topScores(rankLvl).then(({ rows, online }) => { $('rankList').innerHTML = boardHTML(rows, null); $('rankNote').textContent = `${STARTER_LEVELS[rankLvl].name} · ${noteText(online)}`; });
+}
+$('ranksBtn').onclick = () => { rankLvl = Math.max(0, levelIdx); openRanks(); };
+$('ranksClose').onclick = () => { $('ranks').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+// typing a name must not steer Cubi or toggle sound/quality
+addEventListener('keydown', (e) => { if (e.target instanceof HTMLInputElement) e.stopImmediatePropagation(); }, true);
+
 function gameOver() {
   sound.over(); sound.setMode('over');
   mode = 'over'; stars.visible = true; caught = null; $('caught').classList.remove('show');
   $('overText').textContent = `${level.name}: ${Math.floor(s)} of ${level.length} m · ${pearls} pearls`;
+  renderRank('overRank', { score: LB.computeScore({ pearls, distance: s, won: false, lives: 0 }), pearls, distance: s, won: false });
   setTimeout(() => { if (mode === 'over') { showOnly('over'); stars.visible = false; startParty(); } }, 1400);
 }
 function win() {
@@ -663,6 +710,7 @@ function win() {
   $('winStars').innerHTML = [0, 1, 2].map(i => `<span class="star${i < nStars ? ' on' : ''}" aria-hidden="true">★</span>`).join('');
   $('winStars').setAttribute('aria-label', `${nStars} of 3 stars`);
   $('winText').textContent = `${level.name} · ${pearls}/${pearlTotal} pearls`;
+  renderRank('winRank', { score: LB.computeScore({ pearls, distance: level.length, won: true, lives }), pearls, distance: level.length, won: true });
   $('nextBtn').classList.toggle('hidden', levelIdx < 0 || levelIdx >= STARTER_LEVELS.length - 1);
   setTimeout(() => { if (mode === 'win') showOnly('win'); }, 1200);
 }

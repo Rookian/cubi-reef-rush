@@ -43,3 +43,16 @@ Hard corals stay still; anemones, soft corals, sea fans, seaweed and Christmas t
 | `src/editor.js` | level editor |
 | `src/env.js`, `src/materials.js` | lighting, water, toon materials & outlines |
 | `art/` | 2D character sheet, sprite sheets (256/128 px), expressions, turnarounds, 2D demo and generator, renders |
+
+
+## Online ranking (Supabase)
+
+Scores are always saved on the device. To share one ranking list between all players:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor**, paste the contents of [`supabase.sql`](supabase.sql) and click **Run**.
+3. In **Project Settings → API**, copy the **Project URL** and the **publishable key** (`sb_publishable_…`; on older projects the `anon` `public` key).
+4. Put both into `SUPABASE_URL` and `SUPABASE_KEY` at the top of `src/leaderboard.js`, then `npm run build` and push.
+
+The publishable key is meant to be public: the database rules only allow reading scores and adding new ones.
+Score = pearls × 100 + metres swum, plus 1000 for finishing and 300 for every heart left.
