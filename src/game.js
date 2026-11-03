@@ -286,7 +286,7 @@ function rf(a, b) { return a + Math.random() * (b - a); }
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
 const NOGLOW = ['debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
-  if (kind === 'heroanem' && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
+  if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
   let mesh = pool.pop();
   if (!mesh) { mesh = KINDS[kind].make(); if (!NOGLOW.includes(kind)) glowAll(mesh); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
@@ -529,6 +529,20 @@ function spawnItem(it, z) {
       break;
     }
     case 'shark': spawn('shark', x, y, z - 6, { vz: 4, shark: true }); break;
+    case 'decor': {
+      const SC = { xmas: 1.25, star: 1.3, shrimp: 1.8, debris: 1.05, seagrass: 1.1, clam: 1, sponge: 0.9, mushroom: 0.9, crab: 1, nudi: 1.8, kelp: 1 };
+      const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp'].includes(it.kind) ? it.kind : 'magnifica';
+      spawn(k, x, 0, z, { solid: false, ry: rf(0, 6), scale: SC[k] ?? 1, xmas: k === 'xmas', keepKind: true });
+      break;
+    }
+    case 'visitor': {
+      const sd = x >= 0 ? 1 : -1, dir = -sd;
+      if (it.kind === 'turtle') spawn('turtle', -dir * 13, rf(6.5, 7.5), z, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] });
+      else if (it.kind === 'babyturtles') { const y0 = rf(4.4, 5.4); for (let k = 0; k < 3; k++) spawn('babyturtle', -dir * (10 + k * 1.2), y0 + rf(-0.4, 0.4), z + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
+      else if (it.kind === 'manta') spawn('manta', -dir * 14, rf(7, 8), z, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 2.2, 0], maxX: 20 });
+      else { spawn('whaleshark', sd * 6, 6.2, z, { solid: false, scale: 2.4, ry: -sd * 0.12, swim: [-sd * 0.12, -speed * 0.7] }); if (mode === 'play') { toast('A whale shark is passing by!'); sound.whale(); } }
+      break;
+    }
     case 'anemone': {
       const a = spawn('anemone', x, 0, z, { scale: 1.3, solid: false });
       const clown = M.makeClown(); clown.scale.setScalar(0.9); scene.add(clown); a.clown = clown; break;
