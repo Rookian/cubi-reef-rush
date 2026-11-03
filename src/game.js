@@ -601,7 +601,7 @@ function showOnly(id) { ['menu', 'over', 'win'].forEach(k => $(k).classList.togg
 function gameOver() {
   mode = 'over'; stars.visible = true; caught = null; $('caught').classList.remove('show');
   $('overText').textContent = `${level.name}: ${Math.floor(s)} of ${level.length} m · ${pearls} pearls`;
-  setTimeout(() => { if (mode === 'over') showOnly('over'); }, 1400);
+  setTimeout(() => { if (mode === 'over') { showOnly('over'); stars.visible = false; startParty(); } }, 1400);
 }
 function win() {
   mode = 'win'; startParty();
@@ -720,7 +720,7 @@ function step(dt) {
   let inStream = null;
   for (const o of objs) if (o.kind === 'stream' && o.z >= 0 && o.z - o.len <= 0) inStream = o;
   if (inStream && mode === 'play') { ax += inStream.dir[0] * inStream.strength; ay += inStream.dir[1] * inStream.strength; }
-  if (mode === 'over') { ax = -P.vx * 3; ay = -1.2 - P.vy * 2; }
+  if (mode === 'over') { ax = -P.vx * 3; ay = party ? (2.5 - P.y) * 4 - P.vy * 3 : -1.2 - P.vy * 2; }
   if (mode === 'win') { ax = -P.vx * 3; ay = (2.6 - P.y) * 6 - P.vy * 3; }
   if (mode !== 'caught') {
     P.vx += ax * dt; P.vy += ay * dt;
@@ -757,7 +757,8 @@ function step(dt) {
 
   // Cubi pose
   cubi.position.set(P.x, P.y, mode === 'caught' ? 0.55 : 0);
-  if (mode === 'over') { cubi.rotation.z += dt * 2.2; cubi.rotation.x = Math.sin(t * 3) * 0.2; }
+  if (mode === 'over' && !party) { cubi.rotation.z += dt * 2.2; cubi.rotation.x = Math.sin(t * 3) * 0.2; }
+  else if (mode === 'over') { /* end scene */ }
   else if (mode === 'menu') cubi.rotation.set(Math.sin(t * 1.1) * 0.08, Math.PI + Math.sin(t * 0.6) * 0.45, Math.sin(t * 0.9) * 0.06);
   else if (mode === 'splash') {
     // swims in from the distance, does a happy twirl, then says hi
@@ -799,13 +800,11 @@ function step(dt) {
   });
 
   // level complete: Cubi and the clownfish celebrate, facing the camera
-  if (mode === 'win' && party) updateParty(dt);
+  if ((mode === 'win' || mode === 'over') && party) updateParty(dt);
 
   // buddy
   if (buddy) {
     tmpV.set(P.x + 1.0, P.y + 0.35 + Math.sin(t * 2) * 0.1, 0.5);
-    const bb = nearestBubble(buddy.position, 1.6);
-    if (bb && bb.m.position.y < P.y + 1.4) { tmpV.copy(bb.m.position); if (buddy.position.distanceTo(bb.m.position) < 0.3) popBubble(bb); }
     if (tmpV.distanceTo(cubi.position) < 0.95) tmpV.copy(cubi.position).add(_cv.copy(tmpV).sub(cubi.position).normalize().multiplyScalar(0.95));
     buddy.position.lerp(tmpV, 1 - Math.pow(0.002, dt));
     buddy.rotation.set(0, -P.vx * 0.06, -P.vx * 0.06);
@@ -907,7 +906,7 @@ function step(dt) {
   const portrait = camera.aspect < 0.8;
   let cx, cy, cz, lx, ly, lz;
   if (mode === 'splash') { cx = P.x * 0.5; cy = P.y + 0.1; cz = portrait ? 4.4 : 3.6; lx = P.x * 0.5; ly = P.y + (portrait ? -0.05 : 0.55); lz = -2; }
-  else if (mode === 'win') { const wide = camera.aspect > 1.25; const mx = P.x + 0.78; cx = mx; cy = P.y + 0.2; cz = portrait ? 5.2 : 4.4; lx = mx + (wide ? 1.9 : 0); ly = P.y - (portrait ? 0.95 : wide ? 0.05 : 0.45); lz = -2; }
+  else if (mode === 'win' || (mode === 'over' && party)) { const wide = camera.aspect > 1.25; const mx = P.x + 0.78; cx = mx; cy = P.y + 0.2; cz = portrait ? 5.2 : 4.4; lx = mx + (wide ? 1.9 : 0); ly = P.y - (portrait ? 0.95 : wide ? 0.05 : 0.45); lz = -2; }
   else if (mode === 'menu') { const wide = camera.aspect > 1.25; cx = P.x * 0.6; cy = P.y + 0.05; cz = portrait ? 3.7 : 3.0; lx = P.x * 0.6 + (wide ? 1.15 : 0); ly = P.y - (portrait ? 0.75 : wide ? 0.05 : 0.35); lz = -2; }
   else { cx = P.x * 0.72; cy = P.y * 0.55 + (portrait ? 2.5 : 2.15); cz = portrait ? 5.2 : 4.2; lx = P.x * 0.82; ly = P.y * 0.7 + (portrait ? 0.55 : 0.3); lz = -8; }
   const k = 1 - Math.pow(0.002, dt);
@@ -1095,7 +1094,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderer.render(scene, camera);
 window.__game = {
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
-  start: (i) => start(STARTER_LEVELS[i || 0], i || 0), forceWin: () => win(), toxin: useToxin,
+  start: (i) => start(STARTER_LEVELS[i || 0], i || 0), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderer.render(scene, camera); },
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, objs: objs.length }),
   breakdown: () => { const r = {}; objs.forEach(o => { let n = 0, tr = 0; o.mesh.traverse(m => { if (m.isMesh || m.isPoints || m.isLineSegments || m.isSprite) { n++; const gg = m.geometry; if (gg) tr += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); } }); r[o.kind] = r[o.kind] || [0, 0, 0]; r[o.kind][0]++; r[o.kind][1] += n; r[o.kind][2] += Math.round(tr); }); return r; },
