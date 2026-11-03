@@ -1,0 +1,75 @@
+{
+  "character": "Cubi (young yellow boxfish)",
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "facing": "right (flip X for left)",
+  "animations": {
+    "idle": {
+      "file": "cubi_idle_256.png",
+      "frames": 8,
+      "fps": 8,
+      "loop": true,
+      "atlasRow": 0
+    },
+    "blink": {
+      "file": "cubi_blink_256.png",
+      "frames": 4,
+      "fps": 12,
+      "loop": true,
+      "atlasRow": 1
+    },
+    "swim": {
+      "file": "cubi_swim_256.png",
+      "frames": 8,
+      "fps": 12,
+      "loop": true,
+      "atlasRow": 2
+    },
+    "happy": {
+      "file": "cubi_happy_256.png",
+      "frames": 8,
+      "fps": 12,
+      "loop": true,
+      "atlasRow": 3
+    },
+    "hurt": {
+      "file": "cubi_hurt_256.png",
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "atlasRow": 4
+    },
+    "eat": {
+      "file": "cubi_eat_256.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": false,
+      "atlasRow": 5
+    },
+    "sleep": {
+      "file": "cubi_sleep_256.png",
+      "frames": 8,
+      "fps": 6,
+      "loop": true,
+      "atlasRow": 6
+    },
+    "dizzy": {
+      "file": "cubi_dizzy_256.png",
+      "frames": 8,
+      "fps": 10,
+      "loop": true,
+      "atlasRow": 7
+    },
+    "turn": {
+      "file": "cubi_turn_256.png",
+      "frames": 6,
+      "fps": 10,
+      "loop": false,
+      "atlasRow": 8
+    }
+  },
+  "atlas": {
+    "file": "cubi_atlas_256.png",
+    "rows": "one animation per row, frames left to right"
+  }
+}

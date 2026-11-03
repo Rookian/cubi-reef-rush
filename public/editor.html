@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cubi's Reef Rush – Level editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #12324A; --sun: #FFC93C; --sub: #3D5A70; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #EAF7FB; color: var(--ink); font-family: Fredoka, system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; background: #fff; border-bottom: 3px solid #C9E7F1; }
+  header h1 { font-size: 20px; margin: 0 8px 0 0; }
+  header a { font-weight: 600; color: #0B5F8A; }
+  label.f { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--sub); }
+  input, select { font: inherit; font-size: 15px; color: var(--ink); border: 2px solid #9CCFE0; border-radius: 12px; padding: 6px 10px; min-height: 40px; background: #fff; }
+  #lvName { width: 170px; } #lvLen { width: 84px; }
+  #stats { font-size: 13px; color: var(--sub); margin-left: auto; }
+  #palette { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px; background: #fff; border-bottom: 3px solid #C9E7F1; scrollbar-width: thin; }
+  .tool { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 74px; min-height: 64px; padding: 4px; border: 2px solid #C9E7F1; border-radius: 14px; background: #F6FCFE; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .tool img { width: 36px; height: 36px; object-fit: contain; }
+  .tool .ic { font-size: 26px; line-height: 36px; height: 36px; }
+  .tool.on { border-color: var(--ink); background: #FFF0B8; box-shadow: 0 3px 0 var(--ink); }
+  main { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; }
+  #mapWrap { flex: 999 1 320px; min-width: 0; min-height: 300px; position: relative; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  aside { flex: 1 1 280px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: #fff; border-left: 3px solid #C9E7F1; overflow: auto; }
+  @media (max-width: 700px) { main { flex-direction: column; flex-wrap: nowrap; } aside { flex: none; max-height: 42%; border-left: 0; border-top: 3px solid #C9E7F1; } }
+  .hint { margin: 0; color: var(--sub); font-size: 15px; }
+  .ptitle b { font-size: 20px; } .ptitle span { color: var(--sub); font-size: 14px; }
+  .fields { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .field > span { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 4px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; }
+  .seg button { font: inherit; font-size: 14px; font-weight: 600; border: 2px solid #C9E7F1; background: #fff; color: var(--ink); border-radius: 10px; padding: 6px 10px; min-height: 40px; cursor: pointer; }
+  .seg button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .pbtns, .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .btn, button.big { font: inherit; font-weight: 600; font-size: 16px; border: 3px solid var(--ink); border-radius: 999px; padding: 7px 18px; min-height: 44px; cursor: pointer; background: var(--sun); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .pbtns button { font: inherit; font-weight: 600; font-size: 15px; border: 2px solid var(--ink); border-radius: 999px; padding: 6px 16px; min-height: 44px; cursor: pointer; background: #fff; color: var(--ink); }
+  .pbtns .danger { background: #FFE1E6; border-color: #A3123A; color: #A3123A; }
+  .alt { background: #fff !important; }
+  hr { border: 0; border-top: 2px solid #E3F2F7; margin: 4px 0; width: 100%; }
+  .tip { font-size: 13px; color: var(--sub); margin: 0; line-height: 1.4; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 18px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #modal { position: fixed; inset: 0; background: rgba(18, 50, 74, .5); display: grid; place-items: center; padding: 16px; }
+  #modal .box { background: #fff; border-radius: 20px; padding: 18px; width: min(560px, 100%); }
+  #modal h2 { margin: 0 0 8px; }
+  #mText { width: 100%; height: 240px; font: 12px ui-monospace, monospace; border: 2px solid #9CCFE0; border-radius: 12px; padding: 8px; }
+  #mErr { color: #A3123A; font-size: 14px; min-height: 18px; margin: 6px 0 0; }
+  .hidden { display: none !important; }
+  button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #FF7FA8; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Level editor</h1>
+  <label class="f">Name <input id="lvName" maxlength="40"></label>
+  <label class="f">Length (m) <input id="lvLen" type="number" min="60" max="2000" step="10"></label>
+  <label class="f">Current <select id="lvSpeed"><option value="relaxed">Relaxed</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+  <a href="index.html">Back to game</a>
+  <span id="stats"></span>
+</header>
+<nav id="palette" aria-label="Items to place"></nav>
+<main>
+  <div id="mapWrap"><canvas id="map" aria-label="Top-down map of the track. The start is at the bottom, the finish at the top."></canvas></div>
+  <aside>
+    <div id="panel" aria-live="polite"></div>
+    <hr>
+    <div class="actions">
+      <button class="big" id="playBtn">Play this level</button>
+      <button class="big alt" id="copyBtn">Copy level</button>
+      <button class="big alt" id="pasteBtn">Paste level</button>
+    </div>
+    <div class="actions">
+      <label class="f">Start from <select id="tplSel"><option value="-1">Choose…</option><option value="0">Level 1</option><option value="1">Level 2</option><option value="2">Level 3</option></select></label>
+      <button class="big alt" id="newBtn">Empty track</button>
+    </div>
+    <p class="tip">The map shows the track from above: the start is at the bottom and the finish at the top. The letters L, M and H show whether an item floats low, mid or high. Jellyfish, pufferfish, urchins and sharks hurt Cubi. Corals only bump him aside. Your level is saved automatically on this device and appears as “My level” in the game.</p>
+  </aside>
+</main>
+<div id="modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="box">
+    <h2 id="mTitle">Level</h2>
+    <label for="mText" class="tip">Level text</label>
+    <textarea id="mText" spellcheck="false"></textarea>
+    <p id="mErr"></p>
+    <div class="actions"><button class="big hidden" id="mLoad">Load</button><button class="big alt" id="mClose">Close</button></div>
+  </div>
+</div>
+<div id="toast" aria-live="polite"></div>
+<script src="editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "cubi-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Draws Cubi the boxfish and renders all sprite sheets and design images to ../out",
+  "scripts": { "build": "node build.js" },
+  "dependencies": { "playwright": "^1.48.0" }
+}

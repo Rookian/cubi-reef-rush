@@ -1,0 +1,5 @@
+node_modules/
+public/game.js
+public/editor.js
+public/showcase.js
+.DS_Store

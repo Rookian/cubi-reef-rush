@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cubi's Reef</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #17324A; --sun: #FFC93C; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0E5E8A; overflow: hidden; font-family: Fredoka, system-ui, sans-serif; color: #fff; -webkit-user-select: none; user-select: none; }
+  #wrap { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  .hud { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+  .hearts { display: flex; gap: 4px; }
+  .hearts img { width: 34px; height: 34px; transition: opacity .2s, transform .2s; }
+  .hearts img.gone { opacity: .25; transform: scale(.8); filter: grayscale(1); }
+  .pill { display: flex; align-items: center; gap: 8px; background: rgba(8, 44, 66, .72); border-radius: 999px; padding: 4px 16px 4px 6px; font-size: 24px; font-weight: 700; }
+  .pill img { width: 32px; height: 32px; }
+  .pill small { font-size: 14px; font-weight: 500; opacity: .85; margin-left: 6px; }
+  .overlay { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); background: rgba(255, 255, 255, .95); color: var(--ink); border-radius: 28px; padding: 22px 24px; text-align: center; box-shadow: 0 6px 0 rgba(8, 44, 66, .35); }
+  .overlay h1 { margin: 0; font-size: 40px; line-height: 1; }
+  .overlay p { margin: 8px 0 0; font-size: 17px; color: #3D5A70; font-weight: 500; }
+  .btns { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  button { font: inherit; font-weight: 600; font-size: 20px; border: 3px solid var(--ink); border-radius: 999px; padding: 10px 26px; min-height: 48px; cursor: pointer; background: var(--sun); color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  button.alt { background: #fff; }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .hidden { display: none !important; }
+  #moveLabel { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); background: rgba(8, 44, 66, .78); padding: 8px 22px; border-radius: 999px; font-size: 24px; font-weight: 600; text-align: center; white-space: nowrap; }
+  #moveLabel small { display: block; font-size: 14px; font-weight: 500; opacity: .85; }
+  #backBtn { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); }
+  #toast { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -50%); font-size: 44px; font-weight: 700; color: #FFE14D; -webkit-text-stroke: 2px #3B2614; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; }
+  #toast.show { opacity: 1; transform: translate(-50%, -60%); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" aria-label="Cubi's Reef game: guide Cubi the boxfish to pearls and avoid jellyfish"></canvas>
+
+  <div class="hud" id="hud">
+    <div class="hearts" id="hearts">
+      <img src="icon_heart.png" alt="life"><img src="icon_heart.png" alt="life"><img src="icon_heart.png" alt="life">
+    </div>
+    <div class="pill"><img src="pearl.png" alt="pearls"><span id="score">0</span><small id="best"></small></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="start">
+    <h1>Cubi's Reef</h1>
+    <p>Tap or drag to swim. Arrow keys / WASD work too.<br>Eat pearls, dodge the jellies!</p>
+    <div class="btns">
+      <button id="playBtn">Play</button>
+      <button class="alt" id="movesBtn">See all moves</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="over">
+    <h1>Bonk!</h1>
+    <p id="overText">You got 0 pearls.</p>
+    <div class="btns">
+      <button id="againBtn">Play again</button>
+      <button class="alt" id="menuBtn">Menu</button>
+    </div>
+  </div>
+
+  <div id="moveLabel" class="hidden"></div>
+  <button id="backBtn" class="alt hidden">Back</button>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- assets ----------
+  const ANIMS = {
+    idle:  { n: 8, fps: 8,  loop: true },
+    blink: { n: 4, fps: 14, loop: false },
+    swim:  { n: 8, fps: 14, loop: true },
+    happy: { n: 8, fps: 12, loop: false },
+    hurt:  { n: 6, fps: 12, loop: false },
+    eat:   { n: 6, fps: 14, loop: false },
+    sleep: { n: 8, fps: 6,  loop: true },
+    dizzy: { n: 8, fps: 10, loop: true },
+    turn:  { n: 6, fps: 22, loop: false },
+  };
+  const img = (src) => { const i = new Image(); i.src = src; return i; };
+  for (const k in ANIMS) ANIMS[k].img = img(`cubi_${k}_256.png`);
+  const bg = img('scene_bg.png');
+  const pearlImg = img('pearl.png');
+
+  // ---------- world sizing ----------
+  let W = 1280, H = 720, scale = 1, dpr = 1;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const vw = window.innerWidth, vh = window.innerHeight;
+    H = 720;
+    W = Math.round(Math.max(400, Math.min(1700, H * vw / vh)));
+    scale = Math.min(vw / W, vh / H);
+    cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+    offX = (vw - W * scale) / 2; offY = (vh - H * scale) / 2;
+  }
+  let offX = 0, offY = 0;
+  window.addEventListener('resize', resize); resize();
+
+  // ---------- state ----------
+  let mode = 'attract'; // attract | play | over | moves
+  const cubi = { x: 400, y: 330, vx: 0, vy: 0, face: 1, size: 170 };
+  let anim = { name: 'idle', t0: 0, once: null, reverse: false };
+  let pearls = [], jellies = [], parts = [], bubbles = [];
+  let score = 0, lives = 3, best = 0, invuln = 0, lastInput = 0, nextBlink = 2, time = 0;
+  let target = null; const keys = {};
+  try { best = +localStorage.getItem('cubi_best') || 0; } catch (e) {}
+
+  function play(name, opts = {}) { anim = { name, t0: time, once: ANIMS[name].loop ? null : (opts.then || 'base'), reverse: !!opts.reverse }; }
+  function animFrame() {
+    const a = ANIMS[anim.name];
+    let i = Math.floor((time - anim.t0) * a.fps);
+    if (a.loop) i %= a.n;
+    else if (i >= a.n) { i = a.n - 1; return { i, done: true }; }
+    if (anim.reverse) i = a.n - 1 - i;
+    return { i, done: false };
+  }
+  const oneShotActive = () => anim.once && !animFrame().done;
+  const busy = () => oneShotActive() && ['hurt', 'eat', 'happy', 'turn'].includes(anim.name);
+
+  // ---------- spawning ----------
+  const rand = (a, b) => a + Math.random() * (b - a);
+  function spawnPearl() {
+    for (let k = 0; k < 20; k++) {
+      const p = { x: rand(80, W - 80), y: rand(110, H - 150), ph: rand(0, 6) };
+      if (Math.hypot(p.x - cubi.x, p.y - cubi.y) > 180 && pearls.every(q => Math.hypot(q.x - p.x, q.y - p.y) > 90)) { pearls.push(p); return; }
+    }
+  }
+  function spawnJelly() {
+    const left = Math.random() < 0.5;
+    jellies.push({ x: left ? -60 : W + 60, y: rand(120, H - 170), vx: (left ? 1 : -1) * rand(50, 90 + score * 3), ph: rand(0, 6), hue: Math.random() < 0.5 ? '#FF9BD2' : '#C7A4FF' });
+  }
+  function burst(x, y, color, n = 10) {
+    for (let i = 0; i < n; i++) { const a = rand(0, Math.PI * 2), s = rand(60, 200); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.7, max: 0.7, c: color, r: rand(4, 8) }); }
+  }
+  function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('show'), 900); }
+
+  function reset(m) {
+    mode = m; score = 0; lives = 3; invuln = 0; pearls = []; jellies = []; parts = [];
+    cubi.x = W * 0.3; cubi.y = H * 0.45; cubi.vx = cubi.vy = 0; cubi.face = 1; target = null;
+    for (let i = 0; i < 4; i++) spawnPearl();
+    play('idle'); lastInput = time; updateHud();
+  }
+  function updateHud() {
+    $('score').textContent = score;
+    $('best').textContent = best ? `best ${best}` : '';
+    [...$('hearts').children].forEach((h, i) => h.classList.toggle('gone', i >= lives));
+    $('hud').classList.toggle('hidden', mode === 'moves');
+  }
+
+  // ---------- input ----------
+  function toWorld(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - offX) / scale, y: (e.clientY - r.top - offY) / scale }; }
+  let pointerDown = false;
+  cv.addEventListener('pointerdown', (e) => { if (mode !== 'play') return; pointerDown = true; target = toWorld(e); wake(); });
+  cv.addEventListener('pointermove', (e) => { if (mode === 'play' && (pointerDown || e.pointerType === 'mouse')) { target = toWorld(e); wake(); } });
+  window.addEventListener('pointerup', () => { pointerDown = false; });
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['arrowleft','arrowright','arrowup','arrowdown','w','a','s','d'].includes(k)) { keys[k] = true; target = null; wake(); if (k.startsWith('arrow')) e.preventDefault(); }
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+  function wake() { lastInput = time; if (anim.name === 'sleep') play('blink'); }
+
+  $('playBtn').onclick = () => { $('start').classList.add('hidden'); reset('play'); };
+  $('againBtn').onclick = () => { $('over').classList.add('hidden'); reset('play'); };
+  $('menuBtn').onclick = () => { $('over').classList.add('hidden'); $('start').classList.remove('hidden'); reset('attract'); };
+  $('movesBtn').onclick = () => { $('start').classList.add('hidden'); startMoves(); };
+  $('backBtn').onclick = () => { $('backBtn').classList.add('hidden'); $('moveLabel').classList.add('hidden'); $('start').classList.remove('hidden'); reset('attract'); };
+
+  // ---------- moves showcase ----------
+  const MOVES = [['idle','Idle'],['blink','Blink'],['swim','Swim'],['eat','Eat'],['happy','Happy hop'],['hurt','Hurt'],['dizzy','Dizzy'],['sleep','Sleep'],['turn','Turn around']];
+  let moveIdx = 0, moveT = 0;
+  function startMoves() {
+    mode = 'moves'; pearls = []; jellies = []; moveIdx = 0; moveT = time;
+    cubi.x = W / 2; cubi.y = H * 0.48; cubi.vx = cubi.vy = 0; cubi.face = 1;
+    $('moveLabel').classList.remove('hidden'); $('backBtn').classList.remove('hidden'); updateHud(); showMove();
+  }
+  function showMove() {
+    const [k, label] = MOVES[moveIdx];
+    const a = ANIMS[k];
+    $('moveLabel').innerHTML = `${label}<small>${a.n} frames · ${a.loop ? 'loop' : 'one-shot'}</small>`;
+    cubi.face = 1; play(k, { then: 'repeat' });
+  }
+
+  // ---------- update ----------
+  function update(dt) {
+    time += dt;
+    // bubbles ambience
+    if (Math.random() < dt * 3) bubbles.push({ x: rand(0, W), y: H + 10, r: rand(3, 9), v: rand(30, 70), ph: rand(0, 6) });
+    bubbles.forEach(b => { b.y -= b.v * dt; b.x += Math.sin(time * 2 + b.ph) * 12 * dt; });
+    bubbles = bubbles.filter(b => b.y > -20);
+    parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; });
+    parts = parts.filter(p => p.life > 0);
+
+    if (mode === 'moves') {
+      const [k] = MOVES[moveIdx];
+      if (anim.once && animFrame().done) { if (k === 'turn') { cubi.face = 1; } play(k, { then: 'repeat' }); }
+      if (time - moveT > 2.6) { moveIdx = (moveIdx + 1) % MOVES.length; moveT = time; showMove(); }
+      cubi.y = H * 0.48;
+      return;
+    }
+
+    // --- steering ---
+    let ax = 0, ay = 0;
+    const dead = mode === 'over';
+    if (!dead) {
+      const kx = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+      const ky = (keys.arrowdown || keys.s ? 1 : 0) - (keys.arrowup || keys.w ? 1 : 0);
+      let goal = null;
+      if (mode === 'attract') {
+        let best = null, bd = 1e9;
+        pearls.forEach(p => { const d = Math.hypot(p.x - cubi.x, p.y - cubi.y); if (d < bd) { bd = d; best = p; } });
+        if (best) goal = { x: best.x - cubi.face * 20, y: best.y };
+      } else if (kx || ky) {
+        const l = Math.hypot(kx, ky); ax = kx / l * 1400; ay = ky / l * 1400;
+      } else if (target) goal = target;
+      if (goal) {
+        const dx = goal.x - cubi.x, dy = goal.y - cubi.y, d = Math.hypot(dx, dy);
+        if (d > 12) { const sp = Math.min(380, d * 3.2); ax = (dx / d * sp - cubi.vx) * 5; ay = (dy / d * sp - cubi.vy) * 5; }
+      }
+    }
+    const drag = (ax || ay) ? 0.985 : 0.93;
+    cubi.vx = (cubi.vx + ax * dt) * Math.pow(drag, dt * 60);
+    cubi.vy = (cubi.vy + ay * dt) * Math.pow(drag, dt * 60);
+    const sp = Math.hypot(cubi.vx, cubi.vy);
+    if (sp > 420) { cubi.vx *= 420 / sp; cubi.vy *= 420 / sp; }
+    cubi.x = Math.max(60, Math.min(W - 60, cubi.x + cubi.vx * dt));
+    cubi.y = Math.max(80, Math.min(H - 120, cubi.y + cubi.vy * dt));
+    if (dead) cubi.vy -= 0;
+
+    // --- facing / turn ---
+    if (!dead && !busy()) {
+      if (cubi.vx < -60 && cubi.face === 1) { play('turn'); anim.reverse = false; cubi.face = -1; cubi.turning = true; }
+      else if (cubi.vx > 60 && cubi.face === -1) { play('turn', { reverse: true }); cubi.face = 1; cubi.turning = true; }
+    }
+
+    // --- base animation ---
+    if (anim.once && animFrame().done) {
+      const then = anim.once;
+      cubi.turning = false;
+      if (typeof then === 'function') then(); else anim = { name: 'idle', t0: time, once: null };
+    }
+    if (!anim.once && !dead) {
+      const asleep = mode === 'play' && time - lastInput > 7 && sp < 30;
+      const want = asleep ? 'sleep' : sp > 70 ? 'swim' : 'idle';
+      if (anim.name !== want) play(want);
+      if (want === 'idle' && time > nextBlink) { play('blink'); nextBlink = time + rand(2.5, 5); }
+    }
+
+    // --- pearls ---
+    pearls.forEach(p => { p.y += Math.sin(time * 2 + p.ph) * 12 * dt; });
+    const mouthX = cubi.x + cubi.face * 50, mouthY = cubi.y + 12;
+    for (let i = pearls.length - 1; i >= 0; i--) {
+      const p = pearls[i];
+      if (!dead && Math.hypot(p.x - mouthX, p.y - mouthY) < 52) {
+        pearls.splice(i, 1); burst(p.x, p.y, '#FFE14D', 8);
+        if (mode === 'play') { score++; if (score > best) { best = score; try { localStorage.setItem('cubi_best', best); } catch (e) {} } }
+        const milestone = mode === 'play' && score % 5 === 0;
+        if (!['hurt'].includes(anim.name) || !oneShotActive()) play('eat', { then: milestone ? () => { play('happy'); toast(score + ' pearls!'); burst(cubi.x, cubi.y - 60, '#FFF3A0', 14); } : 'base' });
+        setTimeout(spawnPearl, 600); updateHud();
+      }
+    }
+
+    // --- jellies ---
+    if (mode === 'play') {
+      const want = Math.min(1 + Math.floor(score / 4), 6);
+      if (jellies.length < want && Math.random() < dt * 0.8) spawnJelly();
+    }
+    jellies.forEach(j => { j.x += j.vx * dt; j.y += Math.sin(time * 1.6 + j.ph) * 30 * dt; });
+    jellies = jellies.filter(j => j.x > -100 && j.x < W + 100);
+    if (invuln > 0) invuln -= dt;
+    if (mode === 'play' && invuln <= 0) {
+      for (const j of jellies) {
+        if (Math.hypot(j.x - cubi.x, j.y + 10 - cubi.y) < 70) {
+          lives--; invuln = 1.6; updateHud();
+          const d = Math.hypot(cubi.x - j.x, cubi.y - j.y) || 1;
+          cubi.vx = (cubi.x - j.x) / d * 420; cubi.vy = (cubi.y - j.y) / d * 420;
+          burst(cubi.x, cubi.y, '#FF5A5A', 10);
+          if (lives <= 0) { gameOver(); } else play('hurt');
+          break;
+        }
+      }
+    }
+  }
+  function gameOver() {
+    mode = 'over'; play('dizzy'); target = null;
+    $('overText').textContent = `Cubi ate ${score} pearl${score === 1 ? '' : 's'}.` + (score >= best && score > 0 ? ' New best!' : '');
+    setTimeout(() => { if (mode === 'over') $('over').classList.remove('hidden'); }, 1100);
+  }
+
+  // ---------- draw ----------
+  function drawJelly(j) {
+    ctx.save(); ctx.translate(j.x, j.y);
+    ctx.lineCap = 'round'; ctx.strokeStyle = '#4A1832'; ctx.lineWidth = 4;
+    for (let k = -1.5; k <= 1.5; k++) {
+      ctx.beginPath(); ctx.moveTo(k * 14, 10);
+      for (let s = 1; s <= 4; s++) ctx.lineTo(k * 14 + Math.sin(time * 5 + s + k + j.ph) * 6, 10 + s * 14);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(-40, 12); ctx.bezierCurveTo(-42, -44, 42, -44, 40, 12);
+    ctx.quadraticCurveTo(30, 20, 20, 12); ctx.quadraticCurveTo(10, 20, 0, 12); ctx.quadraticCurveTo(-10, 20, -20, 12); ctx.quadraticCurveTo(-30, 20, -40, 12); ctx.closePath();
+    ctx.fillStyle = j.hue; ctx.globalAlpha = 0.92; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.ellipse(-14, -18, 9, 5, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2A1426';
+    ctx.beginPath(); ctx.arc(-11, -2, 3.6, 0, Math.PI * 2); ctx.arc(11, -2, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2A1426'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 2, 5, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function drawCubi() {
+    const a = ANIMS[anim.name];
+    if (!a.img.complete) return;
+    const { i } = animFrame();
+    const S = cubi.size;
+    ctx.save(); ctx.translate(cubi.x, cubi.y);
+    if (invuln > 0 && mode === 'play' && Math.floor(time * 12) % 2 === 0) ctx.globalAlpha = 0.45;
+    // the turn sheet already ends facing left, so don't flip it
+    const flip = anim.name === 'turn' ? 1 : cubi.face;
+    ctx.scale(flip, 1);
+    ctx.drawImage(a.img, i * 256, 0, 256, 256, -S / 2, -S / 2, S, S);
+    ctx.restore();
+  }
+  function draw() {
+    const vw = cv.width / dpr, vh = cv.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#1A7DB3'; ctx.fillRect(0, 0, vw, vh);
+    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * offX, dpr * offY);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    if (bg.complete) { const s = Math.max(W / 1280, H / 720); ctx.drawImage(bg, (W - 1280 * s) / 2, H - 720 * s, 1280 * s, 720 * s); }
+    bubbles.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.stroke(); });
+    pearls.forEach(p => { if (pearlImg.complete) ctx.drawImage(pearlImg, p.x - 26, p.y - 26, 52, 52); });
+    if (mode === 'play' && target && !(keys.arrowleft || keys.arrowright || keys.arrowup || keys.arrowdown)) {
+      ctx.beginPath(); ctx.arc(target.x, target.y, 14 + Math.sin(time * 6) * 3, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    jellies.forEach(drawJelly);
+    drawCubi();
+    parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fillStyle = p.c; ctx.fill(); ctx.strokeStyle = '#3B2614'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1; });
+    ctx.restore();
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); draw();
+    requestAnimationFrame(loop);
+  }
+  reset('attract');
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

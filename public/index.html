@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cubi's Reef Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #12324A; --sun: #FFC93C; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2FA9D6; font-family: Fredoka, system-ui, sans-serif; color: #fff; -webkit-user-select: none; user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { display: flex; align-items: center; gap: 8px; background: rgba(8, 44, 66, .62); border-radius: 999px; padding: 6px 16px; font-size: 22px; font-weight: 700; }
+  .pearl { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 18%, #F3E6FF 30%, #D7C2F5 75%, #B9A0E8); border: 2px solid #3B2614; }
+  #hearts { display: flex; gap: 4px; padding: 6px 12px; }
+  .heart { width: 24px; height: 22px; position: relative; display: inline-block; }
+  .heart::before, .heart::after { content: ''; position: absolute; top: 0; width: 13px; height: 20px; background: #FF4F7E; border-radius: 13px 13px 0 0; }
+  .heart::before { left: 11px; transform: rotate(-45deg); transform-origin: 0 100%; }
+  .heart::after { left: 0; transform: rotate(45deg); transform-origin: 100% 100%; }
+  .heart.gone::before, .heart.gone::after { background: rgba(255, 255, 255, .25); }
+  #buddy { display: none; font-size: 16px; padding: 6px 14px; background: rgba(255, 122, 26, .9); }
+  #buddy.on { display: flex; }
+  .track { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); width: min(320px, 60vw); height: 10px; border-radius: 999px; background: rgba(8, 44, 66, .45); overflow: hidden; pointer-events: none; }
+  #progress { height: 100%; width: 0; background: linear-gradient(90deg, #FFD23F, #FF9A5C); border-radius: 999px; }
+  #warn { position: fixed; left: 50%; top: 24%; transform: translate(-50%, -50%) scale(.9); font-size: 30px; font-weight: 700; padding: 8px 26px; border-radius: 999px; background: rgba(255, 255, 255, .88); color: #0B5F8A; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; white-space: nowrap; }
+  #warn.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #warn.in { background: #FFE14D; color: #5A3A00; }
+  #toast { position: fixed; left: 50%; top: 36%; transform: translate(-50%, -50%); font-size: 38px; font-weight: 700; color: #FFE14D; -webkit-text-stroke: 2px #4A2A00; paint-order: stroke fill; pointer-events: none; opacity: 0; white-space: nowrap; text-align: center; }
+  #toast.show { animation: pop 1.4s ease-out; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
+  /* toxin button */
+  #toxinBtn { position: fixed; right: 18px; bottom: 22px; width: 92px; height: 92px; border-radius: 50%; padding: 0; border: 4px solid #3B2614; background: conic-gradient(rgba(59, 38, 20, .55) calc(var(--cd, 0) * 360deg), #B07CFF 0); color: #fff; font-size: 17px; font-weight: 700; box-shadow: 0 5px 0 #3B2614; -webkit-text-stroke: 1px #3B2614; paint-order: stroke fill; touch-action: none; }
+  #toxinBtn.ready { animation: none; }
+  #toxinBtn small { display: block; font-size: 11px; -webkit-text-stroke: 0; opacity: .9; }
+  #toxinBtn.fire { transform: scale(1.15); }
+  /* caught by shark */
+  #caught { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.8); opacity: 0; pointer-events: none; text-align: center; transition: opacity .15s, transform .15s; }
+  #caught.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #caught .big { font-size: 46px; font-weight: 700; color: #C9FF7A; -webkit-text-stroke: 3px #2A1440; paint-order: stroke fill; animation: shakeit .25s infinite; }
+  #caught .sub { font-size: 20px; font-weight: 600; background: rgba(42, 20, 64, .8); padding: 4px 16px; border-radius: 999px; display: inline-block; margin-top: 6px; }
+  #caught .bar { width: 240px; height: 12px; margin: 10px auto 0; border-radius: 999px; background: rgba(42, 20, 64, .6); overflow: hidden; }
+  #caughtBar { height: 100%; width: 100%; background: #FF5C7A; }
+  #caught.show ~ #toxinBtn { animation: pulse .35s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.18); box-shadow: 0 0 0 10px rgba(201, 255, 122, .55); } }
+  @keyframes shakeit { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  /* cards */
+  .card { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(500px, calc(100% - 24px)); max-height: calc(100% - 36px); overflow: auto; background: rgba(255, 255, 255, .95); color: var(--ink); border-radius: 30px; padding: 20px 22px 22px; text-align: center; box-shadow: 0 8px 0 rgba(8, 44, 66, .3); }
+  .card h1 { margin: 0; font-size: 40px; line-height: 1; }
+  .card p { margin: 8px 0 0; font-size: 16px; color: #3D5A70; font-weight: 500; line-height: 1.35; }
+  .btns { display: flex; gap: 10px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+  button, .btn { font: inherit; font-weight: 600; font-size: 20px; border: 3px solid var(--ink); border-radius: 999px; padding: 9px 26px; min-height: 48px; cursor: pointer; background: var(--sun); color: var(--ink); box-shadow: 0 4px 0 var(--ink); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+  button:active, .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .alt { background: #fff; }
+  button:focus-visible, .btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #levels { display: grid; gap: 8px; margin-top: 14px; }
+  .lvl { display: flex; flex-direction: column; align-items: flex-start; text-align: left; border-radius: 18px; padding: 8px 18px; background: #FFF6D8; }
+  .lvl b { font-size: 20px; } .lvl span { font-size: 14px; font-weight: 500; color: #3D5A70; }
+  #winStars { font-size: 48px; letter-spacing: 6px; margin-top: 6px; }
+  .star { color: #D8E2EA; -webkit-text-stroke: 2px #3B2614; } .star.on { color: #FFD23F; }
+  @media (min-aspect-ratio: 5/4) { .card { left: auto; right: 4vw; bottom: auto; top: 50%; transform: translateY(-50%); width: min(460px, 46vw); } }
+  .hidden { display: none !important; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #2FA9D6; font-size: 26px; font-weight: 600; transition: opacity .4s; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Cubi's Reef Rush: steer Cubi the boxfish through the reef"></canvas>
+
+<div class="hud hidden" id="hud">
+  <div class="row">
+    <div class="pill" id="hearts" role="img" aria-label="3 lives"></div>
+    <div class="pill" id="buddy">Buddy shield</div>
+  </div>
+  <div class="row">
+    <div class="pill"><span class="pearl" aria-hidden="true"></span><span id="pearls">0</span></div>
+  </div>
+  <div class="track" aria-hidden="true"><div id="progress"></div></div>
+</div>
+<div id="warn" aria-live="polite"></div>
+<div id="toast" aria-live="polite"></div>
+<div id="caught" aria-live="assertive">
+  <div class="big">TOXIN!</div>
+  <div class="sub">Press Space or tap the Toxin button</div>
+  <div class="bar"><div id="caughtBar"></div></div>
+</div>
+<button id="toxinBtn" class="hidden" aria-label="Release toxin (Space)">Toxin<small>Space</small></button>
+
+<div class="card" id="menu">
+  <h1>Cubi's Reef Rush</h1>
+  <p>Ride the current to the finish! Drag to steer (or arrow keys). Jellies, puffers, urchins and sharks hurt. Corals just bump you. Press <b>Space</b> or tap <b>Toxin</b> to scare enemies, or to escape a shark's mouth.</p>
+  <div id="levels"></div>
+  <div class="btns"><a class="btn alt" href="editor.html">Level editor</a></div>
+</div>
+
+<div class="card hidden" id="over">
+  <h1>Bonk!</h1>
+  <p id="overText"></p>
+  <div class="btns"><button id="againBtn">Try again</button><button class="alt toMenu">Levels</button></div>
+</div>
+
+<div class="card hidden" id="win">
+  <h1>Level complete!</h1>
+  <div id="winStars" role="img"></div>
+  <p id="winText"></p>
+  <div class="btns"><button id="nextBtn">Next level</button><button class="alt" id="retryBtn">Replay</button><button class="alt toMenu">Levels</button></div>
+</div>
+
+<div id="loading">Filling the ocean…</div>
+<script src="game.js"></script>
+<script>setTimeout(() => { const l = document.getElementById('loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 400); }, 300);</script>
+</body>
+</html>
