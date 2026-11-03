@@ -49,6 +49,17 @@
   #rankTabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
   #rankTabs button[aria-selected="true"] { background: var(--sun); }
   #rankTabs button[aria-selected="false"] { background: #fff; }
+  #commTabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+  #commTabs button { font-size: 16px; padding: 6px 14px; min-height: 40px; }
+  #commTabs button[aria-selected="true"] { background: var(--sun); } #commTabs button[aria-selected="false"] { background: #fff; }
+  #commList { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+  .clvl { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 14px; border-radius: 18px; min-height: 52px; background: #fff; font-size: 16px; justify-content: flex-start; box-shadow: 0 3px 0 var(--ink); }
+  .clvl .t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .clvl .t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clvl .t small { font-size: 13px; color: #3D5A70; font-weight: 500; }
+  .clvl .st { font-size: 13px; color: #3D5A70; white-space: nowrap; }
+  #likeBox { margin-top: 8px; }
+  #likeBox button { font-size: 17px; padding: 6px 18px; min-height: 42px; }
   /* toxin button */
   #toxinBtn { position: fixed; right: 18px; bottom: 22px; width: 92px; height: 92px; border-radius: 50%; padding: 0; border: 4px solid #3B2614; background: conic-gradient(rgba(59, 38, 20, .55) calc(var(--cd, 0) * 360deg), #B07CFF 0); color: #fff; font-size: 17px; font-weight: 700; box-shadow: 0 5px 0 #3B2614; -webkit-text-stroke: 1px #3B2614; paint-order: stroke fill; touch-action: none; }
   #toxinBtn.ready { animation: none; }
@@ -110,7 +121,7 @@
   <h1>Cubi's Reef Rush</h1>
   <p>Ride the current to the finish! Drag to steer (or arrow keys). Jellies, puffers, urchins and sharks hurt. Corals just bump you. Press <b>Space</b> or tap <b>Toxin</b> to scare enemies, or to escape a shark's mouth.</p>
   <div id="levels"></div>
-  <div class="btns"><button class="alt" id="ranksBtn">🏆 Ranking</button><a class="btn alt" href="editor.html">Level editor</a></div>
+  <div class="btns"><button class="alt" id="ranksBtn">🏆 Ranking</button><button class="alt" id="commBtn">🌍 Player levels</button><a class="btn alt" href="editor.html">Level editor</a></div>
 </div>
 
 <div class="card hidden" id="over">
@@ -124,6 +135,7 @@
   <h1>Level complete!</h1>
   <div id="winStars" role="img"></div>
   <p id="winText"></p>
+  <div id="likeBox"></div>
   <div class="rank" id="winRank"></div>
   <div class="btns"><button id="nextBtn">Next level</button><button class="alt" id="retryBtn">Replay</button><button class="alt toMenu">Levels</button></div>
 </div>
@@ -136,8 +148,16 @@
   <div class="btns"><button class="alt" id="ranksClose">Back</button></div>
 </div>
 
+<div class="card hidden" id="community">
+  <h1>🌍 Player levels</h1>
+  <p>Levels built and shared by other players in the level editor.</p>
+  <div class="tabs" id="commTabs" role="tablist"></div>
+  <div id="commList"></div>
+  <div class="btns"><a class="btn alt" href="editor.html">Build your own</a><button class="alt" id="commClose">Back</button></div>
+</div>
+
 <div id="loading">Filling the ocean…</div>
-<script src="game.js?v=mw0tgfku"></script>
+<script src="game.js?v=mw0u2eev"></script>
 <script>setTimeout(() => { const l = document.getElementById('loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 400); }, 300);</script>
 </body>
 </html>

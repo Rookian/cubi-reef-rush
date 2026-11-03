@@ -5,6 +5,7 @@ import * as CR from './critters.js';
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
 import * as LB from './leaderboard.js';
+import * as CM from './community.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -662,7 +663,7 @@ function updateHud() {
 }
 function toast(txt) { const el = $('toast'); el.textContent = txt; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
 function showOnly(id) {
-  ['ranks'].forEach(k => $(k).classList.add('hidden'));
+  ['ranks', 'community'].forEach(k => $(k) && $(k).classList.add('hidden'));
   if (id === 'menu') sound.setMode('menu'); ['menu', 'over', 'win'].forEach(k => $(k).classList.toggle('hidden', k !== id)); $('hud').classList.toggle('hidden', !!id); $('toxinBtn').classList.toggle('hidden', !!id); }
 // ------------------------------------------------------------------ ranking
 const esc = (t) => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -679,9 +680,11 @@ async function showBoard(el, lvl, me) {
   const { rows, online } = await LB.topScores(lvl);
   box.innerHTML = boardHTML(rows, me) + `<p class="lbnote">${noteText(online)}</p>`;
 }
+// rankings: built-in levels 0..n, shared player levels 1000 + id, own unshared levels: none
+const rankKey = () => levelIdx >= 0 ? levelIdx : level.cid ? 1000 + level.cid : null;
 function renderRank(id, res) {
   const el = $(id); if (!el) return;
-  if (levelIdx < 0) { el.innerHTML = `<div class="score">${res.score} points</div>`; return; }
+  if (rankKey() == null) { el.innerHTML = `<div class="score">${res.score} points</div>`; return; }
   el.innerHTML = `<div class="score">${res.score} points</div>
     <form class="saveForm"><input name="n" maxlength="16" autocomplete="nickname" placeholder="Your name" aria-label="Your name" value="${esc(LB.savedName())}"><button type="submit">Save</button></form>
     <div class="boardBox"></div>`;
@@ -690,10 +693,10 @@ function renderRank(id, res) {
     e.preventDefault(); const name = LB.cleanName(input.value);
     if (!name) { input.focus(); return; }
     btn.disabled = true; btn.textContent = 'Saving…';
-    try { const r = await LB.submitScore({ ...res, name, level: levelIdx }); form.remove(); sound.start(); if (r.failed) toast('Saved on this device'); showBoard(el, levelIdx, { name, score: res.score }); }
+    try { const r = await LB.submitScore({ ...res, name, level: rankKey() }); form.remove(); sound.start(); if (r.failed) toast('Saved on this device'); showBoard(el, rankKey(), { name, score: res.score }); }
     catch (err) { btn.disabled = false; btn.textContent = 'Retry'; toast('Could not save'); }
   };
-  showBoard(el, levelIdx, null);
+  showBoard(el, rankKey(), null);
 }
 let rankLvl = 0;
 function openRanks() {
@@ -705,6 +708,40 @@ function openRanks() {
 }
 if ($('ranksBtn')) $('ranksBtn').onclick = () => { rankLvl = Math.max(0, levelIdx); openRanks(); };
 if ($('ranksClose')) $('ranksClose').onclick = () => { $('ranks').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+// ------------------------------------------------------------------ shared player levels
+let commSort = 'new';
+async function openCommunity() {
+  ['menu', 'over', 'win', 'ranks'].forEach(k => $(k).classList.add('hidden')); $('community').classList.remove('hidden');
+  const tabs = $('commTabs'); tabs.innerHTML = '';
+  [['new', 'Newest'], ['plays', 'Most played'], ['likes', 'Most liked']].forEach(([k, l]) => { const b = document.createElement('button'); b.textContent = l; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(k === commSort)); b.onclick = () => { commSort = k; openCommunity(); }; tabs.appendChild(b); });
+  const list = $('commList');
+  if (!CM.communityOnline()) { list.innerHTML = '<p>Online levels are not set up.</p>'; return; }
+  list.innerHTML = '<p>Loading levels…</p>';
+  try {
+    const rows = await CM.listLevels(commSort);
+    if (!rows.length) { list.innerHTML = '<p>No shared levels yet. Build one in the level editor and tap "Share online"!</p>'; return; }
+    list.innerHTML = '';
+    rows.forEach(r => {
+      const b = document.createElement('button'); b.className = 'clvl';
+      b.innerHTML = `<span class="t"><b>${esc(r.name)}</b><small>by ${esc(r.author)} · ${r.length} m</small></span><span class="st">▶ ${r.plays} · 👍 ${r.likes}</span>`;
+      b.onclick = async () => {
+        b.disabled = true; b.querySelector('small').textContent = 'Loading…';
+        try { const lv = await CM.fetchLevel(r.id); CM.countPlay(r.id); start(lv, -1); toast(`${lv.name} by ${lv.author}`); }
+        catch (e) { b.disabled = false; toast('Could not load level'); }
+      };
+      list.appendChild(b);
+    });
+  } catch (e) { list.innerHTML = '<p>Could not load levels. Check your internet connection.</p>'; }
+}
+if ($('commBtn')) $('commBtn').onclick = openCommunity;
+if ($('commClose')) $('commClose').onclick = () => { $('community').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+function renderLike() {
+  const box = $('likeBox'); if (!box) return;
+  if (!level.cid) { box.innerHTML = ''; return; }
+  const done = CM.hasLiked(level.cid);
+  box.innerHTML = `<button class="alt" ${done ? 'disabled' : ''}>${done ? '👍 Liked' : '👍 Like this level'}</button>`;
+  box.querySelector('button').onclick = (e) => { if (CM.likeLevel(level.cid)) { e.target.textContent = '👍 Liked'; e.target.disabled = true; sound.pop(); } };
+}
 // typing a name must not steer Cubi or toggle sound/quality
 addEventListener('keydown', (e) => { if (e.target instanceof HTMLInputElement) e.stopImmediatePropagation(); }, true);
 
@@ -724,6 +761,7 @@ function win() {
   $('winStars').innerHTML = [0, 1, 2].map(i => `<span class="star${i < nStars ? ' on' : ''}" aria-hidden="true">★</span>`).join('');
   $('winStars').setAttribute('aria-label', `${nStars} of 3 stars`);
   $('winText').textContent = `${level.name} · ${pearls}/${pearlTotal} pearls`;
+  renderLike();
   renderRank('winRank', { score: LB.computeScore({ pearls, distance: level.length, won: true, lives }), pearls, distance: level.length, won: true });
   $('nextBtn').classList.toggle('hidden', levelIdx < 0 || levelIdx >= STARTER_LEVELS.length - 1);
   setTimeout(() => { if (mode === 'win') showOnly('win'); }, 1200);

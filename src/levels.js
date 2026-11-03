@@ -120,6 +120,7 @@ export function normalizeLevel(lv) {
     speedEnd: Math.max(3, Math.min(16, +lv?.speedEnd || +lv?.speed || 7)),
     items: Array.isArray(lv?.items) ? lv.items.filter(i => i && typeof i.t === 'string' && isFinite(+i.z)).map(i => ({ ...i, z: +i.z, x: +i.x || 0 })) : [],
   };
+  if (Number.isInteger(+lv?.cid) && +lv.cid > 0) { out.cid = +lv.cid; out.author = String(lv.author || '').slice(0, 16); }
   out.items.sort((a, b) => a.z - b.z);
   return out;
 }

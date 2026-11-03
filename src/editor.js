@@ -1,4 +1,5 @@
 import { STARTER_LEVELS, normalizeLevel, saveCustom, loadCustom, LANE, countPearls } from './levels.js';
+import { publishLevel, communityOnline } from './community.js';
 
 const $ = (id) => document.getElementById(id);
 const cv = $('map'), ctx = cv.getContext('2d');
@@ -226,6 +227,18 @@ $('copyBtn').onclick = async () => {
   const txt = JSON.stringify(lv, null, 1);
   try { await navigator.clipboard.writeText(txt); toast('Level copied'); }
   catch (e) { openModal('Copy your level', txt, false); }
+};
+$('shareBtn').onclick = async () => {
+  if (!communityOnline()) { toast('Online sharing is not set up'); return; }
+  if (lv.items.length < 3) { toast('Add at least 3 items first'); return; }
+  let name = ''; try { name = localStorage.getItem('cubi_name') || ''; } catch (e) {}
+  name = (prompt(`Share "${lv.name}" with all players.\nYour name (shown as the builder):`, name) || '').trim().slice(0, 16);
+  if (!name) return;
+  try { localStorage.setItem('cubi_name', name); } catch (e) {}
+  const b = $('shareBtn'); b.disabled = true; b.textContent = 'Sharing…';
+  try { await publishLevel(lv, name); toast('Shared! Find it under Player levels'); }
+  catch (e) { toast(e.message || 'Could not share'); }
+  b.disabled = false; b.textContent = '🌍 Share online';
 };
 $('pasteBtn').onclick = () => openModal('Paste a level', '', true);
 $('newBtn').onclick = () => { lv = normalizeLevel({ name: 'My level', length: 200, speed: 6, speedEnd: 7.5, items: [] }); sel = null; scrollZ = 0; save(); bindSettings(); panel(); draw(); };

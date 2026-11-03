@@ -56,3 +56,8 @@ Scores are always saved on the device. To share one ranking list between all pla
 
 The publishable key is meant to be public: the database rules only allow reading scores and adding new ones.
 Score = pearls × 100 + metres swum, plus 1000 for finishing and 300 for every heart left.
+
+## Player levels (shared online)
+
+Players can share levels from the editor (**🌍 Share online**) and play other players' levels from the game menu (**🌍 Player levels**), with plays, likes and a ranking per level.
+Run [`supabase-levels.sql`](supabase-levels.sql) once in the Supabase SQL Editor to enable it. To remove an unwanted level, delete its row in Supabase → Table Editor → `levels`.
