@@ -1098,3 +1098,131 @@ export function animateAnemone(g, dt, near) {
   const k = a.U.uK;
   k.value = near ? Math.min(1, k.value + dt * a.speed) : Math.max(0, k.value - dt * a.back);
 }
+
+// =====================================================================
+// SUNKEN DEBRIS — old treasures half-buried in the sand, overgrown a little
+// =====================================================================
+const DB = { wood: ['#8A5A34', '#A0703F', '#6E4426', '#B07A48'], algae: ['#5FBF6A', '#7FD06A', '#3FA77A'], edge: '#3A2414' };
+function brokenPlank(R, len, w) {
+  const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(len, 0);
+  const n = 4; for (let i = 0; i <= n; i++) s.lineTo(len - (i % 2 ? 0.12 : 0) * R() - 0.02, (w * i) / n);       // splintered end
+  s.lineTo(0, w); s.lineTo(0.05 * R(), w * 0.5); s.closePath();
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1 });
+  geo.translate(-len / 2, -w / 2, -0.025); geo.rotateX(-Math.PI / 2);
+  const m = outline(new THREE.Mesh(geo, toon(DB.wood[Math.floor(R() * 4)])), 0.015, DB.edge);
+  // grain lines + rusty nails
+  const ink = basic('#5A3A20');
+  for (let k = 0; k < 2; k++) { const l = new THREE.Mesh(new THREE.BoxGeometry(len * (0.4 + R() * 0.4), 0.004, 0.008), ink); l.position.set((R() - 0.5) * len * 0.3, 0.032, (R() - 0.5) * w * 0.6); m.add(l); }
+  for (const sx of [-1, 1]) { const nl = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.01, 6), basic('#4A3A3A')); nl.position.set(sx * len * 0.38, 0.034, 0); m.add(nl); }
+  return m;
+}
+function algae(R, n = 3, size = 0.12) {
+  const g = new THREE.Group(); const mat = toon(DB.algae[Math.floor(R() * 3)]);
+  for (let i = 0; i < n; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(size * (0.6 + R() * 0.6), 10, 7), mat); b.scale.y = 0.75; b.position.set((R() - 0.5) * size * 3, 0, (R() - 0.5) * size * 3); g.add(b); }
+  return g;
+}
+function bottle(R) {
+  const cols = ['#4FB86A', '#8A5A2A', '#4F9AD8', '#7FD0C0'];
+  const pts = [[0, 0], [0.09, 0], [0.1, 0.02], [0.1, 0.22], [0.085, 0.27], [0.035, 0.32], [0.032, 0.42], [0.04, 0.44], [0.0, 0.44]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.Group();
+  const glass = outline(new THREE.Mesh(new THREE.LatheGeometry(pts, 14), toon(cols[Math.floor(R() * 4)], { transparent: true, opacity: 0.82 })), 0.012, '#1F3A2A');
+  g.add(glass);
+  const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.06, 8), toon('#C89A5A')); cork.position.y = 0.46; g.add(cork);
+  if (R() < 0.6) { const note = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), toon('#FFF3D0')); note.position.y = 0.12; g.add(note);   // a message in the bottle!
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.037, 0.008, 4, 10), toon('#E8505A')); tie.rotation.x = Math.PI / 2; tie.position.y = 0.12; g.add(tie); }
+  g.rotation.z = Math.PI / 2 - 0.15; g.position.y = 0.07;
+  return g;
+}
+function chest(R) {
+  const g = new THREE.Group(); const wood = toon('#A0632F'), band = toon('#C9A040'), e = DB.edge;
+  const box = outline(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.45, 0.5), wood), 0.02, e); box.position.y = 0.2; g.add(box);
+  for (const x of [-0.3, 0.3]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.47, 0.52), band); b.position.set(x, 0.2, 0); g.add(b); }
+  const lidP = new THREE.Group(); lidP.position.set(0, 0.43, -0.25); lidP.rotation.x = -0.9 - R() * 0.3; g.add(lidP);
+  const lid = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 14, 1, false, 0, Math.PI), wood), 0.02, e); lid.rotation.z = Math.PI / 2; lid.position.z = 0.25; lidP.add(lid);
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.04), band); lock.position.set(0, 0.32, 0.26); g.add(lock);
+  // gold coins piled inside and spilling onto the sand
+  const coinG = new THREE.CylinderGeometry(0.055, 0.055, 0.015, 12), gold = toon('#FFC93C', { emissive: '#5A3A00' });
+  const coins = new THREE.InstancedMesh(coinG, gold, 26); const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e3 = new THREE.Euler();
+  for (let i = 0; i < 26; i++) {
+    const inside = i < 14;
+    const p = inside ? new THREE.Vector3((R() - 0.5) * 0.6, 0.42 + R() * 0.06, (R() - 0.5) * 0.3) : new THREE.Vector3((R() - 0.5) * 0.9, 0.095, 0.3 + R() * 0.45);
+    m.compose(p, q.setFromEuler(e3.set((R() - 0.5) * 0.6, R() * 6, (R() - 0.5) * 0.6)), new THREE.Vector3(1, 1, 1)); coins.setMatrixAt(i, m);
+  }
+  g.add(coins);
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), toon('#FF4A8A')); gem.position.set(0.15, 0.48, 0.05); g.add(gem);
+  g.position.y = -0.08; g.rotation.z = (R() - 0.5) * 0.15;
+  return g;
+}
+function amphora(R) {
+  const pts = [[0, 0], [0.06, 0.0], [0.16, 0.1], [0.21, 0.3], [0.18, 0.5], [0.09, 0.62], [0.07, 0.75], [0.1, 0.8], [0.0, 0.8]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.Group(); const clay = ['#D8834A', '#C46A3A', '#E09A5A'][Math.floor(R() * 3)];
+  const geo = new THREE.LatheGeometry(pts, 18);
+  paintGradient(geo, '#fff', '#fff', 'y', 0, 1, (c, i, p) => { c.set(clay); const y = p.getY(i); if (Math.abs(y - 0.32) < 0.025 || Math.abs(y - 0.4) < 0.015) c.set('#5A2A14'); });
+  g.add(outline(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true })), 0.015, '#4A2210'));
+  for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.022, 6, 12, Math.PI), toon(clay)); h.position.set(sx * 0.12, 0.62, 0); h.rotation.set(0, 0, sx > 0 ? -Math.PI / 2 : Math.PI / 2); g.add(h); }
+  const lying = R() < 0.7; if (lying) { g.rotation.z = Math.PI / 2 - 0.1; g.position.y = 0.15; } else { g.position.y = -0.12; g.rotation.z = (R() - 0.5) * 0.4; }
+  return g;
+}
+function porthole() {
+  const g = new THREE.Group();
+  g.add(outline(new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 8, 22), toon('#C9A040')), 0.015, '#4A3A10'));
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), toon('#7FD8E8', { transparent: true, opacity: 0.7 })); g.add(glass);
+  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), toon('#8A7020')); const a = i / 6 * Math.PI * 2; b.position.set(Math.cos(a) * 0.22, Math.sin(a) * 0.22, 0.05); g.add(b); }
+  g.rotation.x = -Math.PI / 2 + 0.2; g.position.y = 0.04;
+  return g;
+}
+function chain(R, n = 9) {
+  const g = new THREE.Group(); const m = toon('#6A5A50'); const geo = new THREE.TorusGeometry(0.07, 0.022, 6, 12);
+  let a = R() * 6, x = 0, z = 0;
+  for (let i = 0; i < n; i++) { const l = new THREE.Mesh(geo, m); a += (R() - 0.5) * 0.6; x += Math.cos(a) * 0.11; z += Math.sin(a) * 0.11; l.position.set(x, 0.02, z); l.rotation.set(i % 2 ? Math.PI / 2 : 0.2, -a, 0); l.scale.y = 1.5; g.add(l); }
+  return g;
+}
+const DEBRIS_SETS = ['planks', 'planks', 'bottles', 'anchor', 'chest', 'amphoras', 'cannon', 'wheel', 'barrel'];
+export function makeDebris(seed = 0) {
+  const R = rng(seed * 29 + 7);
+  const g = new THREE.Group();
+  const set = DEBRIS_SETS[seed % DEBRIS_SETS.length];
+  const put = (o, x, z, ry = R() * 6) => { o.position.x += x; o.position.z += z; const w = new THREE.Group(); w.rotation.y = ry; w.add(o); g.add(w); return o; };
+  if (set === 'planks') {
+    const n = 2 + Math.floor(R() * 3);
+    for (let i = 0; i < n; i++) { const p = brokenPlank(R, 0.9 + R() * 0.8, 0.16 + R() * 0.06); p.position.y = 0.01 + i * 0.03; p.rotation.z = (R() - 0.5) * 0.12; put(p, (R() - 0.5) * 0.5, (R() - 0.5) * 0.5); }
+    if (R() < 0.5) put(bottle(R), 0.6, 0.3);
+  }
+  if (set === 'bottles') { for (let i = 0; i < 2 + Math.floor(R() * 3); i++) put(bottle(R), (R() - 0.5) * 0.9, (R() - 0.5) * 0.9); put(brokenPlank(R, 0.7, 0.15), 0.4, -0.3); }
+  if (set === 'anchor') { const a = anchor(); a.rotation.z = 1.25; a.position.y = 0.08; a.scale.setScalar(0.8); put(a, 0, 0); put(chain(R, 10), 0.45, 0.2); }
+  if (set === 'chest') { put(chest(R), 0, 0, (R() - 0.5) * 1.2); put(bottle(R), -0.7, 0.4); }
+  if (set === 'amphoras') { for (let i = 0; i < 2 + Math.floor(R() * 2); i++) put(amphora(R), (R() - 0.5) * 1.0, (R() - 0.5) * 0.8); }
+  if (set === 'cannon') { const c = cannon(); c.position.y = 0.1; c.rotation.x = 0.1; put(c, 0, 0); const ball = toon('#2A2A34'); for (let i = 0; i < 3; i++) { const b = outline(new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), ball), 0.012, '#0A0A10'); b.position.set(0.35 + i * 0.18, 0.08, 0.5 + (i % 2) * 0.12); g.add(b); } put(brokenPlank(R, 1.1, 0.18), -0.3, -0.4); }
+  if (set === 'wheel') { const w = wheel(); w.position.y = 0.3; w.rotation.x = -0.25; put(w, 0, 0); put(porthole(), 0.7, 0.3); put(brokenPlank(R, 0.8, 0.16), -0.5, 0.2); }
+  if (set === 'barrel') { const b = barrel(); b.rotation.z = Math.PI / 2; b.position.set(-0.35, 0.28, 0); put(b, 0, 0); put(brokenPlank(R, 0.9, 0.17), 0.3, 0.4); put(porthole(), -0.6, 0.5); }
+  // a little life has moved in
+  for (let i = 0; i < 2 + Math.floor(R() * 3); i++) { const a = algae(R, 3, 0.09); a.position.set((R() - 0.5) * 1.1, 0.03, (R() - 0.5) * 1.1); g.add(a); }
+  if (R() < 0.5) { const s = makeStarfish(Math.floor(R() * 6)); s.scale.setScalar(0.6); s.position.set((R() - 0.5) * 1.2, 0.02, (R() - 0.5) * 1.2); g.add(s); }
+  return g;
+}
+
+// =====================================================================
+// SEAGRASS MEADOW — dense ribbons that sway in the current (instanced, shader sway)
+// =====================================================================
+let _blade = null, _bladeMat = null;
+export function makeSeagrass(seed = 0, radius = 1.4, n = 140) {
+  if (!_blade) {
+    const b = new THREE.PlaneGeometry(0.06, 1, 1, 6); b.translate(0, 0.5, 0);
+    const p = b.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setX(i, p.getX(i) * (1 - y * 0.55)); p.setZ(i, y * y * 0.08); }     // tapering, slightly curved
+    b.computeVertexNormals(); _blade = b;
+    _bladeMat = swayShader(new THREE.MeshToonMaterial({ color: '#ffffff', side: THREE.DoubleSide, gradientMap: toon('#fff').gradientMap }), 0);
+  }
+  const R = rng(seed * 41 + 3);
+  const mesh = new THREE.InstancedMesh(_blade, _bladeMat, n);
+  const greens = ['#3FBF6A', '#5AD07A', '#2FA860', '#7FD86A', '#4FC88A'].map(c => new THREE.Color(c));
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), cc = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const a = R() * Math.PI * 2, r = Math.sqrt(R()) * radius;
+    const h = (0.55 + R() * 0.75) * (1.15 - (r / radius) * 0.5);
+    m.compose(new THREE.Vector3(Math.cos(a) * r, -0.02, Math.sin(a) * r), q.setFromEuler(e.set((R() - 0.5) * 0.35, R() * 6, (R() - 0.5) * 0.35)), new THREE.Vector3(1, h, 1));
+    mesh.setMatrixAt(i, m); mesh.setColorAt(i, cc.copy(greens[Math.floor(R() * greens.length)]).multiplyScalar(0.85 + R() * 0.3));
+  }
+  mesh.instanceColor.needsUpdate = true; mesh.frustumCulled = false;
+  const g = new THREE.Group(); g.add(mesh);
+  return g;
+}

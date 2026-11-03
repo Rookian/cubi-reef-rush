@@ -244,6 +244,8 @@ const KINDS = {
   hammer: { make: () => CR.makeHammerhead(), shape: () => [] },
   seasnake: { make: () => CR.makeSeaSnake(), shape: () => [] },
   babyturtle: { make: () => M.makeTurtle(true), shape: () => [] },
+  debris: { make: () => RF.makeDebris(ri(0, 89)), shape: () => [] },
+  seagrass: { make: () => RF.makeSeagrass(ri(0, 50), rf(1.1, 1.8), ri(110, 170)), shape: () => [] },
   grazer: { make: () => CR.makeGrazer(ri(0, 7)), shape: () => [] },
   shrimp: { make: () => CR.makeShrimp(ri(0, 3)), shape: () => [] },
   magnifica: { make: () => anemK(RF.makeMagnifica(ri(0, 3), rf(1.5, 2.0))), shape: () => [] },
@@ -281,7 +283,7 @@ function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 function rf(a, b) { return a + Math.random() * (b - a); }
 
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
-const NOGLOW = ['bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
+const NOGLOW = ['debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
   if (kind === 'heroanem' && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
@@ -496,6 +498,10 @@ function sharedLife(z, bg) {
   else if (Math.random() < 0.01) { const sd = Math.random() < 0.5 ? -1 : 1; spawn('whaleshark', sd * rf(9, 12), rf(7.5, 9.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: 0, swim: [0, -rf(1.8, 2.6)] }); }
   if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3), y0 = rf(4.4, 5.6); for (let k = 0; k < n; k++) spawn('babyturtle', -dir * (10 + k * rf(0.9, 1.6)), y0 + rf(-0.5, 0.5), z - 6 + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
   if (Math.random() < 0.22) spawn('xmas', side * rf(2.4, 3.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15), xmas: true });
+  if (Math.random() < 0.13) spawn('debris', side * rf(3.7, 6.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.2) });
+  if (Math.random() < 0.04) spawn('debris', rf(-2.6, 2.6), 0, z, { solid: false, ry: rf(0, 6) });
+  if (Math.random() < 0.45) spawn('seagrass', side * rf(3.8, 9), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) });
+  if (Math.random() < 0.18) spawn('seagrass', rf(-3, 3), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.6, 0.85) });
   if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
   if (Math.random() < 0.16) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }

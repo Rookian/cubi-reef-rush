@@ -56,6 +56,12 @@ if (which === 'lush') {
   const sw = add(M.makeSchool('chromis', 26, 18, 'plain', 0.36), 0.5, 3.3, -1.5, -0.7); anim.push(dt => { RF.reefClock.value += dt; M.animateSchool(sw, dt); });
   cam.position.set(0, 2.6, 8.5); cam.lookAt(0, 1.0, 0);
 }
+if (which === 'debris') {
+  for (let i = 0; i < 9; i++) add(RF.makeDebris(i), -4 + (i % 3) * 4, 0, -2.2 + Math.floor(i / 3) * 2.0, 0.4 * i);
+  add(RF.makeSeagrass(1, 1.4, 150), -6.5, 0, -1.5); add(RF.makeSeagrass(2, 1.2, 130), 6.2, 0, -0.5);
+  anim.push(dt => { RF.reefClock.value += dt; });
+  cam.position.set(0, 4.8, 7.8); cam.lookAt(0, 0, -0.3); if (location.search.includes('near')) { cam.position.set(0, 2.2, 3.6); cam.lookAt(0, 0.1, -0.6); }
+}
 if (which === 'grazers') {
   const a = add(CR.makeGrazer(0), -1.6, 0, 0, Math.PI * 0.62), b2 = add(CR.makeGrazer(1), 1.8, 0, -0.5, -Math.PI * 0.6), c3 = add(CR.makeGrazer(3), 0.2, 0, 1.6, Math.PI * 0.85);
   for (let i = 0; i < 70; i++) [a, b2, c3].forEach((g, k) => CR.animateGrazer(g, 1 / 60 + k * 0.004, false));
