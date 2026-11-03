@@ -7,6 +7,10 @@ Built with [three.js](https://threejs.org/) — everything (characters, corals, 
 
 ## Play
 
+**Online:** https://rookian.github.io/cubi-reef-rush/ · [level editor](https://rookian.github.io/cubi-reef-rush/editor.html)
+
+**Locally:**
+
 ```bash
 npm install
 npm run build
