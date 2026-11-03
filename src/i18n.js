@@ -1,7 +1,16 @@
 // English / German. All texts are written in English in the code and HTML; when German is chosen,
 // every text node (also ones added later: toasts, lists, rankings) is translated on the way to the screen.
 let lang = 'en';
-try { lang = localStorage.getItem('cubi_lang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (e) {}
+// default: the browser language (first of the browser's preferred languages that is German or English);
+// a flag the player tapped is remembered and wins over that
+function browserLang() {
+  for (const l of (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'])) {
+    const c = String(l).toLowerCase().slice(0, 2); if (c === 'de' || c === 'en') return c;
+  }
+  return 'en';
+}
+lang = browserLang();
+try { const saved = localStorage.getItem('cubi_lang2'); if (saved === 'de' || saved === 'en') lang = saved; localStorage.removeItem('cubi_lang'); } catch (e) {}
 document.documentElement.lang = lang;
 export const getLang = () => lang;
 
@@ -128,7 +137,7 @@ const listeners = [];
 export function onLangChange(fn) { listeners.push(fn); }
 export function setLang(l) {
   if (l === lang) return; lang = l; document.documentElement.lang = l;
-  try { localStorage.setItem('cubi_lang', l); } catch (e) {}
+  try { localStorage.setItem('cubi_lang2', l); } catch (e) {}
   busy = true; walk(document.body); obs.takeRecords(); busy = false;
   listeners.forEach(fn => fn(l));
   document.querySelectorAll('.langSwitch button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === l)));
