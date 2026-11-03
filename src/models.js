@@ -659,7 +659,7 @@ function colorize(geo, col) {
   return geo;
 }
 // shapes: radii [x, y, z]
-export const REEF_SHAPES = { tang: [0.17, 0.3, 0.42], chromis: [0.17, 0.25, 0.29], butterfly: [0.11, 0.36, 0.36], wrasse: [0.12, 0.19, 0.5], dot: [0.14, 0.17, 0.22], rainbow: [0.12, 0.22, 0.4], parrot: [0.2, 0.28, 0.58], grouper: [0.3, 0.34, 0.68] };
+export const REEF_SHAPES = { tang: [0.17, 0.3, 0.42], chromis: [0.17, 0.25, 0.29], butterfly: [0.11, 0.36, 0.36], wrasse: [0.12, 0.19, 0.5], dot: [0.14, 0.17, 0.22], rainbow: [0.12, 0.22, 0.4], parrot: [0.2, 0.28, 0.58], grouper: [0.3, 0.34, 0.68], regal: [0.14, 0.28, 0.46], idol: [0.08, 0.36, 0.3] };
 // bright, saturated palettes (body, top, fin, tail, accent)
 export const REEF_PALETTES = [
   ['#1E90FF', '#0A5BD8', '#FFE600', '#FFE600', '#0A2A6A'],
@@ -685,12 +685,23 @@ export const REEF_PALETTES = [
   // 18-19: anthias (tiny orange / pink swarm fish)
   ['#FF7A1A', '#FF5A00', '#FFB060', '#FFB060', '#FFD0A0'],
   ['#FF5CA8', '#E83A8A', '#FFB0D8', '#FFA040', '#FFD0E8'],
+  // 20: palette surgeonfish (royal blue, black "palette", yellow tail)
+  ['#1E5BFF', '#1E5BFF', '#14204A', '#FFD000', '#14204A'],
+  // 21: moorish idol (white/yellow, black bands, orange snout)
+  ['#FFFDF0', '#FFFDF0', '#FFFFFF', '#1A1A1A', '#1A1A1A'],
+  // 22-24: damselfish: blue-green chromis, yellowtail damsel, humbug
+  ['#5FE0FF', '#3FB8F0', '#9AF0FF', '#9AF0FF', '#2A6A9A'],
+  ['#1E5BFF', '#0A3AC8', '#3E8BFF', '#FFE600', '#FFE600'],
+  ['#FFFFFF', '#F4F4F4', '#1A1A1A', '#FFFFFF', '#1A1A1A'],
 ];
 const SPECIES = [
   { w: 4, gen: () => ({ shape: 'chromis', pattern: 'plain', pal: 18 + (Math.random() < 0.35 ? 1 : 0), n: 18 + Math.floor(Math.random() * 14), size: 0.32 + Math.random() * 0.12 }) },
   { w: 5, gen: () => ({}) },                                                                      // random reef fish
   { w: 2, gen: () => ({ shape: 'rainbow', pattern: 'rainbow', pal: 0, n: 6 + Math.floor(Math.random() * 8) }) },
   { w: 1.5, gen: () => ({ shape: 'parrot', pattern: 'face', pal: 12 + Math.floor(Math.random() * 3), n: 1 + Math.floor(Math.random() * 3), size: 1.3 + Math.random() * 0.5 }) },
+  { w: 2, gen: () => ({ shape: 'regal', pattern: 'regal', pal: 20, n: 1 + Math.floor(Math.random() * 4), size: 1.0 + Math.random() * 0.4 }) },
+  { w: 1.5, gen: () => ({ shape: 'idol', pattern: 'idol', pal: 21, n: 1 + Math.floor(Math.random() * 3), size: 1.1 + Math.random() * 0.4 }) },
+  { w: 3, gen: () => { const k = Math.floor(Math.random() * 3); return { shape: 'chromis', pattern: k === 1 ? 'ytail' : k === 2 ? 'humbug' : 'plain', pal: 22 + k, n: 8 + Math.floor(Math.random() * 12), size: 0.4 + Math.random() * 0.15 }; } },
   { w: 1, gen: () => ({ shape: 'grouper', pattern: 'dots', pal: 15 + Math.floor(Math.random() * 3), n: 1 + (Math.random() < 0.3 ? 1 : 0), size: 1.7 + Math.random() * 0.6 }) },
 ];
 const PATTERNS = ['plain', 'plain', 'band', 'line', 'bars', 'nose'];
@@ -701,8 +712,10 @@ export function reefFishGeometries(shape, pal, pattern) {
   const [B, T, F, TL, A] = REEF_PALETTES[pal];
   const [rx, ry, rz] = REEF_SHAPES[shape];
   const big = shape === 'grouper' || shape === 'parrot';
-  let body = new THREE.SphereGeometry(1, big ? 36 : 12, big ? 26 : 9); body.scale(rx, ry, rz);
+  const fine = ['regal', 'idol', 'humbug', 'ytail'].includes(pattern);
+  let body = new THREE.SphereGeometry(1, big ? 36 : fine ? 28 : 12, big ? 26 : fine ? 20 : 9); body.scale(rx, ry, rz);
   const p = body.attributes.position;
+  if (shape === 'idol') for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z < -rz * 0.4) { const k = (-z / rz - 0.4) / 0.6; p.setY(i, p.getY(i) * (1 - 0.65 * k)); p.setZ(i, z - k * k * rz * 0.45); } }
   for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z > 0) { const k = z / rz; p.setY(i, p.getY(i) * (1 - 0.4 * k * k)); p.setX(i, p.getX(i) * (1 - 0.3 * k * k)); } }
   body.deleteAttribute('uv'); body.deleteAttribute('normal'); body = mergeVertices(body); body.computeVertexNormals();
   const cb = new THREE.Color(B), ct = new THREE.Color(T), ca = new THREE.Color(A), cw = new THREE.Color('#FFFFFF');
@@ -717,6 +730,19 @@ export function reefFishGeometries(shape, pal, pattern) {
     if (pattern === 'nose' && zn < -0.62) c.copy(ca);
     if (pattern === 'rainbow') { const h = ((zn + 1) * 0.42 + yn * 0.08) % 1; c.setHSL(h, 1, 0.58 + Math.max(0, yn) * 0.12); }
     if (pattern === 'face') { if (zn < -0.8) c.set('#F2FFFA'); else if (Math.abs(zn + 0.42 + yn * 0.15) < 0.05 || Math.abs(zn + 0.6 - yn * 0.1) < 0.035) c.copy(ca); }
+    if (pattern === 'regal') {
+      const inSpot = ((zn - 0.02) / 0.3) ** 2 + ((yn - 0.38) / 0.2) ** 2 < 1;
+      if (yn > 0.0 && zn > -0.55 && zn < 0.62 && !inSpot) c.copy(ca);                          // the black "palette"
+      if (zn > 0.5 && Math.abs(yn - (0.2 - (zn - 0.5) * 0.9)) < 0.17) c.copy(ca);               // sweeps down to the tail
+      if (zn > 0.86) c.set('#FFD000');                                                           // yellow tail base
+    }
+    if (pattern === 'idol') {
+      c.set(zn > 0.3 ? '#FFE600' : '#FFFDF0');
+      if (Math.abs(zn + 0.28) < 0.17 || Math.abs(zn - 0.4) < 0.12) c.copy(ca);
+      if (zn < -0.7 && yn > -0.1) c.set('#FF8A00');
+    }
+    if (pattern === 'ytail' && zn > 0.55) c.set('#FFE600');
+    if (pattern === 'humbug' && (Math.abs(zn + 0.45) < 0.13 || Math.abs(zn - 0.2) < 0.14 || zn > 0.8)) c.copy(ca);
     if (pattern === 'dots') { const a = Math.atan2(x, y); if (Math.sin(zn * 16) > 0.75 && Math.sin(a * 9) > 0.7 && zn > -0.75) c.copy(ca); if (zn < -0.88 && Math.abs(yn) < 0.3) c.copy(ct); }
   });
   const hull = body.clone();
@@ -728,6 +754,8 @@ export function reefFishGeometries(shape, pal, pattern) {
   add(new THREE.ShapeGeometry(fanPath(rz * 0.75, 0.9, 1), 12), tailM, TL);
   add(new THREE.ShapeGeometry(fanPath(ry * 0.8, 0.6), 10), dorsM, F);
   for (const sx of [-1, 1]) add(new THREE.ShapeGeometry(fanPath(rx * 1.4, 0.55), 10), m4.clone().compose(new THREE.Vector3(sx * rx * 0.9, -ry * 0.2, -rz * 0.1), q.clone().setFromEuler(e.set(0, sx > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, 0)), one), F);
+  let streamer = null;
+  if (shape === 'idol') { streamer = new THREE.Shape(); streamer.moveTo(-0.1, 0); streamer.quadraticCurveTo(0.0, 0.55, 0.62, 0.78); streamer.quadraticCurveTo(0.05, 0.42, 0.1, 0); streamer.closePath(); add(new THREE.ShapeGeometry(streamer, 16), m4.clone().compose(new THREE.Vector3(0, ry * 0.75, -rz * 0.15), q.clone().setFromEuler(e.set(0, -Math.PI / 2, 0)), one), '#FFFFFF'); }
   const bodyAll = mergeGeometries([body.toNonIndexed(), ...parts]);
   const ink = [];
   const inkAdd = (g, m, col) => { g.applyMatrix4(m); g.deleteAttribute('normal'); ink.push(colorize(g, col)); };
@@ -740,6 +768,7 @@ export function reefFishGeometries(shape, pal, pattern) {
   }
   const tube = (shapeP, m) => { const pts = shapeP.getPoints(30).map(v => new THREE.Vector3(v.x, v.y, 0)); inkAdd(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 32, 0.008, 4, true), m, OUTLINE); };
   tube(fanPath(rz * 0.75, 0.9, 1), tailM); tube(fanPath(ry * 0.8, 0.6), dorsM);
+  if (streamer) tube(streamer, m4.clone().compose(new THREE.Vector3(0, ry * 0.75, -rz * 0.15), q.clone().setFromEuler(e.set(0, -Math.PI / 2, 0)), one));
   const res = { body: bodyAll, hull, ink: mergeGeometries(ink), len: rz };
   return (fishGeoCache[key] = res);
 }
@@ -817,29 +846,31 @@ export function animateSchool(g, dt) {
 }
 
 // Sea turtle — big, slow and friendly. Faces -Z.
-export function makeTurtle() {
+export function makeTurtle(baby = false) {
   const root = new THREE.Group(); const rig = new THREE.Group(); root.add(rig);
   const edge = '#1F4A3A';
+  const HS = baby ? 1.45 : 1, ES = baby ? 1.6 : 1;
   let shell = new THREE.SphereGeometry(1, 40, 24, 0, Math.PI * 2, 0, Math.PI / 2); shell.scale(0.85, 0.58, 1.05);
   shell = smooth(shell);
-  const shellM = outline(new THREE.Mesh(shell, toon('#5FB86A')), 0.035, edge); rig.add(shellM);
+  const shellM = outline(new THREE.Mesh(shell, toon(baby ? '#6FD08A' : '#5FB86A')), 0.035, edge); rig.add(shellM);
   const under = outline(new THREE.Mesh(smooth(new THREE.CylinderGeometry(0.86, 0.8, 0.12, 40)), toon('#F2E3A8')), 0.03, edge);
   under.scale.set(1, 1, 1.22); under.position.y = -0.02; rig.add(under);
   // shell patches
-  const patch = toon('#3F9A55');
+  const patch = toon(baby ? '#4FB878' : '#3F9A55');
   const R = rng(4);
   for (const [x, z, r] of [[0, 0, 0.26], [0, 0.48, 0.2], [0, -0.48, 0.2], [0.42, 0.22, 0.18], [-0.42, 0.22, 0.18], [0.42, -0.25, 0.18], [-0.42, -0.25, 0.18]]) {
     const d = new THREE.Mesh(new THREE.CircleGeometry(r, 6), patch);
     if (stickFrom(shellM, new THREE.Vector3(x, 3, z), new THREE.Vector3(0, -1, 0), d, 0.01)) { d.rotateZ(R() * 3); rig.add(d); }
   }
-  const skin = toon('#9ED48A');
+  const skin = toon(baby ? '#B4E89A' : '#9ED48A');
+  const headG = new THREE.Group(); headG.position.set(0, 0.12, -1.15); headG.scale.setScalar(HS); if (baby) headG.position.z = -1.25; rig.add(headG);
   const head = outline(new THREE.Mesh(smooth(new THREE.SphereGeometry(0.3, 28, 20)), skin), 0.03, edge);
-  head.scale.set(1, 0.85, 1.15); head.position.set(0, 0.12, -1.15); rig.add(head);
+  head.scale.set(1, 0.85, 1.15); headG.add(head);
   for (const sx of [-1, 1]) {
-    const e = placeEye(makeEye(0.09, edge), new THREE.Vector3(sx * 0.17, 0.22, -1.3), new THREE.Vector3(sx * 0.6, 0.2, -1).normalize()); rig.add(e);
-    const b = decal(0.05, 0.03, '#FF8FA3', 0.6); b.position.set(sx * 0.2, 0.06, -1.36); b.rotation.y = Math.PI + sx * 0.5; rig.add(b);
+    const e = placeEye(makeEye(0.09 * ES / HS * (baby ? 0.95 : 1), edge), new THREE.Vector3(sx * 0.17, 0.1, -0.15), new THREE.Vector3(sx * 0.6, 0.2, -1).normalize()); headG.add(e);
+    const b = decal(0.05, 0.03, '#FF8FA3', 0.6); b.position.set(sx * 0.2, -0.06, -0.21); b.rotation.y = Math.PI + sx * 0.5; headG.add(b);
   }
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.014, 8, 20, Math.PI), basic(edge)); smile.position.set(0, 0.05, -1.48); smile.rotation.set(0, Math.PI, Math.PI); rig.add(smile);
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.014, 8, 20, Math.PI), basic(edge)); smile.position.set(0, -0.07, -0.33); smile.rotation.set(0, Math.PI, Math.PI); headG.add(smile);
   const flip = (len, w) => { const s = new THREE.Shape(); s.moveTo(0, -w * 0.5); s.quadraticCurveTo(len * 0.6, -w * 0.9, len, -w * 0.15); s.quadraticCurveTo(len * 0.7, w * 0.6, 0, w * 0.5); s.closePath();
     const g = new THREE.ExtrudeGeometry(s, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2 }); g.rotateX(Math.PI / 2); return outline(new THREE.Mesh(smooth(g), skin), 0.022, edge); };
   const flippers = [];

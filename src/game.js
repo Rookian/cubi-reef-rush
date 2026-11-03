@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as M from './models.js';
 import * as RF from './reef.js';
+import * as CR from './critters.js';
 import { makeRenderer, setupScene, makeFloor, rayTexture } from './env.js';
 import { STARTER_LEVELS, normalizeLevel, countPearls, loadCustom, LANE, HAZARDS } from './levels.js';
 
@@ -227,6 +228,14 @@ const KINDS = {
   bank: { make: () => RF.makeBank(ri(1, 9999)), shape: () => [] },
   kelp: { make: () => M.makeSeaweed(pick(['#2FB070', '#3FC27F', '#5AD08A']), rf(2.2, 3.4)), shape: () => [] },
   patch: { make: () => RF.makeReefMound(ri(1, 9999), 0.4), shape: () => [] },
+  whaleshark: { make: () => CR.makeWhaleShark(), shape: () => [] },
+  hammer: { make: () => CR.makeHammerhead(), shape: () => [] },
+  seasnake: { make: () => CR.makeSeaSnake(), shape: () => [] },
+  babyturtle: { make: () => M.makeTurtle(true), shape: () => [] },
+  shrimp: { make: () => CR.makeShrimp(ri(0, 3)), shape: () => [] },
+  magnifica: { make: () => anemK(RF.makeMagnifica(ri(0, 3), rf(1.5, 2.0))), shape: () => [] },
+  gigantea: { make: () => anemK(RF.makeGigantea(ri(0, 3), rf(1.6, 2.1))), shape: () => [] },
+  mertensii: { make: () => anemK(RF.makeMertensii(ri(0, 3), rf(1.4, 1.8))), shape: () => [] },
   heroanem: { make: () => RF.makeFluffyAnemone(ri(0, 99), rf(1.8, 2.3)), shape: () => [] },
   moundbig: { make: () => RF.makeReefMound(ri(1, 9999), 1.5), shape: () => [] },
   wallfar: { make: () => RF.makeReefWall(ri(1, 999), true), shape: () => [] },
@@ -258,7 +267,9 @@ function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 function rf(a, b) { return a + Math.random() * (b - a); }
 
+function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
 function spawn(kind, x, y, z, opt = {}) {
+  if (kind === 'heroanem' && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
   let mesh = pool.pop();
   if (!mesh) { mesh = KINDS[kind].make(); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
@@ -465,6 +476,10 @@ function sharedLife(z, bg) {
     else spawn('school', sd * rf(6.5, 11), rf(1.8, 6.5), z + rf(-2, 2), { solid: false, ry: rf(-0.3, 0.3), swim: [rf(-0.3, 0.3), -rf(0.8, 3.2)] });
   }
   if (Math.random() < 0.02) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('manta', -dir * 14, rf(7, 8.5), z - 6, { solid: false, scale: rf(1.2, 1.6), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 2.2, 0], maxX: 20 }); }
+  if (Math.random() < 0.012) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whaleshark', -dir * 26, rf(8.5, 10.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.5, 0], maxX: 32 }); }
+  else if (Math.random() < 0.01) { const sd = Math.random() < 0.5 ? -1 : 1; spawn('whaleshark', sd * rf(9, 12), rf(7.5, 9.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: 0, swim: [0, -rf(1.8, 2.6)] }); }
+  if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3), y0 = rf(4.4, 5.6); for (let k = 0; k < n; k++) spawn('babyturtle', -dir * (10 + k * rf(0.9, 1.6)), y0 + rf(-0.5, 0.5), z - 6 + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
+  if (Math.random() < 0.16) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
@@ -482,6 +497,12 @@ function spawnItem(it, z) {
     case 'wreckgate': { const hx = THREE.MathUtils.clamp(+it.x || 0, -2.2, 2.2); const gm = RF.makeWreckGate(hx); scene.add(gm); objs.push({ kind: 'gate', mesh: gm, x: 0, y: 0, z, hx, shapes: [], noPool: true, gate: true }); break; }
     case 'moray': { const sd = (+it.x || 1) >= 0 ? 1 : -1; const tube = it.home ? it.home === 'tube' : Math.random() < 0.5; spawn(tube ? 'moraytube' : 'moray', sd * (tube ? 4.6 : 5.0), 0, z, { scale: 1.3, solid: false, ry: sd > 0 ? -Math.PI / 2 : Math.PI / 2, side: sd, moray: true, tube, phase: 'peek', mt: 0 }); break; }
     case 'kraken': spawn('kraken', THREE.MathUtils.clamp(+it.x || 0, -2.5, 2.5), 5.0, z, { solid: false, kraken: true, phase: 'wait', mt: 0, scale: 1.15 }); break;
+    case 'hammer': case 'seasnake': {
+      const dir = it.from === 'right' ? -1 : it.from === 'left' ? 1 : (x > 0 ? -1 : 1);
+      const hammer = it.t === 'hammer';
+      spawn(it.t, -dir * 12, hammer ? (+it.y || LANE.mid) : (+it.y || LANE.low), z, { crosser: dir, ry: -dir * Math.PI / 2, scale: hammer ? 1.15 : 1.8, halfL: hammer ? 1.35 : 1.25, rad: hammer ? 0.42 : 0.2, cOff: hammer ? 0.2 : -1.1, warn: hammer ? 'Hammerhead!' : 'Sea snake!' });
+      break;
+    }
     case 'shark': spawn('shark', x, y, z - 6, { vz: 4, shark: true }); break;
     case 'anemone': {
       const a = spawn('anemone', x, 0, z, { scale: 1.3, solid: false });
@@ -535,7 +556,7 @@ function useToxin() {
   puffCloud(P.x, P.y, 0, 1);
   // scare everything nearby
   for (const o of objs) {
-    if (!(o.hazard || o.shark || o.moray || o.kraken) || o.sick) continue;
+    if (!(o.hazard || o.shark || o.moray || o.kraken || o.crosser) || o.sick) continue;
     const d = Math.hypot(o.x - P.x, (o.y || 0) - P.y, o.z);
     if (d < (o.shark ? 9 : 4.5)) makeSick(o);
   }
@@ -830,8 +851,10 @@ function step(dt) {
     if (o.kind === 'shark') updateShark(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
     if (o.kind === 'anemone' && o.z > -40 && o.z < 10) M.animateAnemone(o.mesh, dt);
+    if (o.mesh.userData.anem && o.z > -40 && o.z < 10) RF.animateAnemone(o.mesh, dt, Math.abs(o.z) < 3.2 && Math.abs(o.x - P.x) < 2.8 && P.y < 3.2);
     if (o.xmas && o.z > -30) RF.animateXmas(o.mesh, dt, Math.abs(o.z) < 4.5 && Math.abs(o.x - P.x) < 3.6 && P.y < 3.4);
     if (o.kind === 'nudi' && o.z > -30) RF.animateNudi(o.mesh, dt);
+    if (o.crosser) updateCrosser(o, dt);
     if (o.gate) updateGate(o, dt);
     if (o.moray) updateMoray(o, dt);
     if (o.kraken) updateKraken(o, dt);
@@ -851,6 +874,11 @@ function step(dt) {
       else if (o.kind === 'manta') RF.animateManta(o.mesh, dt);
       else if (o.kind === 'eel') RF.animateEel(o.mesh, dt);
       else if (o.kind === 'whale') RF.animateWhale(o.mesh, dt);
+      else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
+      else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
+      else if (o.kind === 'shrimp' && o.z > -25) CR.animateShrimp(o.mesh, dt);
+      else if (o.kind === 'hammer') CR.animateHammerhead(o.mesh, dt);
+      else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
     }
     if (o.kind === 'pearl') { o.mesh.children[0].rotation.y += dt * 2; o.mesh.position.y = o.y + Math.sin(t * 2 + o.ph) * 0.08; }
     if (o.kind === 'flee') { o.x += o.flee * 7 * dt; o.y += 2 * dt; o.mesh.rotation.y = o.flee * 1.3; M.animateFish(o.mesh, dt, 1); }
@@ -990,6 +1018,18 @@ function updateMoray(o, dt) {
     if (cpt.distanceTo(_mv3) < 0.32 + B.r) hurt('Chomp! Moray!');
   }
 }
+// --- crossers (hammerhead, sea snake): wait at the side, then swim across the lane so they pass Cubi's spot right on time
+function updateCrosser(o, dt) {
+  if (o.sick) { o.mesh.rotation.y = o.flee > 0 ? -Math.PI / 2 : Math.PI / 2; return; }
+  if (!o.go) {
+    o.x = -o.crosser * 12;
+    if (o.z > -24) { o.go = true; o.vx = o.crosser * 12 / (24 / Math.max(speed, 2)); if (mode === 'play') toast(o.warn); }
+  } else o.x += o.vx * dt;
+  if (mode === 'play' && invuln <= 0 && Math.abs(o.z) < 1.6) {
+    const s = o.s, cx = o.x + o.crosser * o.cOff * s, along = THREE.MathUtils.clamp(P.x - cx, -o.halfL * s, o.halfL * s);
+    if (Math.hypot(P.x - cx - along, P.y - o.y, o.z) < o.rad * s + B.r) hurt(o.kind === 'hammer' ? 'Bonk! Hammerhead!' : 'Zap! Sea snake!');
+  }
+}
 // --- kraken: hovers ahead, squirts ink, then jets away
 const inkCv = document.createElement('canvas');
 inkCv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';
@@ -1094,7 +1134,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderer.render(scene, camera);
 window.__game = {
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
-  start: (i) => start(STARTER_LEVELS[i || 0], i || 0), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
+  start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderer.render(scene, camera); },
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, objs: objs.length }),
   breakdown: () => { const r = {}; objs.forEach(o => { let n = 0, tr = 0; o.mesh.traverse(m => { if (m.isMesh || m.isPoints || m.isLineSegments || m.isSprite) { n++; const gg = m.geometry; if (gg) tr += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); } }); r[o.kind] = r[o.kind] || [0, 0, 0]; r[o.kind][0]++; r[o.kind][1] += n; r[o.kind][2] += Math.round(tr); }); return r; },

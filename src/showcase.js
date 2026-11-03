@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import * as M from './models.js';
 import * as RF from './reef.js';
+import * as CR from './critters.js';
 import { makeRenderer, setupScene, makeFloor } from './env.js';
 
 const q = new URLSearchParams(location.search);
@@ -53,6 +54,41 @@ if (which === 'lush') {
   add(RF.makeFluffyAnemone(0, 1.5), -0.2, 0, 1.3, 0); add(RF.makeFluffyAnemone(3, 1.2), 4.3, 0, 1.0, 0);
   const sw = add(M.makeSchool('chromis', 26, 18, 'plain', 0.36), 0.5, 3.3, -1.5, -0.7); anim.push(dt => { RF.reefClock.value += dt; M.animateSchool(sw, dt); });
   cam.position.set(0, 2.6, 8.5); cam.lookAt(0, 1.0, 0);
+}
+if (which === 'small') {
+  const list = [];
+  const f1 = add(M.makeSchool('regal', 1, 20, 'regal', 1.4), -1.4, 2.2, 0.5, -Math.PI / 2); list.push(f1);
+  const f2 = add(M.makeSchool('idol', 1, 21, 'idol', 1.4), 0, 1.5, 0, -Math.PI / 2); list.push(f2);
+  const f3 = add(M.makeSchool('chromis', 1, 23, 'ytail', 1.2), 2.2, 1.7, 0, -Math.PI / 2); list.push(f3);
+  const f4 = add(M.makeSchool('chromis', 1, 24, 'humbug', 1.2), 2.2, 0.9, 0, -Math.PI / 2); list.push(f4);
+  const f5 = add(M.makeSchool('chromis', 1, 22, 'plain', 1.2), 3.3, 1.3, 0, -Math.PI / 2); list.push(f5);
+  const sh = [0, 2, 3].map((p, i) => { const o = add(CR.makeShrimp(p), -2.2 + i * 1.5, 0, 1.5, -Math.PI / 2 + 0.4); o.scale.setScalar(2.2); return o; });
+  anim.push(dt => { list.forEach(s => M.animateSchool(s, dt)); sh.forEach(o => CR.animateShrimp(o, dt)); });
+  cam.position.set(0, 1.8, 6); cam.lookAt(0, 1.0, 0.5);
+}
+if (which === 'friends') {
+  const ws = add(CR.makeWhaleShark(), -2.6, 2.6, -3.5, Math.PI * 0.62); ws.scale.setScalar(1.15);
+  const hh = add(CR.makeHammerhead(), 2.8, 2.9, -1.5, -Math.PI * 0.62);
+  const sn = add(CR.makeSeaSnake(), 1.6, 0.7, 1.4, -Math.PI / 2 - 0.3); sn.scale.setScalar(1.6);
+  const bt = add(M.makeTurtle(true), -1.0, 1.2, 1.5, Math.PI * 0.75); bt.scale.setScalar(0.45);
+  const sh1 = add(CR.makeShrimp(0), -0.2, 0, 2.6, Math.PI * 0.8); sh1.scale.setScalar(1.7);
+  const sh2 = add(CR.makeShrimp(2), 0.5, 0, 2.9, Math.PI * 1.2); sh2.scale.setScalar(1.5);
+  const s1 = add(M.makeSchool('regal', 3, 20, 'regal', 1.1), -3.2, 1.0, 1.0, Math.PI * 0.7);
+  const s2 = add(M.makeSchool('idol', 2, 21, 'idol', 1.3), 3.2, 1.1, 1.4, -Math.PI * 0.7);
+  const s3 = add(M.makeSchool('chromis', 8, 23, 'ytail', 0.5), 0.6, 2.0, 0.6, Math.PI * 0.5);
+  const s4 = add(M.makeSchool('chromis', 8, 22, 'plain', 0.5), -1.3, 2.6, 0.4, Math.PI * 0.6);
+  const s5 = add(M.makeSchool('chromis', 5, 24, 'humbug', 0.55), 2.2, 0.6, 2.4, Math.PI * 0.4);
+  anim.push(dt => { [s1, s2, s3, s4, s5].forEach(s => M.animateSchool(s, dt)); CR.animateSeaSnake(sn, dt); CR.animateShrimp(sh1, dt); CR.animateShrimp(sh2, dt); CR.animateWhaleShark(ws, dt); CR.animateHammerhead(hh, dt); M.animateTurtle(bt, dt); });
+  cam.position.set(0, 2.2, 6.2); cam.lookAt(0, 1.0, 1.0); if (location.search.includes('far')) { cam.position.set(0, 3.5, 10.5); cam.lookAt(0, 1.4, -1); }
+}
+if (which === 'anemones') {
+  RF.reefClock.value = 1.0;
+  add(RF.makeMagnifica(0, 1.5), -3.2, 0, 0, 0); add(RF.makeMagnifica(2, 1.2), -2.0, 0, -1.6, 0);
+  add(RF.makeGigantea(0, 1.6), 0.2, 0, 0.4, 0); add(RF.makeGigantea(2, 1.2), 1.4, 0, -1.8, 0);
+  add(RF.makeMertensii(0, 1.4), 3.4, 0, 0.2, 0);
+  const c1 = add(M.makeClown(), -3.1, 1.75, 0.3, -0.6); const c2 = add(M.makeClown(), 3.5, 0.95, 0.5, -0.4); c2.scale.setScalar(0.9);
+  anim.push(dt => { RF.reefClock.value += dt; M.animateFish(c1, dt, 0.3); M.animateFish(c2, dt, 0.3); });
+  cam.position.set(0, 3.0, 7.0); cam.lookAt(0, 0.5, 0);
 }
 if (which === 'stars') { for (let i = 0; i < 6; i++) { const st = add(M.makeStarfish(i), -2.5 + (i % 3) * 2.5, 0, i < 3 ? -0.6 : 1.0, 0); st.scale.setScalar(2.2); } cam.position.set(0, 3.2, 5.2); cam.lookAt(0, 0, 0.2); }
 if (which === 'enemies') {

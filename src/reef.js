@@ -911,3 +911,190 @@ export function makeBank(seed = 1, len = 6, height = 4.2, width = 7.5) {
   const g2 = new THREE.Group(); g2.add(ground, coralMeshes(solid, plates, '#3A2440', soft));
   return g2;
 }
+
+// =====================================================================
+// ANEMONE SPECIES (detailed, cartoon style) with lifelike motion:
+//  - the surge bends every tentacle of one anemone together, as a wave travelling across it (not random wobble)
+//  - carpet rims ripple and slowly "breathe"
+//  - when something swims close they retract: Magnifica pulls its fingers in, carpets curl up and shrink, then slowly unfurl
+// All motion runs in the vertex shader; each anemone has its own small uniform set (uK = retraction 0..1).
+// =====================================================================
+const ANEM_GLSL = `
+uniform float uT, uK, uAmp, uR, uBend, uRet, uShrink;
+float carpetH(vec2 p) {
+  float r = length(p) / uR; float a = atan(p.y, p.x); float r2 = r * r;
+  return uAmp * r2 * sin(uT * 0.6 + a * 3.0 + r * 2.0) + uAmp * 0.5 * r2 * sin(uT * 0.33) + uK * 0.32 * uR * r2 * r;
+}
+`;
+// mode: 0 = solid part (column/carpet/rim), 1 = tentacle (instanced, local y = height along tentacle)
+function anemMotion(mat, U, mode, push = 0) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uT: reefClock }, U);
+    sh.vertexShader = ANEM_GLSL + sh.vertexShader
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        ${push ? 'transformed += normalize(normal) * ' + push.toFixed(3) + ';' : ''}
+        float hLoc = max(0.0, transformed.y);
+        ${mode === 1 ? `
+          float idf = float(gl_InstanceID);
+          transformed.y *= mix(1.0, uRet, uK) * (1.0 + 0.07 * sin(uT * 0.5 + idf * 0.37));   // retract + slow per-tentacle breathing
+          transformed.xz *= mix(1.0, 1.3, uK);` : ''}`)
+      .replace('#include <project_vertex>', `
+        vec4 pg = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          pg = instanceMatrix * pg;
+          vec2 base = instanceMatrix[3].xz;
+        #else
+          vec2 base = pg.xz;
+        #endif
+        float rr = length(base) / uR;
+        pg.y += carpetH(base);
+        pg.xz *= 1.0 - uShrink * uK * clamp(rr, 0.0, 1.0);
+        vec4 pw = modelMatrix * pg;
+        // surge: one coherent back-and-forth wave across the whole animal, with a little flutter on top
+        float ph = uT * 0.85 - pw.x * 0.45 - pw.z * 0.2;
+        float w = ${mode === 1 ? 'hLoc * hLoc' : 'rr * rr * 0.02 + pg.y * pg.y * 0.02'} * uBend * (1.0 - 0.75 * uK);
+        ${mode === 1 ? 'float fl = 0.22 * sin(uT * 2.3 + idf * 0.9);' : 'float fl = 0.0;'}
+        pw.x += (sin(ph) + fl) * w;
+        pw.z += (cos(ph * 0.7 + 1.3) * 0.55 + fl) * w;
+        vec4 mvPosition = viewMatrix * pw;
+        gl_Position = projectionMatrix * mvPosition;`);
+  };
+  mat.customProgramCacheKey = () => 'anemM' + mode + '_' + push;
+  return mat;
+}
+function anemUniforms(o) { return { uK: { value: 0 }, uAmp: { value: o.amp || 0 }, uR: { value: o.R || 1 }, uBend: { value: o.bend || 1 }, uRet: { value: o.ret ?? 0.4 }, uShrink: { value: o.shrink || 0 } }; }
+const _toonGrad = () => toon('#fff').gradientMap;
+const solidMat = (U, color, opts = {}) => anemMotion(new THREE.MeshToonMaterial({ color, gradientMap: _toonGrad(), ...opts }), U, 0);
+const tentMatU = (U) => anemMotion(new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: _toonGrad() }), U, 1);
+const hullMatU = (U, mode, push, color) => anemMotion(new THREE.MeshBasicMaterial({ color, side: THREE.BackSide }), U, mode, push);
+
+const _speciesGeo = {};
+const geoOnce = (k, build) => (_speciesGeo[k] ||= build());
+const _q2 = new THREE.Quaternion(), _m2 = new THREE.Matrix4(), _s2 = new THREE.Vector3(), _up2 = V(0, 1, 0);
+function placeTent(meshes, i, pos, dir, len, thick = 1) {
+  _q2.setFromUnitVectors(_up2, dir); _m2.compose(pos, _q2, _s2.set(thick, len, thick));
+  meshes.forEach(m => m.setMatrixAt(i, _m2));
+}
+function finishInst(list, n) { list.forEach(m => { m.count = n; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; }); }
+
+// --- Magnificent sea anemone (Heteractis magnifica): short bright column, dense crown of fat finger tentacles with blunt glowing tips
+const MAGNIFICA = [['#FF2E7A', '#FF8AB8', '#C8F04A'], ['#E8323A', '#FF9A8A', '#FFE04A'], ['#8A3AE8', '#C8A0FF', '#7FF0A0'], ['#2F6BE8', '#9AC0FF', '#FFE85A']];
+export function makeMagnifica(seed = 0, scale = 1) {
+  const [colC, colS, tipC] = MAGNIFICA[seed % MAGNIFICA.length];
+  const R = rng(seed * 7 + 11);
+  const U = anemUniforms({ R: 0.6, bend: 1.5, ret: 0.3 });
+  const g = new THREE.Group();
+  const prof = []; for (let i = 0; i <= 10; i++) { const t = i / 10; prof.push(new THREE.Vector2(0.34 + Math.pow(t, 2.4) * 0.24 - Math.sin(t * Math.PI) * 0.03, t * 0.42)); }
+  let col = new THREE.LatheGeometry(prof, 36); col.deleteAttribute('uv'); col = col.toNonIndexed(); col.computeVertexNormals();
+  const c1 = new THREE.Color(colC), c2 = new THREE.Color(colS);
+  paintGradient(col, '#fff', '#fff', 'y', 0, 1, (c, i, p) => { const a = Math.atan2(p.getZ(i), p.getX(i)); c.copy(Math.sin(a * 14) > 0.5 ? c2 : c1); if (p.getY(i) < 0.06) c.multiplyScalar(0.75); });
+  g.add(new THREE.Mesh(col, solidMat(U, '#ffffff', { vertexColors: true, side: THREE.DoubleSide })));
+  g.add(new THREE.Mesh(col, hullMatU(U, 0, 0.025, '#3A1030')));
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.58, 36), solidMat(U, new THREE.Color(tipC).multiplyScalar(0.55))); disc.geometry.rotateX(-Math.PI / 2); disc.position.y = 0.41; g.add(disc);
+  // fat finger tentacles (stem + blunt tip, both outlined)
+  const stemG = geoOnce('magStem', () => { const c = new THREE.CapsuleGeometry(0.052, 0.36, 2, 7); c.translate(0, 0.2, 0); return c; });
+  const tipG = geoOnce('magTip', () => { const s = new THREE.SphereGeometry(0.066, 8, 6); s.scale(1, 1.25, 1); s.translate(0, 0.42, 0); return s; });
+  const N = 150, tm = tentMatU(U), hm = hullMatU(U, 1, 0.014, '#2A3A10');
+  const stems = new THREE.InstancedMesh(stemG, tm, N), tips = new THREE.InstancedMesh(tipG, tm, N);
+  const hS = new THREE.InstancedMesh(stemG, hm, N), hT = new THREE.InstancedMesh(tipG, hm, N);
+  const sC = new THREE.Color(tipC).lerp(c1, 0.12).multiplyScalar(0.82), tC = new THREE.Color(tipC), white = new THREE.Color('#fff'), cc = new THREE.Color();
+  for (let i = 0; i < N; i++) {
+    const a = i * 2.399963, rr = Math.sqrt((i + 0.5) / N) * 0.55;
+    const dir = V(Math.cos(a) * rr * 1.3, 1, Math.sin(a) * rr * 1.3).normalize().add(V((R() - 0.5) * 0.18, 0, (R() - 0.5) * 0.18)).normalize();
+    placeTent([stems, tips, hS, hT], i, V(Math.cos(a) * rr, 0.41, Math.sin(a) * rr), dir, 1.25 + R() * 0.45 - rr * 0.5);
+    stems.setColorAt(i, cc.copy(sC).lerp(white, R() * 0.08)); tips.setColorAt(i, cc.copy(tC).lerp(white, 0.15 + R() * 0.2));
+  }
+  finishInst([stems, tips, hS, hT], N);
+  g.add(stems, tips, hS, hT);
+  g.userData.anem = { U, speed: 2.4, back: 0.35 };
+  g.scale.setScalar(scale);
+  return g;
+}
+
+// --- carpet anemones share a ruffled-disc builder; height(x,z) is reused to plant the tentacles on the surface
+function carpet(R, radius, folds, foldAmp, cupLift) {
+  const ph = R() * 6;
+  const height = (x, z) => { const r = Math.hypot(x, z) / radius, a = Math.atan2(z, x); return 0.1 + cupLift * r * r + foldAmp * Math.pow(r, 1.8) * Math.sin(a * folds + ph + Math.sin(a * 3) * 0.5); };
+  const seg = 90, rings = 12;
+  const geo = new THREE.PlaneGeometry(1, 1, seg, rings); const p = geo.attributes.position;
+  const rimPts = [];
+  for (let i = 0; i < p.count; i++) { const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5, a = u * Math.PI * 2; const rr = v * radius; const x = Math.cos(a) * rr, z = Math.sin(a) * rr; p.setXYZ(i, x, height(x, z), z); }
+  for (let i = 0; i < seg; i++) { const a = i / seg * Math.PI * 2; const x = Math.cos(a) * radius, z = Math.sin(a) * radius; rimPts.push(V(x, height(x, z), z)); }
+  geo.deleteAttribute('uv'); geo.computeVertexNormals();
+  return { geo: geo.toNonIndexed(), height, rim: new THREE.CatmullRomCurve3(rimPts, true) };
+}
+function plantCarpet(R, U, height, radius, N, stemG, tipG, stemC, tipC, lenRange, mouthR, hullCol) {
+  const tm = tentMatU(U);
+  const stems = new THREE.InstancedMesh(stemG, tm, N), tips = new THREE.InstancedMesh(tipG, tm, N);
+  const hT = new THREE.InstancedMesh(tipG, hullMatU(U, 1, 0.008, hullCol), N);
+  const cc = new THREE.Color(), sc = new THREE.Color(stemC), tc = new THREE.Color(tipC), white = new THREE.Color('#fff');
+  let k = 0;
+  for (let i = 0; k < N && i < N * 3; i++) {
+    const a = i * 2.399963, rr = Math.sqrt((i + 0.5) / N) * radius * 0.97;
+    if (rr < mouthR) continue;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr, y = height(x, z);
+    const e = 0.02, nrm = V(height(x - e, z) - height(x + e, z), 2 * e, height(x, z - e) - height(x, z + e)).normalize();
+    placeTent([stems, tips, hT], k, V(x, y - 0.01, z), nrm.add(V((R() - 0.5) * 0.3, 0, (R() - 0.5) * 0.3)).normalize(), lenRange[0] + R() * (lenRange[1] - lenRange[0]), 1);
+    stems.setColorAt(k, cc.copy(sc).lerp(white, R() * 0.12)); tips.setColorAt(k, cc.copy(tc).lerp(white, R() * 0.25)); k++;
+  }
+  finishInst([stems, tips, hT], k);
+  return [stems, tips, hT];
+}
+function carpetBody(g, U, geo, rim, color, rimCol) {
+  g.add(new THREE.Mesh(geo, solidMat(U, color, { side: THREE.DoubleSide })));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(rim, 120, 0.024, 5, true), solidMat(U, rimCol)));     // cartoon rim line that ripples with the carpet
+}
+
+// --- Giant carpet anemone (Stichodactyla gigantea): wavy ruffled carpet, very dense short sticky tentacles
+const GIGANTEA = [['#3FD86A', '#C86AFF'], ['#2F9BFF', '#9AF0FF'], ['#9B4DFF', '#FF8AE0'], ['#7FE03A', '#FFE04A']];
+export function makeGigantea(seed = 0, scale = 1) {
+  const [base, tip] = GIGANTEA[seed % GIGANTEA.length];
+  const R = rng(seed * 13 + 5);
+  const radius = 0.9;
+  const U = anemUniforms({ amp: 0.07, R: radius, bend: 7, ret: 0.45, shrink: 0.22 });
+  const g = new THREE.Group();
+  const { geo, height, rim } = carpet(R, radius, 9, 0.085, 0.14);
+  carpetBody(g, U, geo, rim, new THREE.Color(base).multiplyScalar(0.72), new THREE.Color(base).multiplyScalar(0.35));
+  const stemG = geoOnce('gigStem', () => { const c = new THREE.CylinderGeometry(0.02, 0.028, 0.11, 5); c.translate(0, 0.055, 0); return c; });
+  const tipG = geoOnce('gigTip', () => { const s = new THREE.SphereGeometry(0.03, 6, 4); s.translate(0, 0.11, 0); return s; });
+  plantCarpet(R, U, height, radius, 420, stemG, tipG, base, tip, [0.9, 1.35], 0.09, '#2A1A3A').forEach(m => g.add(m));
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(0.085, 16), solidMat(U, '#FFE08A')); mouth.geometry.rotateX(-Math.PI / 2); mouth.scale.z = 0.55; mouth.position.y = height(0, 0) + 0.02; g.add(mouth);
+  g.userData.anem = { U, speed: 1.6, back: 0.22 };
+  g.scale.setScalar(scale);
+  return g;
+}
+
+// --- Merten's carpet anemone (Stichodactyla mertensii): biggest and flattest, knobbly tentacles, spotted coloured column, lipped mouth
+const MERTENSII = [['#E8F5D8', '#7FE07A', '#FF7A3A'], ['#D8F0FF', '#4FD8F0', '#FF5CA8'], ['#FFF0C8', '#FFC04A', '#B04AE8'], ['#EAD8FF', '#B07AFF', '#FF8A3A']];
+export function makeMertensii(seed = 0, scale = 1) {
+  const [stemC0, tipC, colC] = MERTENSII[seed % MERTENSII.length];
+  const R = rng(seed * 17 + 3);
+  const radius = 1.15;
+  const U = anemUniforms({ amp: 0.05, R: radius, bend: 6, ret: 0.5, shrink: 0.18 });
+  const g = new THREE.Group();
+  const { geo, height, rim } = carpet(R, radius, 5, 0.06, 0.05);
+  carpetBody(g, U, geo, rim, new THREE.Color(tipC).multiplyScalar(0.68), new THREE.Color(colC).multiplyScalar(0.8));
+  // coloured column under the rim, dotted with verrucae
+  const col = new THREE.CylinderGeometry(radius * 0.94, radius * 0.72, 0.15, 44, 1, true); col.translate(0, 0.04, 0);
+  g.add(new THREE.Mesh(col, solidMat(U, colC, { side: THREE.DoubleSide })));
+  const dots = new THREE.InstancedMesh(geoOnce('merDot', () => new THREE.SphereGeometry(0.028, 6, 4)), solidMat(U, '#FFE08A'), 30);
+  for (let i = 0; i < 30; i++) { const a = i / 30 * Math.PI * 2, y = 0.02 + (i % 2) * 0.05, rr = radius * (0.76 + (y / 0.15) * 0.2); _m2.makeTranslation(Math.cos(a) * rr, y, Math.sin(a) * rr); dots.setMatrixAt(i, _m2); }
+  g.add(dots);
+  const stemG = geoOnce('merStem', () => { const c = new THREE.CapsuleGeometry(0.032, 0.07, 1, 6); c.translate(0, 0.06, 0); return c; });
+  const tipG = geoOnce('merTip', () => { const s = new THREE.SphereGeometry(0.042, 7, 5); s.translate(0, 0.12, 0); return s; });
+  const stemC = new THREE.Color(stemC0).lerp(new THREE.Color(tipC), 0.35);
+  plantCarpet(R, U, height, radius, 340, stemG, tipG, stemC, tipC, [0.8, 1.2], 0.17, '#1A3A2A').forEach(m => g.add(m));
+  const y0 = height(0, 0);
+  const lips = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.042, 8, 22), solidMat(U, colC)); lips.geometry.rotateX(Math.PI / 2); lips.scale.z = 0.6; lips.position.y = y0 + 0.03; g.add(lips);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.08, 16), solidMat(U, '#6A1A2A')); hole.geometry.rotateX(-Math.PI / 2); hole.scale.z = 0.55; hole.position.y = y0 + 0.035; g.add(hole);
+  g.userData.anem = { U, speed: 1.4, back: 0.2 };
+  g.scale.setScalar(scale);
+  return g;
+}
+
+// Retraction: quick when disturbed, slow careful unfurling afterwards (like the real animals).
+export function animateAnemone(g, dt, near) {
+  const a = g.userData.anem; if (!a) return;
+  const k = a.U.uK;
+  k.value = near ? Math.min(1, k.value + dt * a.speed) : Math.max(0, k.value - dt * a.back);
+}

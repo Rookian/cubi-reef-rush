@@ -22,9 +22,11 @@ const TOOLS = [
   { id: 'wreckgate', label: 'Wreck to swim through', icon: null, make: (x, z) => ({ t: 'wreckgate', x: Math.max(-2.2, Math.min(2.2, x)), z }) },
   { id: 'moray', label: 'Moray eel', icon: null, make: (x, z) => ({ t: 'moray', x: x >= 0 ? 1 : -1, z, home: 'rock' }) },
   { id: 'kraken', label: 'Kraken (ink)', icon: null, make: (x, z) => ({ t: 'kraken', x, z }) },
+  { id: 'hammer', label: 'Hammerhead (crosses)', icon: null, make: (x, z) => ({ t: 'hammer', x, z, y: LANE.mid }) },
+  { id: 'seasnake', label: 'Sea snake (crosses low)', icon: null, make: (x, z) => ({ t: 'seasnake', x, z, y: LANE.low }) },
 ];
-const FLOATERS = ['pearl', 'pearls', 'jelly', 'puffer', 'shark'];
-const NAMES = { pearl: 'Pearl', pearls: 'Pearl line', jelly: 'Jellyfish', puffer: 'Pufferfish', urchin: 'Sea urchin', shark: 'Shark', coral: 'Coral', anemone: 'Clownfish home', stream: 'Current' };
+const FLOATERS = ['pearl', 'pearls', 'jelly', 'puffer', 'shark', 'hammer', 'seasnake'];
+const NAMES = { pearl: 'Pearl', pearls: 'Pearl line', jelly: 'Jellyfish', puffer: 'Pufferfish', urchin: 'Sea urchin', shark: 'Shark', coral: 'Coral', anemone: 'Clownfish home', stream: 'Current', hammer: 'Hammerhead', seasnake: 'Sea snake' };
 let tool = 'select';
 
 // ------------------------------------------------------------ level state
@@ -37,7 +39,7 @@ const PAD = 40;              // px below the start line
 
 function save() { lv.items.sort((a, b) => a.z - b.z); saveCustom(lv); updateStats(); }
 function updateStats() {
-  const hz = lv.items.filter(i => ['jelly', 'puffer', 'urchin', 'shark'].includes(i.t)).length;
+  const hz = lv.items.filter(i => ['jelly', 'puffer', 'urchin', 'shark', 'hammer', 'seasnake'].includes(i.t)).length;
   $('stats').textContent = `${lv.items.length} items · ${countPearls(lv)} pearls · ${hz} enemies`;
 }
 

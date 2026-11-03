@@ -1,10 +1,10 @@
 // Level format (also what the editor saves):
 // { name, length (m), speed, speedEnd, items: [ { t, z, x, y?, ... } ] }
-// t: pearl | pearls (n, gap) | jelly | puffer | urchin | shark | coral (kind) | stream (dir, len) | anemone
+// t: pearl | pearls (n, gap) | jelly | puffer | urchin | shark | hammer (y, from) | seasnake (y, from) | coral (kind) | stream (dir, len) | anemone
 // x: -3.4 (left) .. 3.4 (right).  y: 1.2 low · 2.4 mid · 3.6 high.  z: metres from the start.
 export const LANE = { minX: -3.4, maxX: 3.4, low: 1.2, mid: 2.4, high: 3.6 };
 export const HAZARDS = ['jelly', 'puffer', 'urchin'];
-export const SPECIALS = ['wreckgate', 'moray', 'kraken'];
+export const SPECIALS = ['wreckgate', 'moray', 'kraken', 'hammer', 'seasnake'];
 export const CORAL_KINDS = ['branch', 'stag', 'tube', 'fan', 'brain', 'bubble', 'rock'];
 
 const L = LANE;
@@ -14,6 +14,7 @@ const BASE_LEVELS = [
   {
     name: 'Sunny Shallows', length: 230, speed: 5.5, speedEnd: 6.5,
     items: [
+      { t: 'seasnake', z: 65, x: 2 }, { t: 'hammer', z: 200, x: -2, y: L.mid },
       line(15, 0, L.mid, 5),
       { t: 'anemone', z: 38, x: -1.5 },
       line(52, -1.5, L.low, 4),
@@ -38,6 +39,7 @@ const BASE_LEVELS = [
   {
     name: 'Jelly Garden', length: 300, speed: 6, speedEnd: 7.5,
     items: [
+      { t: 'seasnake', z: 95, x: -2 }, { t: 'hammer', z: 186, x: 2, y: L.high },
       line(15, 0, L.mid, 5),
       { t: 'jelly', z: 40, x: -2, y: L.mid }, { t: 'jelly', z: 40, x: 2, y: L.mid },
       line(38, 0, L.mid, 4),
@@ -67,6 +69,7 @@ const BASE_LEVELS = [
   {
     name: 'Current Canyon', length: 360, speed: 6.5, speedEnd: 8.5,
     items: [
+      { t: 'seasnake', z: 55, x: 2 }, { t: 'hammer', z: 158, x: -2, y: L.mid }, { t: 'seasnake', z: 226, x: -2 }, { t: 'hammer', z: 307, x: 2, y: L.low },
       line(15, 0, L.mid, 5),
       { t: 'stream', z: 35, dir: 'right', len: 16 },
       line(38, -2.5, L.mid, 5),
