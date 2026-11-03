@@ -19,7 +19,7 @@ const ang = (+q.get('angle') || 0) * Math.PI / 180;
 if (which === 'cubi') { const c = add(M.makeCubi(), 0, 1.2, 0, ang); anim.push(dt => M.animateFish(c, dt, 0.3)); cam.position.set(0, 1.5, 4.2); cam.lookAt(0, 1.15, 0); }
 if (which === 'cast') {
   const c = add(M.makeCubi(), -1.3, 1.3, 0, Math.PI + 0.5); const cf = add(M.makeClown(), 0.9, 1.2, 0.4, Math.PI - 0.6); cf.scale.setScalar(1.25);
-  const a = add(M.makeAnemone(), 1.4, 0, -1.2); add(M.makeBranchCoral(M.COR.pink, 5, 1.1), -3.3, 0, -1.6); add(M.makeStarfish('#FF7FA8', '#7A1F3D'), 2.6, 0, 0.8); add(M.makeGrass(), 3.4, 0, -1.6); add(M.makeBrainCoral(M.COR.green, 0.8), -1.8, 0, -2.2); add(M.makeSeaweed(), -4.2, 0, -3); add(M.makeTubeCoral(M.COR.purple, 0.9), 2.6, 0, -3.2); add(M.makeBubbleCoral(0.7), 0, 0, -2.6);
+  const a = add(M.makeAnemone(), 1.4, 0, -1.2); add(M.makeBranchCoral(M.COR.pink, 5, 1.1), -3.3, 0, -1.6); add(M.makeStarfish(4), 2.6, 0, 0.8); add(M.makeGrass(), 3.4, 0, -1.6); add(M.makeBrainCoral(M.COR.green, 0.8), -1.8, 0, -2.2); add(M.makeSeaweed(), -4.2, 0, -3); add(M.makeTubeCoral(M.COR.purple, 0.9), 2.6, 0, -3.2); add(M.makeBubbleCoral(0.7), 0, 0, -2.6);
   const p = add(M.makePearl(), -0.2, 2.2, 0.3);
   anim.push(dt => { M.animateFish(c, dt, 0.3); M.animateFish(cf, dt, 0.3); M.animateAnemone(a, dt); });
   cam.position.set(0, 2.0, 6.4); cam.lookAt(0, 1.2, 0);
@@ -54,6 +54,7 @@ if (which === 'lush') {
   const sw = add(M.makeSchool('chromis', 26, 18, 'plain', 0.36), 0.5, 3.3, -1.5, -0.7); anim.push(dt => { RF.reefClock.value += dt; M.animateSchool(sw, dt); });
   cam.position.set(0, 2.6, 8.5); cam.lookAt(0, 1.0, 0);
 }
+if (which === 'stars') { for (let i = 0; i < 6; i++) { const st = add(M.makeStarfish(i), -2.5 + (i % 3) * 2.5, 0, i < 3 ? -0.6 : 1.0, 0); st.scale.setScalar(2.2); } cam.position.set(0, 3.2, 5.2); cam.lookAt(0, 0, 0.2); }
 if (which === 'enemies') {
   const j = add(M.makeJelly(), -2.4, 1.7, 0, 0.2); const j2 = add(M.makeJelly('#C7A4FF', '#3E2370', '#E9DCFF'), -0.9, 2.3, -1.2, -0.3); const p = add(M.makePuffer(), 0.9, 1.2, 0, -0.35); M.setPuff(p, 0.1); const p2 = add(M.makePuffer(), 2.7, 1.4, -0.4, -0.5); M.setPuff(p2, 1); add(M.makeUrchin(), -0.2, 0, 0.9, 0.2); add(M.makeUrchin(), 1.6, 0, 1.2, -0.2);
   anim.push(dt => { M.animateJelly(j, dt); M.animateJelly(j2, dt); });

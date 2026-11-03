@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { plastic as toon, paintGradient, fanPath, outline, outlineMat, OUTLINE } from './materials.js';
-import { rng, makeEye, COR, basic, smooth, colorize, branchGeo, placeEye, cached, makePearl } from './models.js';
+import { rng, makeEye, COR, basic, smooth, colorize, branchGeo, placeEye, cached, makePearl, makeStarfish } from './models.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 function xf(geo, x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) {
@@ -483,8 +483,6 @@ export function makeWreckGate(holeX = 0) {
     sp.position.set(hcx + Math.cos(a) * rx, hcy + Math.sin(a) * ry, D / 2 + 0.15 + R() * 0.2);
     sp.rotation.set(-0.5 - R() * 0.4, 0, a + Math.PI / 2 + (R() - 0.5) * 0.6); g.add(sp);
   }
-  // the inside of the hull is dark, with a glimpse of treasure through the hole
-  const inner = new THREE.Mesh(new THREE.PlaneGeometry(L - 1, H * 0.8), basic('#2A1A20')); inner.position.set(0, H * 0.4, -D / 2 + 0.05); g.add(inner);
   // lanterns either side of the hole so it reads as "swim here"
   for (const sx of [-1, 1]) {
     const lp = V(hcx + sx * (GATE.halfW + 0.75), GATE.y1 + 0.2, D / 2 + 0.35);
@@ -504,7 +502,8 @@ export function makeWreckGate(holeX = 0) {
 // CHRISTMAS TREE WORMS on a rock — they zip back in when Cubi comes close
 // ------------------------------------------------------------------
 // palettes: [filament colour, band colour] — banded like the real worms
-const XMAS = [['#2F6BFF', '#9EC2FF'], ['#FFB000', '#FF8A00'], ['#FFFFFF', '#FF3A4A'], ['#3FBF5A', '#1F7A3A'], ['#9B4DFF', '#FF7FD0'], ['#FF6A1A', '#FFD000'], ['#1FC8E8', '#2F6BFF'], ['#FF3D8B', '#FFD0E4']];
+const XMAS = [['#2F6BFF', '#9EC2FF'], ['#FFB000', '#FF8A00'], ['#FFFFFF', '#FF3A4A'], ['#3FBF5A', '#1F7A3A'], ['#9B4DFF', '#FF7FD0'], ['#FF6A1A', '#FFD000'], ['#1FC8E8', '#2F6BFF'], ['#FF3D8B', '#FFD0E4'],
+  ['#00E0C8', '#9B4DFF'], ['#C8FF3A', '#FF4FB8'], ['#FF8A00', '#2F6BFF'], ['#FF2E88', '#FFE600'], ['#7A5CFF', '#5FFFE0'], ['#FFD000', '#FF3A6A']];
 // one fluffy "fir tree": fine filaments radiating from a spiral, in stacked whorls
 function xmasTreeGeo(pal) {
   return cached('xmasF2' + pal, () => {
@@ -878,6 +877,7 @@ export function makeReefMound(seed = 1, big = 1) {
   // tall tree coral breaking the skyline (photo 4)
   if (R() < 0.45) { const tree = cached('treeHero' + (seed % 3), () => gBush(rng(seed % 3 + 50), [RCOL.orange, RCOL.yellow, RCOL.coral][seed % 3], true)); const s = (2.2 + R() * 0.8) * big; solid.push(xf(tree, (R() - 0.5) * w * 0.6, h * 0.9, (R() - 0.5) * d * 0.5, s, s, s, 0, R() * 6, 0)); }
   const g = coralMeshes(solid, plates, '#3A2440', soft);
+  if (R() < 0.6) { const st = makeStarfish(Math.floor(R() * 6)); const a = R() * 6.28; st.position.set(Math.cos(a) * w * 0.85, h * 0.55, Math.sin(a) * d * 0.85); st.rotation.set(Math.cos(a) * 0.9, R() * 6, -Math.sin(a) * 0.9); st.scale.setScalar(1.3 * big); g.add(st); }
   // one or two big fluffy anemones nestled in
   const na = R() < 0.55 ? 1 : R() < 0.3 ? 2 : 0;
   for (let i = 0; i < na; i++) { const a = R() * 6.28, f = R() * 0.5; const an = makeFluffyAnemone(Math.floor(R() * 99), (1.2 + R() * 0.6) * big); an.position.set(Math.cos(a) * w * f, h * 0.35 + h * 0.62 * Math.sqrt(1 - f * f) - 0.06, Math.sin(a) * d * f); g.add(an); }

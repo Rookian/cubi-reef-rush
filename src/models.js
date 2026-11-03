@@ -528,19 +528,56 @@ export function makeSeaweed(color = '#3FBF7F', scale = 1) {
 }
 
 // Starfish lying on the sand
-export function makeStarfish(color = '#FF8A5C', edge = '#7A2E14') {
-  const sh = new THREE.Shape();
-  for (let i = 0; i < 10; i++) {
-    const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.13 : 0.34;
-    const x = Math.cos(a) * r, y = Math.sin(a) * r;
-    if (i === 0) sh.moveTo(x, y); else sh.lineTo(x, y);
-  }
-  sh.closePath();
-  const geo = cached('star', () => { const g0 = new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3, curveSegments: 4 }); g0.rotateX(-Math.PI / 2); g0.translate(0, 0.05, 0); return smooth(g0); });
-  const m = outline(new THREE.Mesh(geo, toon(color)), 0.018, edge);
+// Sea star: chunky, puffy arms with rounded tips that curl up a little, a lighter centre and bumpy dots
+export const STAR_PALS = [
+  ['#FF7A1A', '#FFD24A', '#FFF0B0', '#7A2E14'],   // orange with yellow centre
+  ['#2F6BFF', '#7FB0FF', '#E0ECFF', '#14286A'],   // blue linckia
+  ['#FF3A4A', '#FF9AA0', '#FFFFFF', '#6A1420'],   // red with white bumps
+  ['#9B4DFF', '#E0A8FF', '#FFE0FF', '#3E1A70'],   // purple
+  ['#FF4FB8', '#FFD0EA', '#FFF5A0', '#6A1A4A'],   // pink with yellow bumps
+  ['#FFD000', '#FF8A00', '#7A4A00', '#6A4A10'],   // yellow with orange centre, brown bumps
+];
+function starGeo() {
+  return cached('star2', () => {
+    const sh = new THREE.Shape(); const n = 5, R = 0.36, r = 0.11;
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI / 2 + i * Math.PI * 2 / n, a2 = a + Math.PI / n, a0 = a - Math.PI / n;
+      const tip = [Math.cos(a) * R, Math.sin(a) * R];
+      if (i === 0) sh.moveTo(Math.cos(a0) * r, Math.sin(a0) * r);
+      // rounded arm: curve out to the tip and back
+      sh.quadraticCurveTo(Math.cos(a - 0.17) * R * 0.7, Math.sin(a - 0.17) * R * 0.7, Math.cos(a - 0.09) * R, Math.sin(a - 0.09) * R);
+      sh.quadraticCurveTo(tip[0] * 1.06, tip[1] * 1.06, Math.cos(a + 0.09) * R, Math.sin(a + 0.09) * R);
+      sh.quadraticCurveTo(Math.cos(a + 0.17) * R * 0.7, Math.sin(a + 0.17) * R * 0.7, Math.cos(a2) * r, Math.sin(a2) * r);
+    }
+    let g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 4, curveSegments: 6 });
+    g.rotateX(-Math.PI / 2); g.translate(0, 0.07, 0); g.deleteAttribute('uv');
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), d = Math.hypot(x, z); p.setY(i, p.getY(i) * (1.25 - d * 1.2) + Math.pow(Math.max(0, d - 0.22), 2) * 1.6); } // puffy middle, curled tips
+    g = smooth(g);
+    return g;
+  });
+}
+export function makeStarfish(pal = null) {
+  const P = Array.isArray(pal) ? pal : STAR_PALS[(pal ?? Math.floor(Math.random() * STAR_PALS.length)) % STAR_PALS.length];
+  const [C, M, D, E] = P;
+  const geo = starGeo().clone();
+  const cc = new THREE.Color(C), cm = new THREE.Color(M);
+  paintGradient(geo, '#fff', '#fff', 'y', 0, 1, (c, i, p) => { const d = Math.hypot(p.getX(i), p.getZ(i)); c.copy(cm).lerp(cc, THREE.MathUtils.smoothstep(d, 0.05, 0.16)); });
+  const m = outline(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true })), 0.016, E);
   const g = new THREE.Group(); g.add(m);
-  const dots = cached('stardots', () => { const parts = []; for (let i = 0; i < 5; i++) { const a = Math.PI / 2 + i * Math.PI * 2 / 5; for (const r of [0.12, 0.22]) parts.push(placed(new THREE.CircleGeometry(0.022, 8), Math.cos(a) * r, 0.145, -Math.sin(a) * r, 1, 1, 1, -Math.PI / 2)); } return bake(parts); });
-  g.add(new THREE.Mesh(dots, basic('#FFE0C8')));
+  // rows of little bumps along each arm
+  const bumps = cached('starbumps', () => {
+    const parts = []; const pos = starGeo().attributes.position;
+    for (let i = 0; i < 5; i++) { const a = Math.PI / 2 + i * Math.PI * 2 / 5;
+      for (const [r, off] of [[0.1, 0], [0.17, 0.035], [0.17, -0.035], [0.24, 0], [0.3, 0]]) {
+        const x = Math.cos(a) * r + Math.cos(a + Math.PI / 2) * off, z = -(Math.sin(a) * r + Math.sin(a + Math.PI / 2) * off);
+        const d = Math.hypot(x, z); const y = 0.07 + 0.1 * (1.25 - d * 1.2) + Math.pow(Math.max(0, d - 0.22), 2) * 1.6 + 0.02;
+        const sp = new THREE.SphereGeometry(0.022 - r * 0.03, 6, 4); sp.translate(x, y, z); sp.deleteAttribute('uv'); parts.push(sp.toNonIndexed()); }
+    }
+    return mergeGeometries(parts);
+  });
+  g.add(new THREE.Mesh(bumps, toon(D)));
+  g.rotation.y = Math.random() * 6;
   return g;
 }
 // Sea grass tuft

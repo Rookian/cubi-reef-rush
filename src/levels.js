@@ -10,7 +10,7 @@ export const CORAL_KINDS = ['branch', 'stag', 'tube', 'fan', 'brain', 'bubble', 
 const L = LANE;
 const line = (z, x, y, n = 5, gap = 3, dx = 0, dy = 0) => ({ t: 'pearls', z, x, y, n, gap, dx, dy });
 
-export const STARTER_LEVELS = [
+const BASE_LEVELS = [
   {
     name: 'Sunny Shallows', length: 230, speed: 5.5, speedEnd: 6.5,
     items: [
@@ -100,6 +100,14 @@ export const STARTER_LEVELS = [
     ],
   },
 ];
+
+// every level is twice as long: the second half is a mirrored remix of the first
+function doubled(lv) {
+  const flip = { left: 'right', right: 'left', up: 'up', down: 'down' };
+  const second = lv.items.map(i => ({ ...i, z: i.z + lv.length - 10, x: -(i.x || 0), ...(i.dir ? { dir: flip[i.dir] } : {}), ...(i.dx ? { dx: -i.dx } : {}) }));
+  return { ...lv, length: lv.length * 2 - 10, speedEnd: lv.speedEnd + 0.8, items: [...lv.items, ...second] };
+}
+export const STARTER_LEVELS = BASE_LEVELS.map(doubled);
 
 export function normalizeLevel(lv) {
   const out = {

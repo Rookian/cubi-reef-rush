@@ -18,22 +18,23 @@ floor.material.vertexColors = true; floor.material.needsUpdate = true;
 sand.repeat.set(TER.W / 6, TER.L / 6); caus.repeat.set(TER.W / 2.727, TER.L / 2.727);
 const terrain = new THREE.Mesh(terGeo, floor.material); terrain.receiveShadow = true; scene.add(terrain);
 let PATH = { a: 0, b: 1, c: 2, e: 3 };
-const relXRaw = (d) => 5.5 * Math.sin(d * 0.012 + PATH.a) + 2.2 * Math.sin(d * 0.029 + PATH.b);
-const relYRaw = (d) => 2.2 * Math.sin(d * 0.010 + PATH.c) + 1.0 * Math.sin(d * 0.026 + PATH.e);
+const relXRaw = (d) => 7.0 * Math.sin(d * 0.018 + PATH.a) + 3.0 * Math.sin(d * 0.043 + PATH.b);
+const relYRaw = (d) => 4.2 * Math.sin(d * 0.028 + PATH.c) + 1.8 * Math.sin(d * 0.063 + PATH.e);   // clear hills and dips
 let curD = 0, baseX = 0, baseY = 0;
 const relX = (d) => relXRaw(d) - baseX, relY = (d) => relYRaw(d) - baseY;
 // zone shape parameters sampled per distance: canyon walls, cliff side, rocky floor
 function shapeAt(d) {
-  const out = { canyon: 0, cliff: 0, rocky: 0, side: 1 };
+  const out = { canyon: 0, cliff: 0, rocky: 0, narrow: 0, side: 1 };
   for (const k of [-7, 0, 7]) { const Z = (mode === 'menu' || mode === 'splash') ? { type: 'garden', side: 1 } : zoneAt(d + k);
-    if (Z.type === 'canyon') out.canyon += 1 / 3; if (Z.type === 'cliff') { out.cliff += 1 / 3; out.side = Z.side; }
-    if (Z.type === 'canyon' || Z.type === 'cliff' || Z.type === 'arches' || Z.type === 'reefbed') out.rocky += 1 / 3; }
+    if (Z.type === 'canyon') out.canyon += 1 / 3; if (Z.type === 'narrows') out.narrow += 1 / 3; if (Z.type === 'cliff') { out.cliff += 1 / 3; out.side = Z.side; }
+    if (Z.type === 'canyon' || Z.type === 'narrows' || Z.type === 'cliff' || Z.type === 'arches' || Z.type === 'reefbed') out.rocky += 1 / 3; }
   return out;
 }
 function bankH(xl, d, S) {
   const ax = Math.abs(xl);
   let h = 0.5 * Math.pow(Math.max(0, ax - 9) / 6, 2) * 3;                                    // gentle rise at the far sides everywhere
   if (S.canyon) h += S.canyon * 4.4 * Math.pow(THREE.MathUtils.clamp((ax - 4.3) / 7.5, 0, 1), 2.0) + S.canyon * 0.6 * Math.max(0, ax - 11.8);
+  if (S.narrow) h += S.narrow * 7.5 * Math.pow(THREE.MathUtils.clamp((ax - 3.9) / 3.2, 0, 1), 1.4) + S.narrow * 1.2 * Math.max(0, ax - 7.1);   // tight gorge
   if (S.cliff && xl * S.side > 0) h += S.cliff * 6.5 * Math.pow(THREE.MathUtils.clamp((ax - 4.6) / 6, 0, 1), 1.6);
   h += (0.25 + S.rocky * 0.35) * Math.sin(xl * 0.9 + d * 0.21) * Math.sin(d * 0.13 - xl * 0.4) * THREE.MathUtils.clamp((ax - 3.6) / 3, 0, 1); // dunes / boulders outside the lane
   h += S.rocky * 0.12 * Math.sin(xl * 2.3 + d * 0.7) * Math.sin(d * 0.9);                   // rocky texture under the lane
@@ -53,7 +54,7 @@ function updateTerrain() {
       p[k + 1] = h;
       const rockiness = Math.min(1, S.rocky * 1.2 + THREE.MathUtils.smoothstep(h - ry, 0.6, 1.6));
       const n = Math.sin(xl * 1.7 + d * 0.31) * Math.sin(d * 0.23 - xl * 0.8);
-      _tc.copy(C_ROCK); if (n > 0.55) _tc.copy(n > 0.8 ? C_CRUST2 : C_CRUST);
+      _tc.copy(C_ROCK).multiplyScalar(0.9 + n * 0.1);
       _tc.lerp(C_SAND, 1 - rockiness);
       col[k] = _tc.r; col[k + 1] = _tc.g; col[k + 2] = _tc.b;
     }
@@ -242,7 +243,7 @@ const KINDS = {
   kraken: { make: () => RF.makeKraken(), shape: () => [] },
   weed: { make: () => M.makeSeaweed(pick(['#3FBF7F', '#5AD08A', '#2FB58E'])), shape: () => [] },
   grass: { make: () => M.makeGrass(pick(['#4FCB7A', '#7FDB6A', '#3FBF9A'])), shape: () => [] },
-  star: { make: () => pick([() => M.makeStarfish(), () => M.makeStarfish('#FF7FA8', '#7A1F3D'), () => M.makeStarfish('#FFD86B', '#6A4A10')])(), shape: () => [] },
+  star: { make: () => M.makeStarfish(), shape: () => [] },
   anemone: { make: () => { const c = pick([['#9B6BE8', '#D9B8FF', '#3E2370'], ['#FF7FB8', '#FFD0EA', '#7A1F3D'], ['#5FCF8A', '#D4FFE4', '#1F5A3A']]); return M.makeAnemone(...c); }, shape: () => [] },
   jelly: { make: () => pick([() => M.makeJelly(), () => M.makeJelly('#C7A4FF', '#3E2370', '#E9DCFF')])(), shape: () => [sph(0.15, 0.55), cap(-0.15, -1.0, 0.25)] },
   puffer: { make: () => M.makePuffer(), shape: () => [] },
@@ -350,7 +351,7 @@ function reefCluster(x, z, big = 1) {
   }
 }
 // the landscape is a sequence of zones, shuffled per run so every swim feels different
-const ZONES = ['canyon', 'open', 'garden', 'arches', 'cliff', 'kelp', 'reefbed'];
+const ZONES = ['canyon', 'narrows', 'open', 'garden', 'narrows', 'arches', 'cliff', 'kelp', 'reefbed'];
 let zoneList = [];
 function buildZones() {
   PATH = { a: Math.random() * 6.28, b: Math.random() * 6.28, c: Math.random() * 6.28, e: Math.random() * 6.28 };
@@ -368,12 +369,20 @@ function decorRow(z) {
     if (Math.random() < 0.8) spawn('patch', rf(-3.2, 3.2), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
     if (Math.random() < 0.25) spawn(pick(['star', 'mushroom', 'nudi']), rf(-3.5, 3.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(0.6, 1.2) });
   }
+  if (zone === 'narrows') {  // tight gorge: coral-covered rock walls right beside the lane
+    for (const sd of [-1, 1]) {
+      if (Math.random() < 0.85) spawn('mound', sd * rf(4.6, 5.6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
+      if (Math.random() < 0.7) spawn('wall', sd * rf(6.6, 7.6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.25) });
+      if (Math.random() < 0.25) spawn(pick(['heroanem', 'xmas']), sd * rf(4.2, 4.8), 0, z, { solid: false, ry: rf(0, 6), xmas: false });
+    }
+    sharedLife(z); return;
+  }
   if (zone === 'canyon') {   // U-shaped valley: sand curves up into reef slopes, walls crown the rim
     for (const sd of [-1, 1]) {
       if (Math.random() < 0.75) spawn(pick(['mound', 'mound', 'moundbig']), sd * rf(5.2, 9), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.8) spawn('wall', sd * rf(11, 12), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.15) });
       if (Math.random() < 0.3) spawn('heroanem', sd * rf(4.6, 5.4), 0.05, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
-      if (Math.random() < 0.15) spawn('xmas', sd * rf(4.4, 5.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.4), xmas: true });
+      if (Math.random() < 0.35) spawn('xmas', sd * rf(4.4, 5.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.4), xmas: true });
     }
     sharedLife(z);
     return;
@@ -395,6 +404,7 @@ function decorRow(z) {
   }
   if (zone === 'reefbed') {  // swimming right over a rocky reef floor
     if (Math.random() < 0.85) spawn('patch', rf(-3.4, 3.4), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
+    if (Math.random() < 0.35) spawn('xmas', pick([-1, 1]) * rf(3.8, 5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.3), xmas: true });
     if (Math.random() < 0.35) spawn(pick(['xmas', 'heroanem', 'rock']), rf(-3.4, 3.4), 0, z, { solid: false, ry: rf(0, 6), scale: rf(0.6, 0.9), xmas: false });
     for (const sd of [-1, 1]) { if (Math.random() < 0.85) spawn(pick(['mound', 'moundbig']), sd * rf(5, 9), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) }); if (Math.random() < 0.3) spawn('wall', sd * rf(11, 14), 0, z, { solid: false, ry: rf(0, 6) }); }
     sharedLife(z); return;
@@ -425,7 +435,7 @@ function decorRow(z) {
     // little creatures
     if (Math.random() < 0.1) spawn('crab', side * rf(3.9, 5.5), 0, z, { solid: false, ry: rf(-0.5, 0.5) });
     if (Math.random() < 0.12) spawn('heroanem', side * rf(4.4, 5.2), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
-    if (Math.random() < 0.14) spawn('xmas', side * rf(4.3, 6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5), xmas: true });
+    if (Math.random() < 0.3) spawn('xmas', side * rf(4.3, 6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5), xmas: true });
     if (Math.random() < 0.16) spawn('nudi', side * rf(3.7, 5.4), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.5, 2.1) });
     if (Math.random() < 0.07) spawn('seahorse', side * rf(5, 7), rf(1.0, 2.0), z, { solid: false, ry: side > 0 ? -Math.PI / 2 - 0.4 : Math.PI / 2 + 0.4, scale: rf(0.9, 1.2) });
     if (Math.random() < 0.05) spawn('eel', side * rf(5.6, 7.5), 0, z, { solid: false, ry: side > 0 ? -Math.PI / 2 - 0.5 : Math.PI / 2 + 0.5, scale: rf(1, 1.3) });
@@ -437,6 +447,8 @@ function decorRow(z) {
 // creatures, fish and far features shared by every landscape type
 function sharedLife(z, bg) {
   const side = Math.random() < 0.5 ? -1 : 1;
+  if (Math.random() < 0.45) spawn('star', rf(-3.6, 3.6), 0, z + rf(-1.5, 1.5), { solid: false, scale: rf(1.0, 1.6), ry: rf(0, 6) });
+  if (Math.random() < 0.35) spawn('star', side * rf(3.8, 6), 0, z + rf(-1.5, 1.5), { solid: false, scale: rf(1.1, 1.8), ry: rf(0, 6) });
   if (Math.random() < 0.35) spawn('wallfar', side * rf(16, 24), rf(0, 2), z + rf(-3, 3), { solid: false, ry: rf(0, 6), scale: rf(1.4, 2.2) });
   if (Math.random() < 0.08) spawn('crab', side * rf(3.9, 5.2), 0, z, { solid: false, ry: rf(-0.5, 0.5) });
   if (Math.random() < 0.1) spawn('nudi', side * rf(3.7, 5), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.5, 2.1) });
@@ -761,7 +773,8 @@ function step(dt) {
   else {
     const boing = cubi.userData.boing || 0;
     if (boing > 0) cubi.userData.boing = boing - dt;
-    cubi.rotation.set(THREE.MathUtils.clamp(P.vy * 0.06, -0.35, 0.35), -P.vx * 0.05, -P.vx * 0.07 + Math.sin(boing * 40) * boing * 0.8);
+    const slope = Math.atan((relY(curD + 3) - relY(curD - 3)) / 6);
+    cubi.rotation.set(THREE.MathUtils.clamp(P.vy * 0.06 + slope * 0.6, -0.5, 0.5), -P.vx * 0.05, -P.vx * 0.07 + Math.sin(boing * 40) * boing * 0.8);
   }
   M.animateFish(cubi, dt, mode === 'over' ? 0.1 : mode === 'caught' ? 1 : Math.min(1, 0.45 + Math.hypot(P.vx, P.vy) * 0.08));
   if (invuln > 0) { invuln -= dt; cubi.visible = Math.floor(t * 14) % 2 === 0 || invuln <= 0; bodyMat.emissive.setRGB(invuln > 1.2 ? 0.35 : 0, 0.02, 0.01); }
@@ -791,6 +804,9 @@ function step(dt) {
   // buddy
   if (buddy) {
     tmpV.set(P.x + 1.0, P.y + 0.35 + Math.sin(t * 2) * 0.1, 0.5);
+    const bb = nearestBubble(buddy.position, 1.6);
+    if (bb && bb.m.position.y < P.y + 1.4) { tmpV.copy(bb.m.position); if (buddy.position.distanceTo(bb.m.position) < 0.3) popBubble(bb); }
+    if (tmpV.distanceTo(cubi.position) < 0.95) tmpV.copy(cubi.position).add(_cv.copy(tmpV).sub(cubi.position).normalize().multiplyScalar(0.95));
     buddy.position.lerp(tmpV, 1 - Math.pow(0.002, dt));
     buddy.rotation.set(0, -P.vx * 0.06, -P.vx * 0.06);
     M.animateFish(buddy, dt, 0.7);
@@ -898,40 +914,42 @@ function step(dt) {
   camera.position.x += (cx - camera.position.x) * k;
   camera.position.y += (cy - camera.position.y) * k;
   camera.position.z += (cz - camera.position.z) * k;
+  if (mode !== 'menu' && mode !== 'splash' && mode !== 'win') { const ahead = relY(curD + 12); ly += ahead * 0.55; cy += Math.max(-1.2, ahead * 0.15); }
   camLook.x += (lx - camLook.x) * k; camLook.y += (ly - camLook.y) * k; camLook.z += (lz - camLook.z) * k;
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.6; camera.position.y += (Math.random() - 0.5) * shake * 0.6; }
   camera.lookAt(camLook);
   sun.position.set(P.x + 4, 12, 6); sun.target.position.set(P.x, 0, -2);
 }
 
+function nearestBubble(pos, maxD) {
+  let best = null, bd = maxD;
+  for (const b of blubs) { if (b.life <= 0.15 || !b.m.visible) continue; const d = b.m.position.distanceTo(pos); if (d < bd) { bd = d; best = b; } }
+  return best;
+}
+function popBubble(b) { b.life = 0; b.m.visible = false; popHeart(b.m.position.x, b.m.position.y + 0.1, b.m.position.z, 0.35); }
+const _pt = new THREE.Vector3(), _cv = new THREE.Vector3();
 function updateParty(dt) {
   const pt = (party.t += dt);
   const c = party.clown;
-  // the friends always keep a safe gap so they never bump into each other
-  const GAP = 1.55;
-  let sway = 0, cHop = 0, kHop = 0, cy = Math.PI, ky = Math.PI, cRz = 0, kRz = 0, effort = 0.5;
-  if (pt < 1.3) {                                   // clownfish swims in from the side
-    const k = 1 - Math.pow(0.02, dt);
-    c.position.x += (P.x + GAP - c.position.x) * k; c.position.y += (P.y + 0.2 - c.position.y) * k; c.position.z += (0.2 - c.position.z) * k;
-    cy = Math.PI / 2; effort = 1;
-  } else {
-    const q = (pt - 1.3) % 6.5;
-    if (q < 1) { cHop = Math.sin(q * Math.PI) * 0.1; }                                              // turn and say hi
-    else if (q < 2.2) { const a = (q - 1) / 1.2 * Math.PI * 2; cHop = Math.max(0, Math.sin(a)) * 0.35; kHop = Math.max(0, -Math.sin(a)) * 0.3; } // take turns hopping
-    else if (q < 3.2) { cy = Math.PI + (q - 2.2) * Math.PI * 2; ky = Math.PI - (q - 2.2) * Math.PI * 2; effort = 1; } // twirl in place
-    else if (q < 4.3) { cy = Math.PI / 2 + 0.35; ky = -Math.PI / 2 - 0.35; effort = 0.8;                // turn to each other and chat
-      if (pt - party.lastHeart > 0.35) { party.lastHeart = pt; emitBlubAt(P.x + 0.35, P.y, 0.1); emitBlubAt(P.x + GAP - 0.3, P.y + 0.2, 0.2); } }
-    else { const w = Math.sin((q - 4.3) / 2.2 * Math.PI * 4); sway = w * 0.22; cRz = w * 0.2; kRz = w * 0.14; effort = 1; // dance together, side by side
-      cHop = Math.abs(w) * 0.08; kHop = Math.abs(w) * 0.06;
-      if (pt - party.lastHeart > 0.45) { party.lastHeart = pt; popHeart(P.x + GAP * 0.5 + sway, P.y + 0.9, 0.2, 0.7); } }
-    c.position.set(P.x + GAP + sway, P.y + 0.2 + cHop + Math.sin(pt * 2.2) * 0.04, 0.2);
-  }
-  c.rotation.y = angLerp(c.rotation.y, cy, pt < 1.3 ? 1 : 1 - Math.pow(0.0005, dt));
-  c.rotation.z = cRz; c.rotation.x = 0;
-  M.animateFish(c, dt, effort);
-  cubi.rotation.y = angLerp(cubi.rotation.y, ky, 1 - Math.pow(0.0005, dt));
-  cubi.rotation.z = kRz; cubi.rotation.x = 0;
-  cubi.position.x = P.x + sway; cubi.position.y = P.y + kHop;
+  // Cubi faces the camera and blows bubbles; the clownfish chases them and pops them, keeping a friendly gap
+  cubi.rotation.y = angLerp(cubi.rotation.y, Math.PI + Math.sin(pt * 0.6) * 0.25, 1 - Math.pow(0.001, dt));
+  cubi.rotation.z = Math.sin(pt * 1.3) * 0.05; cubi.rotation.x = 0;
+  cubi.position.x = P.x; cubi.position.y = P.y + Math.sin(pt * 1.6) * 0.05;
+  if (pt > 1.0 && (party.nextBlow ??= 1.0) < pt) { party.nextBlow = pt + 0.9 + Math.random() * 0.6; cubi.userData.chomp = 0.3; emitBlubAt(P.x + (Math.random() - 0.5) * 0.2, P.y - 0.05, 0.75); }
+  let target;
+  const bub = pt > 1.3 && nearestBubble(c.position, 3.5);
+  if (bub) { target = _pt.copy(bub.m.position).add(new THREE.Vector3(0.18, -0.05, 0)); if (c.position.distanceTo(bub.m.position) < 0.32) { popBubble(bub); party.happy = pt; } }
+  else target = _pt.set(P.x + 1.35 + Math.sin(pt * 0.8) * 0.2, P.y + 0.3 + Math.sin(pt * 1.4) * 0.15, 0.3);
+  // never bump into Cubi
+  _cv.copy(target).sub(cubi.position); if (_cv.length() < 1.5) target.copy(cubi.position).addScaledVector(_cv.normalize(), 1.5);
+  const prev = c.position.clone();
+  c.position.lerp(target, 1 - Math.pow(pt < 1.3 ? 0.02 : 0.08, dt));
+  const vx = (c.position.x - prev.x) / Math.max(dt, 1e-3);
+  // face the camera, just leaning gently toward where it swims (no spinning)
+  c.rotation.y = angLerp(c.rotation.y, pt < 1.3 ? Math.PI / 2 : Math.PI - THREE.MathUtils.clamp(vx * 0.35, -0.6, 0.6), 1 - Math.pow(0.002, dt));
+  const wig = party.happy && pt - party.happy < 0.5 ? Math.sin((pt - party.happy) * 30) * 0.2 : 0;
+  c.rotation.z = wig; c.rotation.x = 0;
+  M.animateFish(c, dt, 0.5 + Math.min(0.5, Math.abs(vx) * 0.3));
 }
 function updateHearts(dt) {
   hearts.forEach(h => {
@@ -984,18 +1002,22 @@ function squirtInk() {
   for (let i = 0; i < 18; i++) ink.blobs.push({ x: Math.random(), y: 0.15 + Math.random() * 0.75, r: 0.18 + Math.random() * 0.3, vx: (Math.random() - 0.5) * 0.05, vy: (Math.random() - 0.5) * 0.04, ph: Math.random() * 6 });
   toast('Inked!'); shake = Math.max(shake, 0.2);
 }
+const FOG0 = { near: scene.fog.near, far: scene.fog.far }, inkFogCol = new THREE.Color('#2E4A6A'), fogCol0 = scene.fog.color.clone();
 function drawInk(dt) {
+  const fk = Math.min(1, ink.level * 1.5);
+  scene.fog.near = THREE.MathUtils.lerp(FOG0.near, 0.5, fk); scene.fog.far = THREE.MathUtils.lerp(FOG0.far, 9, fk);
+  scene.fog.color.copy(fogCol0).lerp(inkFogCol, fk);
   const w = inkCv.clientWidth, h = inkCv.clientHeight;
   if (ink.level <= 0) { if (inkCv.width) { inkCv.width = 0; } return; }
   if (inkCv.width !== w) { inkCv.width = w; inkCv.height = h; }
   ink.level = Math.max(0, ink.level - dt / 4.2);
-  const a = Math.min(1, ink.level * 1.6) * 0.94;
+  const a = Math.min(1, ink.level * 1.6) * 0.58;
   inkCtx.clearRect(0, 0, w, h);
   const S = Math.max(w, h);
   ink.blobs.forEach(b => {
     b.x += b.vx * dt; b.y += b.vy * dt; const r = b.r * S * (1.1 + (1 - ink.level) * 0.5) * (1 + Math.sin(t * 2 + b.ph) * 0.05);
     const gr = inkCtx.createRadialGradient(b.x * w, b.y * h, 0, b.x * w, b.y * h, r);
-    gr.addColorStop(0, `rgba(10,8,20,${a})`); gr.addColorStop(0.6, `rgba(14,10,28,${a * 0.85})`); gr.addColorStop(1, 'rgba(14,10,28,0)');
+    gr.addColorStop(0, `rgba(34,40,62,${a})`); gr.addColorStop(0.6, `rgba(40,48,72,${a * 0.8})`); gr.addColorStop(1, 'rgba(40,48,72,0)');
     inkCtx.fillStyle = gr; inkCtx.beginPath(); inkCtx.arc(b.x * w, b.y * h, r, 0, Math.PI * 2); inkCtx.fill();
   });
 }
