@@ -157,6 +157,7 @@ function emitPartyBubble(x, y, z) {
 }
 function emitBlubAt(x, y, z) { for (let k = 0; k < 2; k++) { const b = blubs[blubNext++ % blubs.length]; b.m.visible = true; b.life = 1.3; b.vx = (Math.random() - 0.5) * 0.3; b.m.position.set(x + (Math.random() - 0.5) * 0.15, y + k * 0.12, z); b.m.scale.setScalar(0.06 + Math.random() * 0.03); } }
 function emitBlub(n = 1) {
+  if (window.__noBlub) return;
   const head = new THREE.Vector3(0, -0.12, -0.62).applyMatrix4(cubi.matrixWorld);
   for (let k = 0; k < n; k++) {
     const b = blubs[blubNext++ % blubs.length];
