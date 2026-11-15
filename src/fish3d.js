@@ -1,0 +1,112 @@
+// Builds a 3D fish straight from its 2D design: the silhouette is inflated into a smooth body, the design's
+// pattern becomes the body texture (crisp, exactly as drawn), fins are outlined cut-outs, eyes are Cubi-style 3D eyes.
+import * as THREE from 'three';
+import { makeEye, placeEye } from './models.js';
+import { DESIGNS } from './fishdesigns.js';
+
+const OUT = '#3B2614', S = 0.006;                       // world units per design unit (body ≈ 1.2 long)
+const THICK = { 'Blackspotted puffer (yellow)': 0.92, 'Blackspotted puffer, puffed up': 1.0, 'Giant puffer': 0.92, 'Blacktip reef shark': 0.9, 'Whitetip reef shark': 0.9, 'Needlefish': 0.9, 'Trumpetfish': 0.9,
+  'Coral grouper': 0.62, 'Parrotfish': 0.52, 'Lunar fusilier': 0.7, 'Silversides': 0.6, 'Anthias': 0.52, 'Clownfish': 0.5, 'Pink skunk clownfish': 0.5, 'Blue-green chromis': 0.48, 'Yellowtail damselfish': 0.48 };
+export const FISH3D = DESIGNS.filter(d => d.en !== 'Blue-spotted stingray');
+
+function svgTexture(inner, bg, w = 1024, h = 683) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const ctx = cv.getContext('2d');
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const img = new Image();
+  img.onload = () => { ctx.drawImage(img, 0, 0, w, h); tex.needsUpdate = true; };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="${w}" height="${h}">${inner}</svg>`);
+  return tex;
+}
+let _scan = null;
+function silhouette(d) {
+  _scan ||= document.createElement('canvas').getContext('2d');
+  const p = new Path2D(d), cols = [];
+  for (let x = 0; x <= 300; x++) { let t = -1, b = -1; for (let y = 0; y <= 200; y++) if (_scan.isPointInPath(p, x + 0.5, y + 0.5)) { if (t < 0) t = y; b = y + 1; } cols.push(t < 0 ? null : [t, b]); }
+  let x0 = cols.findIndex(c => c), x1 = 300; while (!cols[x1]) x1--;
+  return { cols, x0, x1 };
+}
+// shared swimming wave: head stays calm, amplitude grows toward the tail
+function swim(mat, U, len, push = 0) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uT = U;
+    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      ${push ? `transformed += normalize(normal) * ${push.toFixed(4)};` : ''}
+      float zn = position.z / ${len.toFixed(4)};
+      float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2).toFixed(4)};
+      transformed.x += sin(uT - zn * 3.0) * env;`);
+    if (mat.isMeshToonMaterial) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
+      { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
+        float fr = pow(1.0 - clamp(abs(dot(nn, vv)), 0.0, 1.0), 2.4);
+        float hs = pow(max(dot(nn, normalize(vec3(-0.3, 0.85, 0.45))), 0.0), 40.0);
+        outgoingLight += fr * 0.28 * vec3(0.8, 0.95, 1.0) + hs * 0.45; }
+      #include <opaque_fragment>`);
+  };
+  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type;
+  return mat;
+}
+let _grad = null;
+const softGrad = () => { if (_grad) return _grad; const d = new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 236, 236, 236, 255, 255, 255, 255, 255]); _grad = new THREE.DataTexture(d, 4, 1, THREE.RGBAFormat); _grad.minFilter = _grad.magFilter = THREE.NearestFilter; _grad.needsUpdate = true; return _grad; };
+const firstPt = (svg) => { const m = /d="M\s*([\d.]+)[ ,]([\d.]+)/.exec(svg); return m ? [+m[1], +m[2]] : null; };
+const bbox = (svg) => { const d = /d="([^"]+)"/.exec(svg)[1], n = d.match(/-?[\d.]+/g).map(Number); let a = 1e9, b = 1e9, c = -1e9, e = -1e9; for (let i = 0; i + 1 < n.length; i += 2) { a = Math.min(a, n[i]); c = Math.max(c, n[i]); b = Math.min(b, n[i + 1]); e = Math.max(e, n[i + 1]); } return [a - 4, b - 4, c + 4, e + 4]; };
+
+const cache = {};
+function parts(d) {
+  if (cache[d.en]) return cache[d.en];
+  const { cols, x0, x1 } = silhouette(d.body), xm = (x0 + x1) / 2, len = (x1 - x0) * S;
+  let Hmax = 0; for (let x = x0; x <= x1; x++) Hmax = Math.max(Hmax, (cols[x][1] - cols[x][0]) / 2);
+  const thick = d.thick || THICK[d.en] || 0.36;
+  const N = 44, M = 22, pos = [], uv = [], idx = [], rings = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, xs = x0 + 0.5 + t * (x1 - x0 - 1), c = cols[Math.round(xs)] || cols[Math.floor(xs)];
+    const cy = (c[0] + c[1]) / 2, h = Math.max(0.6, (c[1] - c[0]) / 2);
+    const w = Math.max(0.5, Math.min(thick * Hmax * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.55), h * (thick > 0.8 ? 1.0 : 0.9)));
+    rings.push({ xs, cy, h, w });
+    for (let j = 0; j <= M; j++) { const a = j / M * Math.PI * 2, ys = cy - h * Math.cos(a), xl = w * Math.sin(a); pos.push(xl * S, (100 - ys) * S, (xs - xm) * S); uv.push(xs / 300, 1 - ys / 200); }
+  }
+  for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  const body = new THREE.BufferGeometry(); body.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); body.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); body.setIndex(idx); body.computeVertexNormals();
+  const latAt = (xs, ys) => { const r = rings[Math.max(0, Math.min(N, Math.round((xs - x0) / (x1 - x0) * N)))]; return r.w * Math.sqrt(Math.max(0.05, 1 - ((ys - r.cy) / r.h) ** 2)); };
+  // textures
+  const bodyTex = svgTexture((d.pattern || '') + (d.shine ? `<ellipse cx="${d.shine[0]}" cy="${d.shine[1]}" rx="${d.shine[2] || 20}" ry="5" fill="#fff" opacity=".7" transform="rotate(${d.shine[3] || -8} ${d.shine[0]} ${d.shine[1]})"/>` : '') + (d.over || '') +
+    (d.blush ? `<ellipse cx="${d.blush[0]}" cy="${d.blush[1]}" rx="${(d.blushR || 7) * 1.25}" ry="${(d.blushR || 7) * 0.75}" fill="#FF8FA3" opacity=".8"/>` : '') +
+    (d.mouth ? `<path d="M${d.mouth[0]},${d.mouth[1]} q${5 * (d.mouthS || 1)},${6 * (d.mouthS || 1)} ${11 * (d.mouthS || 1)},${d.mouthS || 1}" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>` : ''), d.fill);
+  const finTex = svgTexture((d.fins || []).join('') + (d.pec || ''));
+  // median fins: one cut-out sheet in the centre plane
+  const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
+  let pec = null;
+  if (d.pec) { const [a, b, c, e] = bbox(d.pec), base = firstPt(d.pec);
+    const g = new THREE.PlaneGeometry((c - a) * S, (e - b) * S); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, (a + u.getX(i) * (c - a)) / 300, 1 - (b + (1 - u.getY(i)) * (e - b)) / 200);
+    g.translate(((a + c) / 2 - base[0]) * S, (base[1] - (b + e) / 2) * S, 0); g.rotateY(-Math.PI / 2);
+    pec = { g, y: (100 - base[1]) * S, z: (base[0] - xm) * S, x: latAt(base[0], base[1]) * S }; }
+  return (cache[d.en] = { body, fins, pec, bodyTex, finTex, len, xm, latAt });
+}
+
+export function makeFish3D(d, size = 1) {
+  const P = parts(d), U = { value: Math.random() * 6 };
+  const root = new THREE.Group(), rig = new THREE.Group(); root.add(rig);
+  const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len);
+  rig.add(new THREE.Mesh(P.body, bodyM));
+  rig.add(new THREE.Mesh(P.body, swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), U, P.len, 0.014)));
+  const finM = swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), U, P.len);
+  rig.add(new THREE.Mesh(P.fins, finM));
+  const pecs = [];
+  if (P.pec) for (const sx of [-1, 1]) { const m = new THREE.Mesh(P.pec.g, new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide })); const piv = new THREE.Group(); piv.position.set(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); piv.add(m); rig.add(piv); pecs.push({ piv, sx }); }
+  const eyes = [];
+  if (d.eye) { const [ex, ey, er] = d.eye, lat = P.latAt(ex, ey) * S, r3 = Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85));
+    for (const sx of [-1, 1]) {
+      const e = placeEye(makeEye(r3, OUT), new THREE.Vector3(sx * Math.max(lat - r3 * 0.35, r3 * 0.25), (100 - ey) * S, (ex - P.xm) * S), new THREE.Vector3(sx, 0.12, -0.38).normalize());
+      rig.add(e); eyes.push(e);
+      if (d.grumpy) { const br = new THREE.Mesh(new THREE.CapsuleGeometry(r3 * 0.15, r3 * 1.3, 4, 8), new THREE.MeshBasicMaterial({ color: OUT })); br.position.set(0, r3 * 1.0, r3 * 0.55); br.rotation.z = Math.PI / 2 + sx * 0.45; e.add(br); }
+    } }
+  root.scale.setScalar(size);
+  root.userData = { U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 4.5 : 6.5 };
+  return root;
+}
+export function animateFish3D(f, dt) {
+  const u = f.userData; u.t += dt; u.U.value += dt * u.speed;
+  u.rig.rotation.y = -Math.sin(u.U.value) * 0.05; u.rig.position.y = Math.sin(u.t * 1.3) * 0.02; u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03;
+  u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
+  u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
+  u.eyes.forEach(e => { e.scale.y = k; });
+}

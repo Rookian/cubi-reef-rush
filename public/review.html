@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cubi's Reef Rush – Design review</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --ink: #12324A; --sun: #FFD23F; }
+* { box-sizing: border-box; } html, body { margin: 0; height: 100%; font-family: Fredoka, system-ui, sans-serif; color: var(--ink); background: #2C93C4; }
+#wrap { display: grid; grid-template-columns: 250px 1fr; height: 100%; }
+#list { overflow-y: auto; background: rgba(255,255,255,.9); border-right: 4px solid var(--ink); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+#list button { text-align: left; font: 600 15px Fredoka, sans-serif; color: var(--ink); background: #fff; border: 2px solid transparent; border-radius: 10px; padding: 7px 9px; cursor: pointer; }
+#list button.on { border-color: var(--ink); background: var(--sun); }
+#stage { position: relative; min-width: 0; } canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+#top { position: absolute; top: 14px; left: 0; right: 0; text-align: center; pointer-events: none; }
+#name { margin: 0; font-size: 34px; font-weight: 700; color: #fff; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; }
+#de { font-size: 19px; font-weight: 600; color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+#bar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(680px, 94%); background: rgba(255,255,255,.93); border: 4px solid var(--ink); border-radius: 22px; padding: 12px; display: grid; gap: 8px; }
+.row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
+button.b { font: 700 17px Fredoka, sans-serif; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 999px; padding: 8px 18px; min-height: 44px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+#ok[aria-pressed="true"] { background: #8EDB7A; } #no[aria-pressed="true"] { background: #FFB36B; } #copy { background: var(--sun); }
+textarea { width: 100%; font: 500 16px Fredoka, sans-serif; border: 3px solid var(--ink); border-radius: 14px; padding: 8px 12px; min-height: 52px; resize: vertical; color: var(--ink); }
+#count { font-weight: 700; min-width: 70px; text-align: center; } .hint { font-size: 14px; text-align: center; color: #3D5A70; }
+@media (max-width: 760px) { #wrap { grid-template-columns: 1fr; grid-template-rows: 1fr; } #list { display: none; } #name { font-size: 26px; } }
+</style></head><body>
+<div id="wrap"><nav id="list" aria-label="All designs"></nav>
+<main id="stage"><canvas id="c"></canvas>
+  <div id="top"><h1 id="name"></h1><div id="de"></div></div>
+  <div id="bar">
+    <div class="row"><button class="b" id="prev" aria-label="Previous">◀</button><span id="count"></span><button class="b" id="next" aria-label="Next">▶</button>
+      <button class="b" id="ok" aria-pressed="false">👍 Accept</button><button class="b" id="no" aria-pressed="false">✏️ Needs changes</button></div>
+    <label><textarea id="note" placeholder="What should change? (shape, colours, face, movement …)" aria-label="Feedback for this design"></textarea></label>
+    <div class="row"><button class="b" id="copy">Copy my feedback</button></div>
+    <div class="hint">Drag to look around, scroll to zoom. Your notes are saved in this browser.</div>
+  </div></main></div>
+<script src="review.js?v=mwhrrplr"></script></body></html>
