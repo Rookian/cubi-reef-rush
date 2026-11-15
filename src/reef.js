@@ -571,7 +571,7 @@ export function animateXmas(r, dt, near) {
 // ------------------------------------------------------------------
 // NUDIBRANCH — tiny, colourful sea slug that crawls along
 // ------------------------------------------------------------------
-const NUDI = [['#9B3DFF', '#FFB000', '#FFFFFF'], ['#1E90FF', '#FFE600', '#FF7A00'], ['#FF2E88', '#FFFFFF', '#FFE600'], ['#FF7A00', '#FFFFFF', '#9B3DFF'], ['#00E0C8', '#FF2E88', '#1E90FF']];
+const NUDI = [['#16161C', '#3FE07A', '#7FFF5A'], ['#9B3DFF', '#FFB000', '#FFFFFF'], ['#1E90FF', '#FFE600', '#FF7A00'], ['#FF2E88', '#FFFFFF', '#FFE600'], ['#FF7A00', '#FFFFFF', '#9B3DFF'], ['#00E0C8', '#FF2E88', '#1E90FF']];
 export function makeNudibranch(pal = 0) {
   const [B, E, S] = NUDI[pal % NUDI.length];
   const g = new THREE.Group(); const rig = new THREE.Group(); g.add(rig);

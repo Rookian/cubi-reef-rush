@@ -56,6 +56,17 @@ if (which === 'lush') {
   const sw = add(M.makeSchool('chromis', 26, 18, 'plain', 0.36), 0.5, 3.3, -1.5, -0.7); anim.push(dt => { RF.reefClock.value += dt; M.animateSchool(sw, dt); });
   cam.position.set(0, 2.6, 8.5); cam.lookAt(0, 1.0, 0);
 }
+if (which === 'newfish') {
+  const list = [];
+  [['rabbit', 25, 'foxface', 1.4, -2.6, 2.3], ['angel', 26, 'emperor', 1.4, 0, 2.4], ['needle', 27, 'needle', 1.6, 2.6, 2.6], ['trumpet', 28, 'trumpet', 1.6, -2.4, 1.3], ['trumpet', 29, 'trumpet', 1.6, 0.4, 1.2]].forEach(([sh, pal, pat, sz, x, y]) => list.push(add(M.makeSchool(sh, 1, pal, pat, sz), x, y, 0, -Math.PI / 2)));
+  const bt = add(CR.makeReefShark('blacktip'), -2.4, 3.6, -3, -Math.PI / 2 - 0.3); const wt = add(CR.makeReefShark('whitetip'), 2.6, 3.4, -3.4, -Math.PI / 2 + 0.3);
+  const ray = add(CR.makeStingray(), 1.6, 0, 1.6, 2.5); ray.scale.setScalar(1.5);
+  add(CR.makeGorgonian(0), 4.4, 0, -2.5, -0.3); add(CR.makeGorgonian(2), -4.6, 0, -2.2, 0.3);
+  add(CR.makeRubble(3), -1.2, 0, 2.0, 0); const nb = add(RF.makeNudibranch(0), 0.2, 0, 2.6, 0.6); nb.scale.setScalar(2.2);
+  const pf = add(M.makePuffer(), 3.6, 1.2, 0.8, -1.2); M.setPuff(pf, 1);
+  anim.push(dt => { list.forEach(s => M.animateSchool(s, dt)); CR.animateReefShark(bt, dt); CR.animateReefShark(wt, dt); CR.animateStingray(ray, dt); });
+  cam.position.set(0, 2.6, 8); cam.lookAt(0, 1.2, 0);
+}
 if (which === 'debris') {
   for (let i = 0; i < 9; i++) add(RF.makeDebris(i), -4 + (i % 3) * 4, 0, -2.2 + Math.floor(i / 3) * 2.0, 0.4 * i);
   add(RF.makeSeagrass(1, 1.4, 150), -6.5, 0, -1.5); add(RF.makeSeagrass(2, 1.2, 130), 6.2, 0, -0.5);

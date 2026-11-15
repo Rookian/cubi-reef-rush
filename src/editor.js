@@ -24,7 +24,7 @@ const TOOLS = [
   { id: 'wreckgate', label: 'Wreck to swim through', icon: null, make: (x, z) => ({ t: 'wreckgate', x: Math.max(-2.2, Math.min(2.2, x)), z }) },
   { id: 'moray', label: 'Moray eel', icon: null, make: (x, z) => ({ t: 'moray', x: x >= 0 ? 1 : -1, z, home: 'rock' }) },
   { id: 'kraken', label: 'Kraken (ink)', icon: null, make: (x, z) => ({ t: 'kraken', x, z }) },
-  { id: 'hammer', label: 'Hammerhead (crosses)', icon: null, make: (x, z) => ({ t: 'hammer', x, z, y: LANE.mid }) },
+  { id: 'hammer', label: 'Reef shark (crosses)', icon: null, make: (x, z) => ({ t: 'hammer', x, z, y: LANE.mid }) },
   { id: 'seasnake', label: 'Sea snake (crosses low)', icon: null, make: (x, z) => ({ t: 'seasnake', x, z, y: LANE.low }) },
   { id: 'decor', label: 'Reef decor', icon: null, make: (x, z) => ({ t: 'decor', kind: 'magnifica', x, z }) },
   { id: 'visitor', label: 'Visitor swims by', icon: null, make: (x, z) => ({ t: 'visitor', kind: 'whaleshark', x, z }) },
@@ -32,12 +32,12 @@ const TOOLS = [
 // emoji symbols for items without a picture (map + palette)
 const DECOR = [['magnifica', 'Magnificent anemone', '🪸'], ['gigantea', 'Giant carpet anemone', '🌸'], ['mertensii', "Merten's carpet anemone", '🌼'], ['heroanem', 'Fluffy anemone', '🌺'], ['xmas', 'Christmas tree worms', '🎄'],
   ['debris', 'Sunken debris', '⚓'], ['seagrass', 'Seagrass meadow', '🌿'], ['grazer', 'Turtle eating coral', '🐢'], ['shrimp', 'Shrimp', '🦐'], ['star', 'Sea star', '⭐'],
-  ['clam', 'Giant clam', '🐚'], ['sponge', 'Sponge', '🧽'], ['mushroom', 'Mushroom coral', '🍄'], ['crab', 'Crab', '🦀'], ['nudi', 'Nudibranch', '🐌'], ['kelp', 'Kelp', '🌱']];
+  ['clam', 'Giant clam', '🐚'], ['sponge', 'Sponge', '🧽'], ['mushroom', 'Mushroom coral', '🍄'], ['crab', 'Crab', '🦀'], ['nudi', 'Nudibranch', '🐌'], ['kelp', 'Kelp', '🌱'], ['stingray', 'Blue-spotted stingray', '🔵'], ['gorgonian', 'Sea fan', '🎐'], ['rubble', 'Dead coral', '🦴']];
 const VISITORS = [['whaleshark', 'Whale shark', '🐋'], ['turtle', 'Sea turtle', '🐢'], ['babyturtles', 'Baby turtles', '🐣'], ['manta', 'Manta ray', '🪽']];
 const EMOJI = { wreckgate: '🚢', moray: '🐉', kraken: '🐙', hammer: '🦈', seasnake: '🐍', stream: '⇄', decor: '🪸', visitor: '🐋' };
 const emojiFor = (it) => it.t === 'decor' ? (DECOR.find(d => d[0] === it.kind) || DECOR[0])[2] : it.t === 'visitor' ? (VISITORS.find(d => d[0] === it.kind) || VISITORS[0])[2] : EMOJI[it.t];
 const FLOATERS = ['pearl', 'pearls', 'jelly', 'puffer', 'shark', 'hammer', 'seasnake'];
-const NAMES = { pearl: 'Pearl', pearls: 'Pearl line', jelly: 'Jellyfish', puffer: 'Pufferfish', urchin: 'Sea urchin', shark: 'Shark', coral: 'Coral', anemone: 'Clownfish home', stream: 'Current', hammer: 'Hammerhead', seasnake: 'Sea snake', wreckgate: 'Wreck to swim through', moray: 'Moray eel', kraken: 'Kraken', decor: 'Reef decor', visitor: 'Visitor' };
+const NAMES = { pearl: 'Pearl', pearls: 'Pearl line', jelly: 'Jellyfish', puffer: 'Pufferfish', urchin: 'Sea urchin', shark: 'Shark', coral: 'Coral', anemone: 'Clownfish home', stream: 'Current', hammer: 'Reef shark', seasnake: 'Sea snake', wreckgate: 'Wreck to swim through', moray: 'Moray eel', kraken: 'Kraken', decor: 'Reef decor', visitor: 'Visitor' };
 let tool = 'select';
 
 // ------------------------------------------------------------ level state
@@ -197,6 +197,7 @@ function panel() {
   if (FLOATERS.includes(it.t)) h += seg('Height', [[LANE.low, 'Low'], [LANE.mid, 'Mid'], [LANE.high, 'High']], it.y ?? LANE.mid);
   if (it.t === 'pearls') h += seg('Count', [[3, '3'], [5, '5'], [8, '8'], [12, '12']], it.n || 5) + seg('Gap', [[2, 'Tight'], [3, 'Normal'], [4.5, 'Wide']], it.gap || 3) + seg('Shape', [[0, 'Straight'], [0.4, 'Slant →'], [-0.4, 'Slant ←']], it.dx || 0) + seg('Rise', [[0, 'Flat'], [0.25, 'Up ↗'], [-0.25, 'Down ↘']], it.dy || 0);
   if (it.t === 'moray') h += seg('Side', [[-1, '← Left'], [1, 'Right →']], it.x >= 0 ? 1 : -1) + seg('Home', [['rock', 'Rock'], ['tube', 'Pipe coral']], it.home || 'rock');
+  if (it.t === 'hammer') h += seg('Type', [['auto', 'Auto'], ['blacktip', 'Blacktip'], ['whitetip', 'Whitetip']], it.kind || 'auto');
   if (it.t === 'hammer' || it.t === 'seasnake') h += seg('From', [['auto', 'Auto'], ['left', 'Left'], ['right', 'Right']], it.from || 'auto');
   if (it.t === 'decor') h += seg('Thing', DECOR.map(d => [d[0], d[2] + ' ' + d[1]]), it.kind);
   if (it.t === 'visitor') h += seg('Who', VISITORS.map(d => [d[0], d[2] + ' ' + d[1]]), it.kind);
@@ -204,7 +205,7 @@ function panel() {
   if (it.t === 'stream') h += seg('Push', [['left', '← Left'], ['right', 'Right →'], ['up', '↑ Up'], ['down', '↓ Down']], it.dir) + seg('Length', [[10, 'Short'], [14, 'Medium'], [20, 'Long']], it.len || 14);
   h += `</div><div class="pbtns"><button class="alt" id="dupBtn">Duplicate</button><button class="danger" id="delBtn">Delete</button></div>`;
   el.innerHTML = h;
-  const keys = { Height: 'y', Count: 'n', Gap: 'gap', Shape: 'dx', Rise: 'dy', Kind: 'kind', Push: 'dir', Length: 'len', Side: 'x', Home: 'home', From: 'from', Thing: 'kind', Who: 'kind' };
+  const keys = { Height: 'y', Count: 'n', Gap: 'gap', Shape: 'dx', Rise: 'dy', Kind: 'kind', Push: 'dir', Length: 'len', Side: 'x', Home: 'home', From: 'from', Type: 'kind', Thing: 'kind', Who: 'kind' };
   el.querySelectorAll('.field').forEach(f => {
     const k = keys[f.dataset.k];
     f.querySelectorAll('button').forEach(b => b.onclick = () => { const v = b.dataset.v; it[k] = isNaN(+v) ? v : +v; save(); panel(); draw(); });

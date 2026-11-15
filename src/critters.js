@@ -239,3 +239,133 @@ export function animateGrazer(g, dt, near) {
   }
   u.crumbs.forEach(q => { if (q.life <= 0) return; q.life -= dt; q.m.position.addScaledVector(q.v, dt); q.m.rotation.x += dt * 3; q.m.scale.setScalar(Math.max(0.01, Math.min(1, q.life))); if (q.life <= 0) q.m.visible = false; });
 }
+
+// =====================================================================
+// REEF SHARKS — blacktip / whitetip: foes that cross the lane (replace the hammerhead)
+// =====================================================================
+function tipFin(shape, color, tipColor, tipFrom, edge, axis = 'y', both = false) {
+  const g = new THREE.Group();
+  const geo = new THREE.ShapeGeometry(shape, 16); const p = geo.attributes.position;
+  let mx = 0, mn = 0; for (let i = 0; i < p.count; i++) { const v = axis === 'y' ? p.getY(i) : p.getX(i); mx = Math.max(mx, v); mn = Math.min(mn, v); }
+  const c0 = new THREE.Color(color), c1 = new THREE.Color(tipColor), cols = [];
+  for (let i = 0; i < p.count; i++) { const v = axis === 'y' ? p.getY(i) : p.getX(i); const k = Math.max(v / (mx || 1), both ? v / (mn || -1) : 0); const c = k > tipFrom ? c1 : c0; cols.push(c.r, c.g, c.b); }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  g.add(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true, side: THREE.DoubleSide })));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shape.getPoints(30).map(q => V(q.x, q.y, 0)), true), 60, 0.018, 5, true), basic(edge)));
+  return g;
+}
+export function makeReefShark(kind = 'blacktip') {
+  const white = kind === 'whitetip';
+  const root = new THREE.Group(); const rig = new THREE.Group(); root.add(rig);
+  const edge = '#2A2E40', top = new THREE.Color(white ? '#7C8696' : '#A3AEBF'), belly = new THREE.Color('#F4F6FA');
+  const tipC = white ? '#FFFFFF' : '#16161C', finC = white ? '#727C8C' : '#97A2B4';
+  const geo = latheBody(t => Math.sin(Math.PI * Math.pow(t, 0.7)) * (white ? 0.42 : 0.5) * (1 - 0.15 * t) + 0.02, -1.5, 1.05, 1.0, 0.92, 28);
+  paintGradient(geo, '#fff', '#fff', 'y', 0, 1, (c, i, p) => c.copy(top).lerp(belly, THREE.MathUtils.smoothstep(-p.getY(i), 0.0, 0.14)));
+  rig.add(outline(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true })), 0.04, edge));
+  for (const sx of [-1, 1]) {
+    rig.add(placeEye(makeEye(0.1, edge), V(sx * 0.2, 0.12, -1.0), V(sx, 0.3, -0.35).normalize()));
+    const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.11, 4, 8), basic(edge)); brow.position.set(sx * 0.21, 0.25, -1.0); brow.rotation.set(0, 0, Math.PI / 2 + sx * 0.4); rig.add(brow);
+    for (let k = 0; k < 4; k++) { const gl = new THREE.Mesh(new THREE.CapsuleGeometry(0.01, 0.12, 2, 4), basic('#5A6278')); gl.position.set(sx * 0.47, 0.02, -0.42 + k * 0.07); gl.rotation.z = sx * 0.2; rig.add(gl); }
+  }
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.02, 6, 18, Math.PI), basic(edge)); mouth.position.set(0, -0.14, -1.18); mouth.rotation.set(-0.6, 0, 0); rig.add(mouth);
+  const dor = tipFin(shp([[-0.3, 0], [-0.05, 0.25], [0.12, 0.62], [0.18, 0.25], [0.35, 0]]), finC, tipC, 0.45, edge); dor.rotation.y = Math.PI / 2; dor.position.set(0, 0.38, -0.2); rig.add(dor);
+  const d2 = fin(shp([[-0.1, 0], [0, 0.08], [0.06, 0.15], [0.08, 0.06], [0.12, 0]]), finC, edge); d2.rotation.y = Math.PI / 2; d2.position.set(0, 0.22, 0.6); rig.add(d2);
+  for (const sx of [-1, 1]) { const f = tipFin(shp([[0, -0.15], [0.45, -0.25], [0.68, -0.5], [0.35, 0.05], [0, 0.15]]), finC, white ? finC : tipC, 0.55, edge, 'x'); f.position.set(sx * 0.38, -0.22, -0.45); f.rotation.set(-0.3, sx > 0 ? -0.5 : Math.PI + 0.5, sx * -0.4); rig.add(f); }
+  const tail = new THREE.Group(); tail.position.z = 1.05; rig.add(tail);
+  const tf = tipFin(shp([[0, -0.06], [0.22, -0.3], [0.4, -0.5], [0.3, 0], [0.75, 0.7], [0.3, 0.22], [0, 0.06]]), finC, tipC, white ? 0.55 : 0.45, edge, 'y', !white); tf.rotation.y = -Math.PI / 2; tail.add(tf);
+  root.userData = { rig, tail, t: Math.random() * 10 };
+  return root;
+}
+export function animateReefShark(h, dt) { const u = h.userData; u.t += dt * 6.5; u.tail.rotation.y = Math.sin(u.t) * 0.5; u.rig.rotation.y = -Math.sin(u.t) * 0.09; }
+
+// =====================================================================
+// BLUE-SPOTTED STINGRAY — rests on the sand, rippling its disc edges; long striped tail
+// =====================================================================
+export function makeStingray() {
+  const root = new THREE.Group(); const rig = new THREE.Group(); root.add(rig);
+  const edge = '#4A3A1A';
+  const geo = new THREE.SphereGeometry(1, 36, 14); geo.scale(0.55, 0.1, 0.68);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z < -0.5) p.setX(i, p.getX(i) * (1 - (-z - 0.5) * 0.6)); if (p.getY(i) < 0) p.setY(i, p.getY(i) * 0.4); }   // slightly pointed snout, flat belly
+  geo.computeVertexNormals();
+  const base = new THREE.Color('#C9A15A'), spot = new THREE.Color('#2F8BFF');
+  paintGradient(geo, '#fff', '#fff', 'y', 0, 1, (c, i, q) => { const x = q.getX(i), y = q.getY(i), z = q.getZ(i); c.copy(base); if (y > 0.01 && Math.sin(x * 34) * Math.sin(z * 30) > 0.72) c.copy(spot); if (y > 0.01 && Math.hypot(x / 0.55, z / 0.68) > 0.92) c.set('#3FA0FF'); if (y < 0) c.set('#F4EEE0'); });
+  const disc = outline(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true })), 0.015, edge); rig.add(disc);
+  for (const sx of [-1, 1]) { const e = placeEye(makeEye(0.06, edge), V(sx * 0.14, 0.09, -0.3), V(sx * 0.4, 1, -0.5).normalize()); rig.add(e); }
+  // tail with two blue stripes
+  const tail = new THREE.Group(); tail.position.set(0, 0.02, 0.62); rig.add(tail);
+  const tg = new THREE.CylinderGeometry(0.008, 0.045, 0.75, 8); tg.rotateX(Math.PI / 2); tg.translate(0, 0, 0.37);
+  paintGradient(tg, '#fff', '#fff', 'z', 0, 1, (c, i, q) => { const z = q.getZ(i); c.set(z > 0.3 && z < 0.62 && Math.abs(q.getX(i)) > 0.01 ? '#2F8BFF' : '#C9A15A'); });
+  tail.add(outline(new THREE.Mesh(tg, toon('#ffffff', { vertexColors: true })), 0.01, edge));
+  const base0 = Float32Array.from(p.array);
+  root.userData = { rig, tail, geo, base0, t: Math.random() * 10 };
+  return root;
+}
+export function animateStingray(r, dt) {
+  const u = r.userData; u.t += dt;
+  const p = u.geo.attributes.position, b = u.base0;
+  for (let i = 0; i < p.count; i++) { const x = b[i * 3], z = b[i * 3 + 2], ex = Math.max(0, Math.abs(x) / 0.55 - 0.45); p.setY(i, b[i * 3 + 1] + Math.sin(u.t * 3.2 - z * 7) * 0.05 * ex); }
+  p.needsUpdate = true;
+  u.tail.rotation.y = Math.sin(u.t * 1.3) * 0.25; u.rig.position.y = 0.05 + Math.sin(u.t * 0.7) * 0.02;
+}
+
+// =====================================================================
+// GORGONIAN SEA FAN — lacy branching fan in one plane with tiny polyps
+// =====================================================================
+const GORG = [['#FF4A5A', '#FFD2D8'], ['#FF8A2A', '#FFE6C8'], ['#B04AE8', '#F0D8FF'], ['#FFC21F', '#FFF4C8'], ['#FF5CA8', '#FFE0F0']];
+export function makeGorgonian(seed = 0) {
+  let r = seed * 9301 + 49297; const R = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+  const [col, polyp] = GORG[seed % GORG.length];
+  const tubes = [], dots = [];
+  function branch(x, y, ang, len, w, depth) {
+    const x2 = x + Math.sin(ang) * len, y2 = y + Math.cos(ang) * len;
+    const mid = V((x + x2) / 2 + (R() - 0.5) * len * 0.25, (y + y2) / 2, (R() - 0.5) * 0.04);
+    tubes.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(x, y, 0), mid, V(x2, y2, 0)]), 3, w, 4));
+    for (let k = 0; k < 2; k++) { const t = R(); dots.push(V(x + (x2 - x) * t, y + (y2 - y) * t, (R() - 0.5) * 0.03)); }
+    if (depth <= 0 || y2 > 2.1) return;
+    const n = depth > 3 ? 2 : (R() < 0.7 ? 2 : 3);
+    for (let i = 0; i < n; i++) branch(x2, y2, ang + (i - (n - 1) / 2) * (0.5 + R() * 0.3) + (R() - 0.5) * 0.2, len * (0.72 + R() * 0.18), w * 0.78, depth - 1);
+  }
+  branch(0, 0, 0, 0.45, 0.05, 6);
+  // cross-links make it look like lace
+  for (let i = 0; i < 40; i++) { const a = dots[Math.floor(R() * dots.length)], b2 = dots[Math.floor(R() * dots.length)]; if (a.distanceTo(b2) < 0.28 && a.distanceTo(b2) > 0.06) tubes.push(new THREE.TubeGeometry(new THREE.LineCurve3(a, b2), 1, 0.008, 3)); }
+  const g = new THREE.Group();
+  const merged = mergeGeometries(tubes.map(t => { t.deleteAttribute('uv'); return t; }));
+  g.add(outline(new THREE.Mesh(merged, toon(col)), 0.008, '#5A1A2A'));
+  const dm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.022, 5, 4), toon(polyp), dots.length);
+  const m = new THREE.Matrix4(); dots.forEach((d, i) => { m.makeTranslation(d.x, d.y, d.z); dm.setMatrixAt(i, m); }); g.add(dm);
+  const base = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), toon('#8A6A5A')); base.scale.y = 0.5; g.add(base);
+  g.userData = { t: Math.random() * 10 };
+  return g;
+}
+export function animateGorgonian(g, dt) { const u = g.userData; u.t += dt; g.children[0].parent.rotation.x = Math.sin(u.t * 0.9) * 0.05; }
+
+// =====================================================================
+// DEAD CORAL RUBBLE — bleached skeleton pieces, broken branches and an old coral head, lightly algae-tinted
+// =====================================================================
+const DEAD = ['#E4DDD0', '#D2CABB', '#C2BBAA', '#B8B4A0', '#CFC9B6'];
+export function makeRubble(seed = 0) {
+  let r = seed * 7919 + 17; const R = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+  const g = new THREE.Group();
+  const n = 14 + Math.floor(R() * 12);
+  const pieces = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.035, 0.22, 2, 6), toon('#ffffff'), n);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), cc = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const a = R() * 6.28, rr = Math.sqrt(R()) * 1.1;
+    m.compose(V(Math.cos(a) * rr, 0.03, Math.sin(a) * rr), q.setFromEuler(e.set(Math.PI / 2 + (R() - 0.5) * 0.5, R() * 6, (R() - 0.5) * 0.4)), V(0.7 + R() * 0.8, 0.6 + R() * 1.2, 0.7 + R() * 0.8));
+    pieces.setMatrixAt(i, m); pieces.setColorAt(i, cc.set(DEAD[Math.floor(R() * DEAD.length)]).lerp(new THREE.Color('#9AB08A'), R() < 0.25 ? 0.35 : 0));
+  }
+  pieces.instanceColor.needsUpdate = true; g.add(pieces);
+  // a broken staghorn skeleton
+  if (R() < 0.75) {
+    const parts = [];
+    const stub = (x, z, ang, len) => { const c = new THREE.CapsuleGeometry(0.045, len, 2, 6); c.translate(0, len / 2, 0); c.rotateZ(ang); c.rotateY(R() * 6); c.translate(x, 0, z); parts.push(c); };
+    const bx = (R() - 0.5) * 0.6, bz = (R() - 0.5) * 0.6;
+    for (let i = 0; i < 5; i++) stub(bx + (R() - 0.5) * 0.25, bz + (R() - 0.5) * 0.25, (R() - 0.5) * 1.3, 0.25 + R() * 0.35);
+    g.add(outline(new THREE.Mesh(mergeGeometries(parts), toon(DEAD[Math.floor(R() * 3)])), 0.012, '#6A6458'));
+  }
+  // an old, flattened coral head
+  if (R() < 0.6) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), toon('#C8C2B0')); h.scale.set(1, 0.45, 0.9); h.position.set((R() - 0.5) * 1.2, 0.06, (R() - 0.5) * 1.2); g.add(outline(h, 0.014, '#6A6458'));
+    const alg = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 6), toon('#8FB07A')); alg.scale.set(1.1, 0.25, 0.9); alg.position.copy(h.position).add(V(0.05, 0.12, 0)); g.add(alg); }
+  return g;
+}

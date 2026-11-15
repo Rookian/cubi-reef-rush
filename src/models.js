@@ -659,7 +659,7 @@ function colorize(geo, col) {
   return geo;
 }
 // shapes: radii [x, y, z]
-export const REEF_SHAPES = { tang: [0.17, 0.3, 0.42], chromis: [0.17, 0.25, 0.29], butterfly: [0.11, 0.36, 0.36], wrasse: [0.12, 0.19, 0.5], dot: [0.14, 0.17, 0.22], rainbow: [0.12, 0.22, 0.4], parrot: [0.2, 0.28, 0.58], grouper: [0.3, 0.34, 0.68], regal: [0.14, 0.28, 0.46], idol: [0.08, 0.36, 0.3] };
+export const REEF_SHAPES = { tang: [0.17, 0.3, 0.42], chromis: [0.17, 0.25, 0.29], butterfly: [0.11, 0.36, 0.36], wrasse: [0.12, 0.19, 0.5], dot: [0.14, 0.17, 0.22], rainbow: [0.12, 0.22, 0.4], parrot: [0.2, 0.28, 0.58], grouper: [0.3, 0.34, 0.68], regal: [0.14, 0.28, 0.46], idol: [0.08, 0.36, 0.3], rabbit: [0.12, 0.3, 0.45], angel: [0.1, 0.4, 0.42], needle: [0.045, 0.06, 0.5], trumpet: [0.06, 0.075, 0.62] };
 // bright, saturated palettes (body, top, fin, tail, accent)
 export const REEF_PALETTES = [
   ['#1E90FF', '#0A5BD8', '#FFE600', '#FFE600', '#0A2A6A'],
@@ -693,12 +693,22 @@ export const REEF_PALETTES = [
   ['#5FE0FF', '#3FB8F0', '#9AF0FF', '#9AF0FF', '#2A6A9A'],
   ['#1E5BFF', '#0A3AC8', '#3E8BFF', '#FFE600', '#FFE600'],
   ['#FFFFFF', '#F4F4F4', '#1A1A1A', '#FFFFFF', '#1A1A1A'],
+  // 25: foxface rabbitfish, 26: emperor angelfish, 27: needlefish, 28/29: trumpetfish (yellow / brown)
+  ['#FFD21F', '#FFC000', '#FFE14D', '#FFD21F', '#1A1A1A'],
+  ['#1E4FD8', '#1E4FD8', '#2A6AF0', '#FFD21F', '#14204A'],
+  ['#E4F0F6', '#C4DCE6', '#A8D4DA', '#A8D4DA', '#3F9A98'],
+  ['#FFC21F', '#FFB000', '#FFD25A', '#FFD25A', '#C88A00'],
+  ['#C08A4A', '#A87438', '#D8A868', '#D8A868', '#5A3A1A'],
 ];
 const SPECIES = [
   { w: 4, gen: () => ({ shape: 'chromis', pattern: 'plain', pal: 18 + (Math.random() < 0.35 ? 1 : 0), n: 18 + Math.floor(Math.random() * 14), size: 0.32 + Math.random() * 0.12 }) },
   { w: 5, gen: () => ({}) },                                                                      // random reef fish
   { w: 2, gen: () => ({ shape: 'rainbow', pattern: 'rainbow', pal: 0, n: 6 + Math.floor(Math.random() * 8) }) },
   { w: 1.5, gen: () => ({ shape: 'parrot', pattern: 'face', pal: 12 + Math.floor(Math.random() * 3), n: 1 + Math.floor(Math.random() * 3), size: 1.3 + Math.random() * 0.5 }) },
+  { w: 1.6, gen: () => ({ shape: 'rabbit', pattern: 'foxface', pal: 25, n: 1 + Math.floor(Math.random() * 2), size: 1.0 + Math.random() * 0.3 }) },
+  { w: 1.2, gen: () => ({ shape: 'angel', pattern: 'emperor', pal: 26, n: 1, size: 1.2 + Math.random() * 0.3 }) },
+  { w: 1.4, gen: () => ({ shape: 'needle', pattern: 'needle', pal: 27, n: 4 + Math.floor(Math.random() * 6), size: 1.0 + Math.random() * 0.3, high: true }) },
+  { w: 0.9, gen: () => { const y = Math.random() < 0.6; return { shape: 'trumpet', pattern: 'trumpet', pal: y ? 28 : 29, n: 1, size: 1.3 + Math.random() * 0.4 }; } },
   { w: 2, gen: () => ({ shape: 'regal', pattern: 'regal', pal: 20, n: 1 + Math.floor(Math.random() * 4), size: 1.0 + Math.random() * 0.4 }) },
   { w: 1.5, gen: () => ({ shape: 'idol', pattern: 'idol', pal: 21, n: 1 + Math.floor(Math.random() * 3), size: 1.1 + Math.random() * 0.4 }) },
   { w: 3, gen: () => { const k = Math.floor(Math.random() * 3); return { shape: 'chromis', pattern: k === 1 ? 'ytail' : k === 2 ? 'humbug' : 'plain', pal: 22 + k, n: 8 + Math.floor(Math.random() * 12), size: 0.4 + Math.random() * 0.15 }; } },
@@ -712,9 +722,11 @@ export function reefFishGeometries(shape, pal, pattern) {
   const [B, T, F, TL, A] = REEF_PALETTES[pal];
   const [rx, ry, rz] = REEF_SHAPES[shape];
   const big = shape === 'grouper' || shape === 'parrot';
-  const fine = ['regal', 'idol', 'humbug', 'ytail'].includes(pattern);
+  const fine = ['regal', 'idol', 'humbug', 'ytail', 'foxface', 'emperor', 'needle', 'trumpet'].includes(pattern);
   let body = new THREE.SphereGeometry(1, big ? 36 : fine ? 28 : 16, big ? 26 : fine ? 20 : 12); body.scale(rx * 1.22, ry, rz);
   const p = body.attributes.position;
+  // needlefish beak / trumpetfish tube snout: long thin snout in front
+  if (shape === 'needle' || shape === 'trumpet') for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z < -rz * 0.35) { const k = (-z / rz - 0.35) / 0.65; const th = shape === 'needle' ? 0.85 : 0.6; p.setY(i, p.getY(i) * (1 - th * Math.min(1, k * 1.6))); p.setX(i, p.getX(i) * (1 - th * Math.min(1, k * 1.6))); p.setZ(i, z - k * k * rz * (shape === 'needle' ? 0.7 : 0.5)); } }
   if (shape === 'idol') for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z < -rz * 0.4) { const k = (-z / rz - 0.4) / 0.6; p.setY(i, p.getY(i) * (1 - 0.65 * k)); p.setZ(i, z - k * k * rz * 0.45); } }
   for (let i = 0; i < p.count; i++) { const z = p.getZ(i); if (z > 0) { const k = z / rz; p.setY(i, p.getY(i) * (1 - 0.4 * k * k)); p.setX(i, p.getX(i) * (1 - 0.3 * k * k)); } }
   body.deleteAttribute('uv'); body.deleteAttribute('normal'); body = mergeVertices(body); body.computeVertexNormals();
@@ -730,6 +742,18 @@ export function reefFishGeometries(shape, pal, pattern) {
     if (pattern === 'nose' && zn < -0.62) c.copy(ca);
     if (pattern === 'rainbow') { const h = ((zn + 1) * 0.42 + yn * 0.08) % 1; c.setHSL(h, 1, 0.58 + Math.max(0, yn) * 0.12); }
     if (pattern === 'face') { if (zn < -0.8) c.set('#F2FFFA'); else if (Math.abs(zn + 0.42 + yn * 0.15) < 0.05 || Math.abs(zn + 0.6 - yn * 0.1) < 0.035) c.copy(ca); }
+    if (pattern === 'foxface') {
+      if (zn < -0.42) c.copy(cw);                                                       // pale face
+      if (Math.abs(zn + 0.6) < 0.09 || (zn < -0.5 && yn < -0.15)) c.copy(ca);           // black eye band + throat
+    }
+    if (pattern === 'emperor') {
+      if (zn > -0.4 && Math.sin((yn + zn * 0.22) * 15) > 0.35) c.set('#FFD21F');   // diagonal yellow stripes
+      if (Math.abs(zn + 0.52) < 0.1 && yn > -0.35) c.copy(ca);                           // dark mask
+      if (zn < -0.64) c.set('#DDE8FF');
+      if (zn > 0.82) c.set('#FFD21F');
+    }
+    if (pattern === 'needle') { if (yn > 0.15) c.copy(ca); else if (Math.abs(yn) < 0.08) c.set('#9AE0F0'); }
+    if (pattern === 'trumpet') { if (Math.abs(Math.sin(zn * 30)) > 0.93) c.lerp(cw, 0.45); if (yn < -0.3) c.lerp(cw, 0.3); }
     if (pattern === 'regal') {
       const inSpot = ((zn - 0.02) / 0.3) ** 2 + ((yn - 0.38) / 0.2) ** 2 < 1;
       if (yn > 0.0 && zn > -0.55 && zn < 0.62 && !inSpot) c.copy(ca);                          // the black "palette"
@@ -751,7 +775,8 @@ export function reefFishGeometries(shape, pal, pattern) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
   const tailM = m4.clone().compose(new THREE.Vector3(0, 0, rz * 0.9), q.clone().setFromEuler(e.set(0, -Math.PI / 2, 0)), one);
   const dorsM = m4.clone().compose(new THREE.Vector3(0, ry * 0.85, rz * 0.1), q.clone().setFromEuler(e.set(-1.1, -Math.PI / 2, 0, 'XYZ')), one);
-  add(new THREE.ShapeGeometry(fanPath(rz * 0.75, 0.9, 1), 12), tailM, TL);
+  const tailS = (shape === 'needle' || shape === 'trumpet') ? ry * 2.6 : rz * 0.75;
+  add(new THREE.ShapeGeometry(fanPath(tailS, 0.9, 1), 12), tailM, TL);
   add(new THREE.ShapeGeometry(fanPath(ry * 0.8, 0.6), 10), dorsM, F);
   for (const sx of [-1, 1]) add(new THREE.ShapeGeometry(fanPath(rx * 1.4, 0.55), 10), m4.clone().compose(new THREE.Vector3(sx * rx * 0.9, -ry * 0.2, -rz * 0.1), q.clone().setFromEuler(e.set(0, sx > 0 ? -Math.PI / 4 : -3 * Math.PI / 4, 0)), one), F);
   let streamer = null;
@@ -767,7 +792,7 @@ export function reefFishGeometries(shape, pal, pattern) {
     inkAdd(new THREE.SphereGeometry(er * 0.2, 6, 4), m4.clone().compose(ep.clone().add(new THREE.Vector3(sx * er * 1.08, er * 0.3, -er * 0.22)), q.identity(), one), '#ffffff');
   }
   const tube = (shapeP, m) => { const pts = shapeP.getPoints(30).map(v => new THREE.Vector3(v.x, v.y, 0)); inkAdd(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 32, 0.008, 4, true), m, OUTLINE); };
-  tube(fanPath(rz * 0.75, 0.9, 1), tailM); tube(fanPath(ry * 0.8, 0.6), dorsM);
+  tube(fanPath(tailS, 0.9, 1), tailM); tube(fanPath(ry * 0.8, 0.6), dorsM);
   if (streamer) tube(streamer, m4.clone().compose(new THREE.Vector3(0, ry * 0.75, -rz * 0.15), q.clone().setFromEuler(e.set(0, -Math.PI / 2, 0)), one));
   const res = { body: bodyAll, hull, ink: mergeGeometries(ink), len: rz };
   return (fishGeoCache[key] = res);

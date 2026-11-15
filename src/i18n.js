@@ -64,6 +64,8 @@ const DE = {
   'Shared! Find it under Player levels': 'Geteilt! Du findest es unter Spieler-Level', 'Could not share': 'Teilen fehlgeschlagen', 'Level loaded': 'Level geladen', 'Sharing…': 'Wird geteilt…',
   "That doesn't look like a level. Paste the text from Copy level.": 'Das sieht nicht nach einem Level aus. Füge den Text von „Level kopieren“ ein.',
   'Copy your level': 'Dein Level kopieren', 'Paste a level': 'Level einfügen', 'Please enter your name': 'Bitte gib deinen Namen ein',
+  'Reef shark (crosses)': 'Riffhai (kreuzt)', 'Reef shark': 'Riffhai', 'Reef shark!': 'Riffhai!', 'Bonk! Reef shark!': 'Bonk! Riffhai!', 'Type': 'Typ', 'Blacktip': 'Schwarzspitze', 'Whitetip': 'Weißspitze',
+  'Blue-spotted stingray': 'Blaupunktrochen', 'Sea fan': 'Fächerkoralle', 'Dead coral': 'Tote Korallen',
   'English': 'Englisch', 'Deutsch': 'Deutsch', 'Language': 'Sprache',
 };
 const lvl = (s) => DE[s] || s;
