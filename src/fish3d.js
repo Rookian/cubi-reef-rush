@@ -22,12 +22,14 @@ let _scan = null;
 function silhouette(d) {
   _scan ||= document.createElement('canvas').getContext('2d');
   const p = new Path2D(d), cols = [];
-  for (let x = 0; x <= 300; x++) { let t = -1, b = -1; for (let y = 0; y <= 200; y++) if (_scan.isPointInPath(p, x + 0.5, y + 0.5)) { if (t < 0) t = y; b = y + 1; } cols.push(t < 0 ? null : [t, b]); }
+  for (let x = 0; x <= 300; x++) { let t = -1, b = -1; for (let y = 0; y <= 200; y += 0.2) if (_scan.isPointInPath(p, x + 0.5, y)) { if (t < 0) t = y; b = y; } cols.push(t < 0 ? null : [t, b]); }
   let x0 = cols.findIndex(c => c), x1 = 300; while (!cols[x1]) x1--;
   return { cols, x0, x1 };
 }
 // shared swimming wave: head stays calm, amplitude grows toward the tail
-function swim(mat, U, len, push = 0) {
+const GLOW = { 'Palette surgeonfish': [0.6, '#1670FF'], 'Emperor angelfish': [0.6, '#1E4FD8'], 'Clown surgeonfish': [0.65, '#2E9BFF'], 'Orange-lined triggerfish': [0.6, '#FF9A2A'], 'Anthias': [0.5, '#FF8A3A'], 'Parrotfish': [0.7, '#FF7AB8'], 'Coral grouper': [0.9, '#5FD0FF'], 'Lunar fusilier': [0.3, '#3FA8F0'] };
+const METAL = { 'Lunar fusilier': 0.6, 'Silversides': 1.2 };
+function swim(mat, U, len, push = 0, fx = null) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uT = U;
     sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -39,10 +41,15 @@ function swim(mat, U, len, push = 0) {
       { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
         float fr = pow(1.0 - clamp(abs(dot(nn, vv)), 0.0, 1.0), 2.4);
         float hs = pow(max(dot(nn, normalize(vec3(-0.3, 0.85, 0.45))), 0.0), 40.0);
-        outgoingLight += fr * 0.28 * vec3(0.8, 0.95, 1.0) + hs * 0.45; }
-      #include <opaque_fragment>`);
+        outgoingLight += fr * 0.28 * vec3(0.8, 0.95, 1.0) + hs * 0.45;
+        ${fx && fx.glow ? `{ float gw = 1.0 - smoothstep(0.22, 0.55, distance(diffuseColor.rgb, vec3(${fx.gc.r.toFixed(3)}, ${fx.gc.g.toFixed(3)}, ${fx.gc.b.toFixed(3)})));
+          outgoingLight += diffuseColor.rgb * gw * ${fx.glow.toFixed(2)} * (1.0 + 0.25 * sin(uT * 0.45)); }` : ''}
+        ${fx && fx.metal ? `{ vec3 rr = reflect(-vv, nn); float sp2 = pow(max(dot(rr, normalize(vec3(-0.2, 0.9, 0.4))), 0.0), 9.0);
+          float band = smoothstep(0.55, 1.0, sin(vMapUv.x * 26.0 - uT * 0.5 + vMapUv.y * 8.0));
+          outgoingLight = mix(outgoingLight, outgoingLight * 1.15 + vec3(0.75, 0.9, 1.0) * (sp2 * 0.6 + band * 0.16 + fr * 0.3), ${Math.min(1, fx.metal * 0.75).toFixed(2)}); }` : ''} }
+      #include <opaque_fragment>`).replace('void main() {', 'uniform float uT;\nvoid main() {');
   };
-  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type;
+  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '');
   return mat;
 }
 let _grad = null;
@@ -56,12 +63,15 @@ function parts(d) {
   const { cols, x0, x1 } = silhouette(d.body), xm = (x0 + x1) / 2, len = (x1 - x0) * S;
   let Hmax = 0; for (let x = x0; x <= x1; x++) Hmax = Math.max(Hmax, (cols[x][1] - cols[x][0]) / 2);
   const thick = d.thick || THICK[d.en] || 0.36;
-  const N = 44, M = 22, pos = [], uv = [], idx = [], rings = [];
+  const N = 64, M = 24, pos = [], uv = [], idx = [], rings = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N, xs = x0 + 0.5 + t * (x1 - x0 - 1), c = cols[Math.round(xs)] || cols[Math.floor(xs)];
     const cy = (c[0] + c[1]) / 2, h = Math.max(0.6, (c[1] - c[0]) / 2);
     const w = Math.max(0.5, Math.min(thick * Hmax * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.55), h * (thick > 0.8 ? 1.0 : 0.9)));
-    rings.push({ xs, cy, h, w });
+    rings.push({ xs, cy, h, w, t });
+  }
+  for (let pass = 0; pass < 3; pass++) { const c = rings.map(r => ({ ...r })); for (let i = 1; i < N; i++) for (const k of ['cy', 'h', 'w']) rings[i][k] = (c[i - 1][k] + 2 * c[i][k] + c[i + 1][k]) / 4; }
+  for (let i = 0; i <= N; i++) { const { xs, cy, h, w } = rings[i];
     for (let j = 0; j <= M; j++) { const a = j / M * Math.PI * 2, ys = cy - h * Math.cos(a), xl = w * Math.sin(a); pos.push(xl * S, (100 - ys) * S, (xs - xm) * S); uv.push(xs / 300, 1 - ys / 200); }
   }
   for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
@@ -85,7 +95,8 @@ function parts(d) {
 export function makeFish3D(d, size = 1) {
   const P = parts(d), U = { value: Math.random() * 6 };
   const root = new THREE.Group(), rig = new THREE.Group(); root.add(rig);
-  const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len);
+  const gl = GLOW[d.en], fx = (gl || METAL[d.en]) ? { glow: gl ? gl[0] : 0, gc: new THREE.Color(gl ? gl[1] : '#fff'), metal: METAL[d.en] || 0, key: d.en } : null;
+  const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len, 0, fx);
   rig.add(new THREE.Mesh(P.body, bodyM));
   rig.add(new THREE.Mesh(P.body, swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), U, P.len, 0.014)));
   const finM = swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), U, P.len);

@@ -3,6 +3,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { makeRenderer, setupScene } from './env.js';
 import { FISH3D, makeFish3D, animateFish3D } from './fish3d.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (id) => document.getElementById(id);
 const renderer = makeRenderer($('c'), 2);
@@ -14,6 +18,8 @@ renderer.domElement.addEventListener('pointerdown', () => { ctl.autoRotate = fal
 const bub = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([...Array(240)].map(() => (Math.random() - 0.5) * 10), 3)), new THREE.PointsMaterial({ color: '#DFF8FF', size: 0.05, transparent: true, opacity: 0.6 }));
 scene.add(bub);
 
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, cam)); composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.5, 0.95)); composer.addPass(new OutputPass());
 const KEY = 'cubi_review_v1';
 let notes = {}; try { notes = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(notes)); } catch (e) {} };
@@ -41,10 +47,10 @@ $('copy').onclick = async () => {
   setTimeout(() => { $('copy').textContent = 'Copy my feedback'; }, 2500);
 };
 addEventListener('keydown', (e) => { if (e.target.tagName === 'TEXTAREA') return; if (e.key === 'ArrowRight') show(idx + 1); if (e.key === 'ArrowLeft') show(idx - 1); });
-function resize() { const w = $('c').clientWidth, h = $('c').clientHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+function resize() { const w = $('c').clientWidth, h = $('c').clientHeight; renderer.setSize(w, h, false); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 show(idx);
 let last = performance.now();
-function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (cur) animateFish3D(cur, dt); bub.rotation.y += dt * 0.02; ctl.update(); renderer.render(scene, cam); requestAnimationFrame(frame); }
-window.__review = { show, tick: (n = 1) => { for (let i = 0; i < n; i++) if (cur) animateFish3D(cur, 1 / 30); ctl.update(); renderer.render(scene, cam); }, cam, ctl, count: FISH3D.length };
+function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (cur) animateFish3D(cur, dt); bub.rotation.y += dt * 0.02; ctl.update(); composer.render(); requestAnimationFrame(frame); }
+window.__review = { show, tick: (n = 1) => { for (let i = 0; i < n; i++) if (cur) animateFish3D(cur, 1 / 30); ctl.update(); composer.render(); }, cam, ctl, count: FISH3D.length };
 if (!/[?&]still/.test(location.search)) requestAnimationFrame(frame);
