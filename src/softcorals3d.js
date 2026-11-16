@@ -79,28 +79,40 @@ function makeTreeCoral() {
 }
 function animateTree(g, dt) { const u = g.userData; u.t += dt; u.swayers.forEach(s => { s.o.rotation.x = s.rest[0] + Math.sin(u.t * 0.9 + s.ph) * s.amp; s.o.rotation.z = s.rest[2] + Math.cos(u.t * 0.7 + s.ph) * s.amp; }); }
 
-// 3 PULSING XENIA: soft lavender stalks, each crowned with feathery 8-armed polyps that open and close like hands
+// 3 PULSING XENIA: wrinkled mauve trunks crowned with long-stemmed polyps; each polyp is a hand of 8 feathery arms that opens and closes
 function makeXenia() {
-  seed = 71; const g = new THREE.Group(), heads = [];
-  const arm = (() => { const parts = [ni(new THREE.CapsuleGeometry(0.008, 0.07, 3, 6).translate(0, 0.043, 0))];
-    for (let k = 0; k < 6; k++) { const y = 0.02 + k * 0.011; [-1, 1].forEach(sd => { const f = new THREE.CylinderGeometry(0.0025, 0.0035, 0.022, 4); f.rotateZ(sd * 1.1); f.translate(sd * 0.011, y + 0.004, 0); parts.push(ni(f)); }); }
-    const a = mergeGeometries(parts); paint(a, (c, x, y) => c.set('#F4EEFF').lerp(new THREE.Color('#8466C4'), Math.max(0, 1 - y * 14) * 0.9).lerp(new THREE.Color('#C9B4F0'), Math.abs(x) > 0.008 ? 0.35 : 0)); return a; })();
-  const items = [];
-  for (let s = 0; s < 7; s++) { const a = s / 7 * Math.PI * 2 + rnd() * 0.5, r = s ? 0.16 + rnd() * 0.08 : 0, h = 0.24 + rnd() * 0.14, tilt = r * 2.2;
-    const dir = V(Math.cos(a) * tilt, 1, Math.sin(a) * tilt).normalize(), base = V(Math.cos(a) * r * 0.6, 0, Math.sin(a) * r * 0.6), top = base.clone().addScaledVector(dir, h);
-    const st = new THREE.CylinderGeometry(0.036, 0.03, h, 12, 4); st.translate(0, h / 2, 0); paint(st, (c, x, y) => c.set('#9C86CC').lerp(new THREE.Color('#E2D6F6'), y / h)); st.applyMatrix4(new THREE.Matrix4().compose(base, new THREE.Quaternion().setFromUnitVectors(UP, dir), V(1, 1, 1)));
-    g.add(lined(new THREE.Mesh(st, vmat()), 0.008));
-    for (let k = 0; k < 4; k++) { const pa = k / 4 * Math.PI * 2 + rnd(), pd = dir.clone().add(V(Math.cos(pa) * 0.7, 0.25, Math.sin(pa) * 0.7)).normalize(), pc = top.clone().addScaledVector(pd, 0.06);
-      const ph = rnd() * 6.28, sc = 0.95 + rnd() * 0.25; heads.push({ c: pc, d: pd, ph });
-      for (let j = 0; j < 8; j++) items.push({ p: pc, d: pd, j, ph, s: sc, side: V(), q: new THREE.Quaternion().setFromUnitVectors(UP, pd) }); } }
-  const im = new THREE.InstancedMesh(arm, vmat(), items.length); g.add(im);
-  const knob = new THREE.SphereGeometry(0.018, 8, 6), km = new THREE.InstancedMesh(knob, cmat('#D8C6F2'), heads.length);
+  seed = 71; const g = new THREE.Group(), heads = [], C = (h) => new THREE.Color(h), parts = [];
+  const AL = 0.085, arm = (() => { const ps = []; const rach = new THREE.CylinderGeometry(0.0028, 0.0062, AL, 6, 8); rach.translate(0, AL / 2, 0); rach.scale(1, 1, 0.6); ps.push(ni(rach));
+    for (let k = 0; k < 11; k++) { const t = (k + 1) / 12, y = AL * (0.1 + t * 0.86), len = 0.02 * (1 - t * 0.55) * (k < 2 ? 0.6 + k * 0.2 : 1); [-1, 1].forEach(sd => { const f = new THREE.ConeGeometry(0.0022, len, 4); f.translate(0, len / 2, 0); f.rotateZ(-sd * 0.95); f.translate(sd * 0.003, y, 0); ps.push(ni(f)); }); }
+    const tip = new THREE.SphereGeometry(0.0034, 6, 4); tip.translate(0, AL, 0); ps.push(ni(tip));
+    const a = mergeGeometries(ps), q = a.attributes.position; for (let i = 0; i < q.count; i++) { const t = q.getY(i) / AL; q.setZ(i, q.getZ(i) - 0.22 * t * t * AL + Math.abs(q.getX(i)) * 0.25); }
+    a.computeVertexNormals(); const c0 = C('#C8508E'), c1 = C('#F6B8D6'), c2 = C('#FFF6FB'), pin = C('#FFE9F4');
+    paint(a, (c, x, y) => { const t = Math.max(0, Math.min(1, y / AL)); c.copy(c0).lerp(c1, Math.min(1, t * 2.2)).lerp(c2, Math.max(0, (t - 0.55) / 0.45)); if (Math.abs(x) > 0.004) c.lerp(pin, 0.7); }); return a; })();
+  const items = [], stemC0 = C('#B078A8'), stemC1 = C('#F0CFE4');
+  for (let s = 0; s < 6; s++) { const a = s / 5 * Math.PI * 2 + rnd() * 0.5, r = s ? 0.15 + rnd() * 0.05 : 0, h = 0.2 + rnd() * 0.1 + (s ? 0 : 0.08), tilt = r * 2.4;
+    const dir = V(Math.cos(a) * tilt, 1, Math.sin(a) * tilt).normalize(), base = V(Math.cos(a) * r * 0.55, 0, Math.sin(a) * r * 0.55), top = base.clone().addScaledVector(dir, h), q0 = new THREE.Quaternion().setFromUnitVectors(UP, dir);
+    // wrinkled trunk
+    const tp = []; for (let k = 0; k <= 20; k++) { const t = k / 20; tp.push(new THREE.Vector2(0.04 * (1.15 - 0.3 * t + 0.25 * t * t * t) * (1 + 0.07 * Math.sin(t * 34)), h * t)); }
+    for (let k = 1; k <= 4; k++) { const an = k / 4 * Math.PI / 2; tp.push(new THREE.Vector2(Math.max(0.0001, 0.044 * Math.cos(an)), h + 0.02 * Math.sin(an))); }
+    const tr = new THREE.LatheGeometry(tp, 16); paint(tr, (c, x, y) => c.set('#7A4A7E').lerp(C('#D8A6CC'), Math.min(1, y / h)).lerp(C('#5A2E62'), 0.35 * Math.max(0, Math.sin(y / h * 34 + 3.6))));
+    parts.push(ni(tr).applyMatrix4(new THREE.Matrix4().compose(base, q0, V(1, 1, 1))));
+    // polyps on slender stems fanning out of the crown
+    const n = 9; for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, pa = k * 2.39996 + s, sp = 0.15 + Math.sqrt(f) * 1.0, pd = V(Math.cos(pa) * Math.sin(sp), Math.cos(sp), Math.sin(pa) * Math.sin(sp)).applyQuaternion(q0), sl = 0.07 + rnd() * 0.07;
+      const sb = top.clone().addScaledVector(V(Math.cos(pa), 0, Math.sin(pa)).applyQuaternion(q0), 0.022 * Math.sqrt(f)), pc = sb.clone().addScaledVector(pd, sl);
+      const st = new THREE.CylinderGeometry(0.0055, 0.008, sl, 6); st.translate(0, sl / 2, 0); paint(st, (c, x, y) => c.copy(stemC0).lerp(stemC1, y / sl)); parts.push(ni(st).applyMatrix4(new THREE.Matrix4().compose(sb, new THREE.Quaternion().setFromUnitVectors(UP, pd), V(1, 1, 1))));
+      const ph = rnd() * 6.28, sc = 0.8 + rnd() * 0.3; heads.push({ c: pc, d: pd });
+      for (let j = 0; j < 8; j++) items.push({ p: pc, d: pd, j, ph, s: sc, q: new THREE.Quaternion().setFromUnitVectors(UP, pd) }); } }
+  const foot = new THREE.SphereGeometry(0.17, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2); foot.scale(1.2, 0.3, 1.2); parts.push(solid2(ni(foot), '#7A4A7E'));
+  g.add(lined(new THREE.Mesh(mergeGeometries(parts), vmat()), 0.003));
+  const im = new THREE.InstancedMesh(arm, vmat({ side: THREE.DoubleSide, emissive: '#2A0A20' }), items.length); g.add(im);
+  const km = new THREE.InstancedMesh(new THREE.SphereGeometry(0.011, 8, 6), cmat('#FFD25A', { emissive: '#4A3000' }), heads.length);
   heads.forEach((h, i) => { _m.compose(h.c, _q.identity(), _s.set(1, 1, 1)); km.setMatrixAt(i, _m); }); g.add(km);
   g.userData = { t: 0, im, items }; animateXenia(g, 0); return g;
 }
+const solid2 = (g, col) => { const k = new THREE.Color(col); return paint(g, c => c.copy(k)); };
 const _ea = new THREE.Euler();
 function animateXenia(g, dt) { const u = g.userData; u.t += dt;
-  u.items.forEach((it, i) => { const pulse = Math.pow(0.5 + 0.5 * Math.sin(u.t * 2.6 + it.ph), 1.5), open = 0.25 + pulse * 1.15;   // open angle from the polyp axis
+  u.items.forEach((it, i) => { const pulse = Math.pow(0.5 + 0.5 * Math.sin(u.t * 2.4 + it.ph), 1.3), open = 0.32 + pulse * 1.0;   // open angle from the polyp axis
     _ea.set(open, it.j / 8 * Math.PI * 2, 0, 'YXZ'); _q2.setFromEuler(_ea); _q.copy(it.q).multiply(_q2); _m.compose(it.p, _q, _s.set(it.s, it.s, it.s)); u.im.setMatrixAt(i, _m); });
   u.im.instanceMatrix.needsUpdate = true; }
 
@@ -168,7 +180,7 @@ function animateBubbleTip(g, dt) { const u = g.userData; u.t += dt; const t = u.
 export const SOFT3D = [
   { en: 'Toadstool leather coral', de: 'Lederkoralle (Sarcophyton)', make: makeLeather, anim: animateLeather, cam: [-2.2, 1.9, -2.8], target: [0, 0.25, 0] },
   { en: 'Carnation tree coral', de: 'Bäumchenweichkoralle (Dendronephthya)', make: makeTreeCoral, anim: animateTree, cam: [-2.7, 1.6, -3.4], target: [0, 0.7, 0] },
-  { en: 'Pulsing Xenia', de: 'Pumpende Xenia', make: makeXenia, anim: animateXenia, cam: [-1.2, 1.0, -1.5], target: [0, 0.2, 0] },
+  { en: 'Pulsing Xenia', de: 'Pumpende Xenia', make: makeXenia, anim: animateXenia, cam: [-1.05, 0.95, -1.35], target: [0, 0.24, 0] },
   { en: 'Sea whips', de: 'Peitschenkorallen', make: makeWhips, anim: animateWhips, cam: [-2.6, 1.4, -3.2], target: [0, 0.65, 0] },
   { en: 'Bubble-tip anemone', de: 'Blasenanemone', make: makeBubbleTip, anim: animateBubbleTip, cam: [-1.25, 1.15, -1.6], target: [0, 0.28, 0] },
 ];
