@@ -68,18 +68,37 @@ function makeCauliflower() {
   return g;
 }
 
-// 4 BRAIN CORAL: dome with meandering ridges and valleys
+// 4 BRAIN CORAL (Platygyra): lumpy dome covered in long meandering ridges, tan crests over bright green valleys
+function vnoise(x, y, z) { const h = (i, j, k) => { let n = (i * 374761393 + j * 668265263 + k * 1274126177) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967295; };
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), f = (t) => t * t * (3 - 2 * t), u = f(x - xi), v = f(y - yi), w = f(z - zi), L = THREE.MathUtils.lerp;
+  return L(L(L(h(xi, yi, zi), h(xi + 1, yi, zi), u), L(h(xi, yi + 1, zi), h(xi + 1, yi + 1, zi), u), v), L(L(h(xi, yi, zi + 1), h(xi + 1, yi, zi + 1), u), L(h(xi, yi + 1, zi + 1), h(xi + 1, yi + 1, zi + 1), u), v), w); }
+let _maze = null;
+function brainMaze() {   // Gray-Scott reaction-diffusion in the labyrinth regime: real brain-coral meanders
+  if (_maze) return _maze; const N = 160, A = new Float32Array(N * N).fill(1), B = new Float32Array(N * N), A2 = new Float32Array(N * N), B2 = new Float32Array(N * N);
+  seed = 77; for (let i = 0; i < 60; i++) { const cx = (rnd() * N) | 0, cy = (rnd() * N) | 0; for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) { const j = ((cy + y + N) % N) * N + (cx + x + N) % N; A[j] = 0.5; B[j] = 0.25; } }
+  const F = 0.029, K = 0.057; let a = A, bb = B, a2 = A2, b2 = B2;
+  for (let it = 0; it < 4200; it++) { for (let y = 0; y < N; y++) { const yu = ((y + N - 1) % N) * N, yd = ((y + 1) % N) * N, yc = y * N;
+      for (let x = 0; x < N; x++) { const xl = (x + N - 1) % N, xr = (x + 1) % N, i = yc + x, A0 = a[i], B0 = bb[i];
+        const la = a[yc + xl] + a[yc + xr] + a[yu + x] + a[yd + x] - 4 * A0, lb = bb[yc + xl] + bb[yc + xr] + bb[yu + x] + bb[yd + x] - 4 * B0, r = A0 * B0 * B0;
+        a2[i] = A0 + 0.2 * la - r + F * (1 - A0); b2[i] = B0 + 0.1 * lb + r - (K + F) * B0; } }
+    [a, a2] = [a2, a]; [bb, b2] = [b2, bb]; }
+  let mn = 1, mx = 0; for (const v of bb) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  _maze = { N, f: Float32Array.from(bb, v => (v - mn) / (mx - mn)) }; return _maze;
+}
+function mazeAt(u, v) { const { N, f } = brainMaze(); u = ((u % 1) + 1) % 1 * N; v = ((v % 1) + 1) % 1 * N; const x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0, g = (x, y) => f[(y % N) * N + (x % N)];
+  return (g(x0, y0) * (1 - fx) + g(x0 + 1, y0) * fx) * (1 - fy) + (g(x0, y0 + 1) * (1 - fx) + g(x0 + 1, y0 + 1) * fx) * fy; }
 function makeBrain() {
-  const geo = new THREE.SphereGeometry(0.62, 160, 80, 0, Math.PI * 2, 0, Math.PI * 0.58); const p = geo.attributes.position;
-  const ridge = new Float32Array(p.count);
-  for (let i = 0; i < p.count; i++) { const v = V(p.getX(i), p.getY(i), p.getZ(i)).normalize(), th = Math.atan2(v.z, v.x), ph = Math.acos(v.y);
-    const w = Math.sin(th * 9 + 2.6 * Math.sin(ph * 7 + th * 2)) + Math.sin(ph * 15 + 2.4 * Math.sin(th * 5));
-    const r = (1 - Math.min(1, Math.abs(w) / 0.6)) * THREE.MathUtils.smoothstep(ph, 0.08, 0.35); ridge[i] = r; const k = 0.62 * (1 + 0.04 * r);
-    p.setXYZ(i, v.x * k, v.y * k * 0.78, v.z * k); }
-  geo.computeVertexNormals(); geo.translate(0, -0.08, 0);
-  const a = new THREE.Color('#3E6A3A'), b = new THREE.Color('#C8E07A'); let i = 0;
-  paint(geo, c => { c.copy(a).lerp(b, ridge[i++]); });
-  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.014));
+  const geo = new THREE.SphereGeometry(0.62, 240, 120, 0, Math.PI * 2, 0, Math.PI * 0.6), p = geo.attributes.position, hull = geo.clone();
+  const ridge = new Float32Array(p.count), lo = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) { const v = V(p.getX(i), p.getY(i), p.getZ(i)).normalize(), ph = Math.acos(Math.min(1, v.y)), th = Math.atan2(v.z, v.x);
+    const m = mazeAt(0.5 + ph * Math.cos(th) * 0.33, 0.5 + ph * Math.sin(th) * 0.33), r = THREE.MathUtils.smoothstep(m, 0.22, 0.7);
+    lo[i] = THREE.MathUtils.smoothstep(ph, 1.4, 1.85); ridge[i] = r;
+    const lump = 1 + 0.06 * (vnoise(v.x * 1.4 + 2, v.y * 1.4, v.z * 1.4) - 0.5) * 2, k = 0.62 * lump * (1 + 0.05 * r * (1 - lo[i] * 0.6));
+    p.setXYZ(i, v.x * k, v.y * k * 0.8, v.z * k); hull.attributes.position.setXYZ(i, v.x * 0.62 * lump * 1.05, v.y * 0.62 * lump * 0.8 * 1.05, v.z * 0.62 * lump * 1.05); }
+  geo.computeVertexNormals(); geo.translate(0, -0.1, 0); hull.translate(0, -0.1, 0);
+  const valD = new THREE.Color('#1F5A38'), val = new THREE.Color('#3E9A55'), rid = new THREE.Color('#B8955A'), cr = new THREE.Color('#EEDCA0'), base = new THREE.Color('#5E5236'); let i = 0;
+  paint(geo, c => { const r = ridge[i]; c.copy(valD).lerp(val, Math.min(1, r * 2.2)).lerp(rid, THREE.MathUtils.smoothstep(r, 0.35, 0.75)).lerp(cr, THREE.MathUtils.smoothstep(r, 0.82, 1) * 0.8).lerp(base, lo[i] * 0.55); i++; });
+  const g = new THREE.Group(); g.add(new THREE.Mesh(geo, vmat()), new THREE.Mesh(hull, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide })));
   return g;
 }
 
@@ -165,25 +184,37 @@ function animateCup(g, dt) { const u = g.userData; u.t += dt; let i = 0;
       _m.compose(c.top.clone().addScaledVector(V(Math.cos(a), 0, Math.sin(a)).applyQuaternion(q0), 0.045), _q.setFromUnitVectors(UP, dir), _s.set(1, 0.4 + open * 0.8, 1)); u.tm.setMatrixAt(i++, _m); } });
   u.tm.instanceMatrix.needsUpdate = true; }
 
-// 10 FIRE CORAL (Millepora): upright fans of forked, flattened branches; mustard-yellow with white tips
+// 10 FIRE CORAL (Millepora dichotoma): upright fans of thin, flattened, forking branches fused into a net, mustard with white tips
+function fireFan(w, h, R) {
+  const parts = [], tips = [], a = new THREE.Color('#B9831C'), b = new THREE.Color('#F2C230'), wt = new THREE.Color('#FFF4D2');
+  const seg = (x0, y0, x1, y1, r0, r1) => { const L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.004) return; const g = new THREE.CylinderGeometry(r1, r0, L, 7, 1, true); g.scale(1, 1, 0.5);
+    g.applyMatrix4(new THREE.Matrix4().compose(V((x0 + x1) / 2, (y0 + y1) / 2, 0), new THREE.Quaternion().setFromUnitVectors(UP, V(x1 - x0, y1 - y0, 0).normalize()), V(1, 1, 1))); parts.push(g);
+    const j = new THREE.SphereGeometry(r1, 7, 5); j.scale(1, 1, 0.5); j.translate(x1, y1, 0); parts.push(j); };
+  const nodes = [];
+  const near = (x, y, skip) => nodes.find((n, k) => k < skip && Math.hypot(n[0] - x, n[1] - y) < 0.032);
+  const grow = (x, y, ang, r, depth) => { const L = 0.045 + rnd() * 0.025, a2 = ang + (rnd() - 0.5) * 0.22, env = w * Math.min(1, 0.2 + y / (h * 0.5));
+    const nx = x + Math.sin(a2) * L, ny = y + Math.cos(a2) * L, r1 = Math.max(0.009, r * 0.92);
+    if (Math.abs(nx) > env) { tips.push([x, y, r]); return; }
+    const hit = depth > 3 && near(nx, ny, nodes.length - 3);
+    if (hit) { seg(x, y, hit[0], hit[1], r, r1); return; }                                  // branches fuse into the net
+    seg(x, y, nx, ny, r, r1); nodes.push([nx, ny]);
+    if (ny > h - 0.04 - rnd() * 0.06 || depth > 26) { tips.push([nx, ny, r1]); return; }
+    if (rnd() < (depth < 2 ? 0.9 : 0.42)) { const sp = 0.26 + rnd() * 0.14; grow(nx, ny, a2 - sp, r1, depth + 1); grow(nx, ny, a2 + sp, r1, depth + 1); }
+    else grow(nx, ny, a2 * 0.85, r1, depth + 1); };
+  grow(0, 0, 0, 0.032, 0);
+  tips.forEach(([x, y, r]) => { const t = new THREE.SphereGeometry(r * 1.25, 8, 6); t.scale(1, 1.3, 0.6); t.translate(x, y + 0.008, 0); parts.push(t); });
+  const g = mergeGeometries(parts.map(q => { q.deleteAttribute('uv'); return q.index ? q.toNonIndexed() : q; }));
+  const P = g.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i), z = P.getZ(i), an = x / R; P.setX(i, Math.sin(an) * (R + z)); P.setZ(i, Math.cos(an) * (R + z) - R); }
+  g.computeVertexNormals();
+  paint(g, (c, x, y) => { const t = Math.max(0, Math.min(1, y / h)); c.copy(a).lerp(b, Math.min(1, t * 1.5)); if (t > 0.84) c.lerp(wt, Math.min(1, (t - 0.84) / 0.12)); });
+  return g;
+}
 function makeFireCoral() {
-  seed = 41; const parts = [], tips = [];
-  const fan = (rot, scale, ox, oz) => {
-    const M = new THREE.Matrix4().compose(V(ox, 0, oz), new THREE.Quaternion().setFromAxisAngle(UP, rot), V(scale, scale, scale));
-    const br = (x, y, ang, len, r, depth) => {
-      const d = V(Math.sin(ang), Math.cos(ang), 0), c = new THREE.CapsuleGeometry(r, len, 3, 10); c.scale(1, 1, 0.55); c.translate(0, len / 2, 0);
-      c.applyMatrix4(new THREE.Matrix4().makeRotationZ(-ang)); c.translate(x, y, 0); parts.push(c.applyMatrix4(M));
-      const ex = x + d.x * len, ey = y + d.y * len;
-      if (depth === 0 || ey > 0.78) { const t = new THREE.SphereGeometry(r * 1.05, 10, 8); t.scale(1, 1.15, 0.6); t.translate(ex, ey, 0); tips.push(t.applyMatrix4(M)); return; }
-      const sp = 0.3 + rnd() * 0.12, k = 0.88 + rnd() * 0.08, base = ang * 0.75; br(ex, ey, base - sp, len * k, r * 0.86, depth - 1); br(ex, ey, base + sp, len * k, r * 0.86, depth - 1);
-    };
-    br(-0.03, 0, -0.32, 0.16, 0.065, 4); br(0.03, 0, 0.32, 0.16, 0.065, 4);
-  };
-  fan(0, 1, 0, 0); fan(0.6, 0.85, 0.32, 0.16); fan(-0.5, 0.8, -0.34, 0.12);
-  const geo = mergeGeometries(parts.map(p => { p.deleteAttribute('uv'); return p.toNonIndexed(); })); geo.computeBoundingBox(); const top = geo.boundingBox.max.y;
-  const a = new THREE.Color('#D89A1A'), b = new THREE.Color('#FFD84A'); paint(geo, (c, x, y) => c.copy(a).lerp(b, Math.max(0, Math.min(1, y / top))));
-  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.012));
-  g.add(new THREE.Mesh(mergeGeometries(tips.map(t => { t.deleteAttribute('uv'); return t.toNonIndexed(); })), cmat('#FFF8E2', { emissive: '#4A3A10' })));
+  seed = 41; const parts = [];
+  [[0, 0, 0, 0.36, 0.78, 0.3], [0.26, 0, 0.16, 0.28, 0.6, -0.9], [-0.28, 0, 0.12, 0.27, 0.56, 1.0], [0.06, 0, -0.22, 0.25, 0.5, 2.5]].forEach(([x, y, z, w, h, rot]) => {
+    const f = fireFan(w, h, 0.8); f.applyMatrix4(new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, rot), V(1, 1, 1))); parts.push(f); });
+  const base = new THREE.IcosahedronGeometry(0.16, 2), bp = base.attributes.position; for (let i = 0; i < bp.count; i++) { const k = 0.85 + vnoise(bp.getX(i) * 9, bp.getY(i) * 9, bp.getZ(i) * 9) * 0.35; bp.setXYZ(i, bp.getX(i) * k * 1.5, Math.max(-0.02, bp.getY(i) * k * 0.55), bp.getZ(i) * k * 1.2); } base.deleteAttribute('uv'); base.computeVertexNormals(); parts.push(solid(base.toNonIndexed(), '#A8781C'));
+  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(mergeGeometries(parts), vmat()), 0.006));
   return g;
 }
 
