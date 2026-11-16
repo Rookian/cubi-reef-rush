@@ -165,17 +165,26 @@ function animateCup(g, dt) { const u = g.userData; u.t += dt; let i = 0;
       _m.compose(c.top.clone().addScaledVector(V(Math.cos(a), 0, Math.sin(a)).applyQuaternion(q0), 0.045), _q.setFromUnitVectors(UP, dir), _s.set(1, 0.4 + open * 0.8, 1)); u.tm.setMatrixAt(i++, _m); } });
   u.tm.instanceMatrix.needsUpdate = true; }
 
-// 10 FIRE CORAL (Millepora): upright mustard blades with white tips
+// 10 FIRE CORAL (Millepora): upright fans of forked, flattened branches; mustard-yellow with white tips
 function makeFireCoral() {
-  seed = 41; const parts = [];
-  for (let k = 0; k < 9; k++) {
-    const w = 0.18 + rnd() * 0.14, h = 0.35 + rnd() * 0.35, s = new THREE.Shape(); s.moveTo(-w, 0); s.lineTo(-w * 0.8, h * 0.7); s.quadraticCurveTo(-w * 0.9, h, -w * 0.3, h); s.quadraticCurveTo(0, h * 1.12, w * 0.35, h * 0.98); s.quadraticCurveTo(w * 0.95, h * 0.95, w * 0.8, h * 0.65); s.lineTo(w, 0); s.closePath();
-    const g = new THREE.ExtrudeGeometry(s, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 2, curveSegments: 10 }); g.translate(0, 0, -0.02);
-    g.rotateY(rnd() * Math.PI); g.translate((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.5); g.deleteAttribute('uv'); parts.push(g.toNonIndexed());
-  }
-  const geo = mergeGeometries(parts); geo.computeVertexNormals(); geo.computeBoundingBox(); const top = geo.boundingBox.max.y;
-  const a = new THREE.Color('#B8862A'), b = new THREE.Color('#FFF6DA'); paint(geo, (c, x, y) => c.copy(a).lerp(b, Math.pow(Math.max(0, Math.min(1, y / top)), 2.2)));
-  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.012)); return g;
+  seed = 41; const parts = [], tips = [];
+  const fan = (rot, scale, ox, oz) => {
+    const M = new THREE.Matrix4().compose(V(ox, 0, oz), new THREE.Quaternion().setFromAxisAngle(UP, rot), V(scale, scale, scale));
+    const br = (x, y, ang, len, r, depth) => {
+      const d = V(Math.sin(ang), Math.cos(ang), 0), c = new THREE.CapsuleGeometry(r, len, 3, 10); c.scale(1, 1, 0.55); c.translate(0, len / 2, 0);
+      c.applyMatrix4(new THREE.Matrix4().makeRotationZ(-ang)); c.translate(x, y, 0); parts.push(c.applyMatrix4(M));
+      const ex = x + d.x * len, ey = y + d.y * len;
+      if (depth === 0 || ey > 0.78) { const t = new THREE.SphereGeometry(r * 1.05, 10, 8); t.scale(1, 1.15, 0.6); t.translate(ex, ey, 0); tips.push(t.applyMatrix4(M)); return; }
+      const sp = 0.3 + rnd() * 0.12, k = 0.88 + rnd() * 0.08, base = ang * 0.75; br(ex, ey, base - sp, len * k, r * 0.86, depth - 1); br(ex, ey, base + sp, len * k, r * 0.86, depth - 1);
+    };
+    br(-0.03, 0, -0.32, 0.16, 0.065, 4); br(0.03, 0, 0.32, 0.16, 0.065, 4);
+  };
+  fan(0, 1, 0, 0); fan(0.6, 0.85, 0.32, 0.16); fan(-0.5, 0.8, -0.34, 0.12);
+  const geo = mergeGeometries(parts.map(p => { p.deleteAttribute('uv'); return p.toNonIndexed(); })); geo.computeBoundingBox(); const top = geo.boundingBox.max.y;
+  const a = new THREE.Color('#D89A1A'), b = new THREE.Color('#FFD84A'); paint(geo, (c, x, y) => c.copy(a).lerp(b, Math.max(0, Math.min(1, y / top))));
+  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.012));
+  g.add(new THREE.Mesh(mergeGeometries(tips.map(t => { t.deleteAttribute('uv'); return t.toNonIndexed(); })), cmat('#FFF8E2', { emissive: '#4A3A10' })));
+  return g;
 }
 
 // 11 FINGER CORAL (Porites cylindrica): cluster of blunt cream fingers with pastel tips
