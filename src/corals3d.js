@@ -55,16 +55,27 @@ function makeTable() {
   return g;
 }
 
-// 3 CAULIFLOWER CORAL (Pocillopora): round clump of short knobby pink branches
+// 3 CAULIFLOWER CORAL (Pocillopora): tight dome of stout, flattened pink branches that fork into warty, club-shaped lobes with pale tips
+function cauliLobe(len, R, flare, ph) {
+  const pts = [], n = 12; for (let k = 0; k <= n; k++) { const t = k / n; pts.push(new THREE.Vector2(R * (0.8 + flare * t * t), len * t)); }
+  const rt = pts[n].x; for (let k = 1; k <= 6; k++) { const a = k / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rt * Math.cos(a)), len + rt * 0.75 * Math.sin(a))); }
+  const g = new THREE.LatheGeometry(pts, 20), p = g.attributes.position, top = len + rt * 0.75, wart = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z), an = Math.atan2(z, x);
+    const w = Math.max(0, Math.sin(y * 62 + ph) * Math.sin(an * 5 + y * 20 + ph)) * Math.min(1, y / (len * 0.25)), k = 1 + 0.2 * w * THREE.MathUtils.smoothstep(r, 0, R * 0.7); wart[i] = w;
+    p.setXYZ(i, x * k, y, z * k * 0.62); }
+  g.computeVertexNormals(); g.deleteAttribute('uv');
+  const c0 = new THREE.Color('#A8405E'), c1 = new THREE.Color('#EE7FA0'), c2 = new THREE.Color('#FFDCE6'); let i = 0;
+  paint(g, (c, x, y) => { const t = Math.max(0, Math.min(1, y / top)), w = wart[i++]; c.copy(c0).lerp(c1, Math.min(1, t * 2)).lerp(c2, Math.max(0, (t - 0.72) / 0.28) * 0.9).lerp(c2, w * 0.45); });
+  return g.toNonIndexed();
+}
 function makeCauliflower() {
-  seed = 11; const parts = [], col = new THREE.Color('#F27AA0'), tip = new THREE.Color('#FFD2E0');
-  for (let k = 0; k < 34; k++) {
-    const y = rnd(), a = rnd() * Math.PI * 2, d = V(Math.cos(a) * (1 - y * 0.7), 0.5 + y, Math.sin(a) * (1 - y * 0.7)).normalize(), len = 0.3 + rnd() * 0.18;
-    const cyl = new THREE.CylinderGeometry(0.05, 0.07, len, 8); cyl.translate(0, len / 2, 0); parts.push(solid(place(cyl, V(0, 0.05, 0), d), '#E06890'));
-    const e = d.clone().multiplyScalar(len).add(V(0, 0.05, 0));
-    for (let j = 0; j < 5; j++) { const s = new THREE.SphereGeometry(0.045 + rnd() * 0.03, 8, 6); s.translate(e.x + (rnd() - 0.5) * 0.09, e.y + (rnd() - 0.2) * 0.07, e.z + (rnd() - 0.5) * 0.09); parts.push(solid(s, j ? col : tip)); }
-  }
-  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(mergeGeometries(parts.map(p => p.toNonIndexed())), vmat({ map: poreTex() })), 0.012)); g.scale.setScalar(1.25);
+  seed = 11; const parts = [], o = V(0, 0.02, 0), N = 17;
+  for (let k = 0; k < N; k++) { const y = 1 - (k + 0.5) / N * 0.86, r = Math.sqrt(1 - y * y), a = k * 2.39996, d = V(Math.cos(a) * r, y * 0.9 + 0.12, Math.sin(a) * r).normalize(), len = 0.24 + rnd() * 0.08;
+    const stem = cauliLobe(len, 0.055, 0.25, rnd() * 6); stem.rotateY(rnd() * 3.14); parts.push(place(stem, o, d));
+    const e = o.clone().addScaledVector(d, len * 0.85), nl = 2 + (rnd() < 0.5 ? 1 : 0);
+    for (let j = 0; j < nl; j++) { const dd = bend(d, 0.38 + rnd() * 0.2, 0.05), lobe = cauliLobe(0.11 + rnd() * 0.05, 0.045, 0.55, rnd() * 6); lobe.rotateY(rnd() * 3.14); parts.push(place(lobe, e, dd)); } }
+  const base = new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1.2, 0.5, 1.2); base.deleteAttribute('uv'); parts.push(solid(base.toNonIndexed(), '#A8405E'));
+  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(mergeGeometries(parts), vmat()), 0.009)); g.scale.setScalar(1.3);
   return g;
 }
 
@@ -119,20 +130,30 @@ function makeScroll() {
   return g;
 }
 
-// 6 BUBBLE CORAL (Plerogyra): cluster of pearly grape-like bubbles that slowly breathe
+// 6 BUBBLE CORAL (Plerogyra sinuosa): plump pearly vesicles like a bunch of grapes on a pale ridged skeleton, slowly breathing
 function makeBubble() {
-  seed = 23; const g = new THREE.Group(), N = 64;
-  const base = new THREE.SphereGeometry(0.42, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1, 0.55, 1); g.add(new THREE.Mesh(base, cmat('#6A6A50')));
-  const sg = new THREE.SphereGeometry(1, 16, 12), bm = new THREE.InstancedMesh(sg, cmat('#D8E4B0'), N), hm = new THREE.InstancedMesh(sg, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N);
+  seed = 23; const g = new THREE.Group(), N = 44;
+  const base = new THREE.SphereGeometry(0.4, 40, 12, 0, Math.PI * 2, 0, Math.PI / 2), bp = base.attributes.position;
+  for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), z = bp.getZ(i), an = Math.atan2(z, x), k = 1 + 0.06 * Math.abs(Math.sin(an * 16)); bp.setXYZ(i, x * k * 1.08, bp.getY(i) * 0.42, z * k * 0.95); }
+  base.computeVertexNormals(); paint(base, (c, x, y) => c.set('#8E8468').lerp(new THREE.Color('#C8BFA2'), Math.min(1, y / 0.12))); g.add(lined(new THREE.Mesh(base, vmat()), 0.008));
+  const sg = new THREE.SphereGeometry(1, 28, 18), sp = sg.attributes.position;
+  for (let i = 0; i < sp.count; i++) { const y = sp.getY(i), k = y < 0 ? 1 + 0.4 * y : 1; sp.setXYZ(i, sp.getX(i) * k, y * 1.18, sp.getZ(i) * k); }
+  sg.computeVertexNormals();
+  const lo = new THREE.Color('#6FB08E'), mid = new THREE.Color('#D2E6C6'), hi = new THREE.Color('#F2F6E6'), vein = new THREE.Color('#FFFFFF');
+  paint(sg, (c, x, y, z) => { const t = (y / 1.18 + 1) / 2; c.copy(lo).lerp(mid, Math.min(1, t * 1.7)).lerp(hi, Math.max(0, (t - 0.55) / 0.45)); c.lerp(vein, 0.35 * Math.pow(Math.max(0, Math.cos(Math.atan2(z, x) * 12)), 10) * (1 - Math.abs(t - 0.5) * 1.6)); });
+  const bm = new THREE.InstancedMesh(sg, new THREE.MeshLambertMaterial({ vertexColors: true, emissive: new THREE.Color('#2E3E34') }), N), hm = new THREE.InstancedMesh(sg, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N);
+  const gl = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: '#F2F6EA' }), N);
   const items = [];
-  for (let i = 0; i < N; i++) { const y = 1 - (i + 0.5) / N * 0.95, r = Math.sqrt(1 - y * y), a = i * 2.39996; items.push({ p: V(Math.cos(a) * r * 0.46, 0.06 + y * 0.32, Math.sin(a) * r * 0.46), s: 0.075 + rnd() * 0.05, ph: rnd() * 6 }); }
-  g.add(hm, bm); g.userData = { bm, hm, items, t: 0 };
+  for (let i = 0; i < N; i++) { const y = 1 - (i + 0.5) / N * 0.9, r = Math.sqrt(1 - y * y), a = i * 2.39996, n = V(Math.cos(a) * r, y * 1.4, Math.sin(a) * r).normalize();
+    items.push({ p: V(Math.cos(a) * r * 0.4, 0.1 + y * 0.2, Math.sin(a) * r * 0.36), q: new THREE.Quaternion().setFromUnitVectors(UP, n.clone().lerp(UP, 0.35).normalize()), s: (0.085 + rnd() * 0.05) * (0.85 + y * 0.3), ph: rnd() * 6 }); }
+  g.add(hm, bm, gl); g.userData = { bm, hm, gl, items, t: 0 };
   animateBubble(g, 0); return g;
 }
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
-function animateBubble(g, dt) { const u = g.userData; u.t += dt; u.items.forEach((it, i) => { const s = it.s * (1 + Math.sin(u.t * 1.2 + it.ph) * 0.08);
-  _m.compose(it.p, _q, _s.set(s, s * 0.92, s)); u.bm.setMatrixAt(i, _m); _m.compose(it.p, _q, _s.set(s + 0.012, s * 0.92 + 0.012, s + 0.012)); u.hm.setMatrixAt(i, _m); });
-  u.bm.instanceMatrix.needsUpdate = u.hm.instanceMatrix.needsUpdate = true; }
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _gl = new THREE.Vector3(-0.42, 0.62, -0.66).normalize(), _v = new THREE.Vector3();
+function animateBubble(g, dt) { const u = g.userData; u.t += dt; u.items.forEach((it, i) => { const s = it.s * (1 + Math.sin(u.t * 1.1 + it.ph) * 0.09);
+  _m.compose(it.p, it.q, _s.set(s, s, s)); u.bm.setMatrixAt(i, _m); _m.compose(it.p, it.q, _s.set(s + 0.007, s + 0.007, s + 0.007)); u.hm.setMatrixAt(i, _m);
+  _m.compose(_v.copy(it.p).addScaledVector(_gl, s * 1.0), _q.identity(), _s.set(s * 0.24, s * 0.15, s * 0.24)); u.gl.setMatrixAt(i, _m); });
+  u.bm.instanceMatrix.needsUpdate = u.hm.instanceMatrix.needsUpdate = u.gl.instanceMatrix.needsUpdate = true; }
 
 // 7 MUSHROOM CORAL (Fungia): thick, free-living oval discs lying on the sand; fine radial septa run from a central mouth slit to the rim
 function mushroomDisc(a, b, cIn, cOut, cRidge, ph, hull) {
