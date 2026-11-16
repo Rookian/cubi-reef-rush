@@ -2,6 +2,7 @@
 // pattern becomes the body texture (crisp, exactly as drawn), fins are outlined cut-outs, eyes are Cubi-style 3D eyes.
 import * as THREE from 'three';
 import { makeEye, placeEye } from './models.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DESIGNS } from './fishdesigns.js';
 
 const OUT = '#3B2614', S = 0.006;                       // world units per design unit (body ≈ 1.2 long)
@@ -9,7 +10,7 @@ const THICK = { 'Blackspotted puffer (yellow)': 0.92, 'Blackspotted puffer, puff
   'Coral grouper': 0.62, 'Parrotfish': 0.52, 'Lunar fusilier': 0.7, 'Silversides': 0.6, 'Anthias': 0.52, 'Clownfish': 0.5, 'Pink skunk clownfish': 0.5, 'Blue-green chromis': 0.48, 'Yellowtail damselfish': 0.48 };
 export const FISH3D = DESIGNS.filter(d => d.en !== 'Blue-spotted stingray');
 
-function svgTexture(inner, bg, w = 1024, h = 683) {
+function svgTexture(inner, bg, w = 768, h = 512) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const ctx = cv.getContext('2d');
   if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
@@ -29,14 +30,14 @@ function silhouette(d) {
 // shared swimming wave: head stays calm, amplitude grows toward the tail
 const GLOW = { 'Palette surgeonfish': [0.6, '#1670FF'], 'Emperor angelfish': [0.6, '#1E4FD8'], 'Clown surgeonfish': [0.65, '#2E9BFF'], 'Orange-lined triggerfish': [0.6, '#FF9A2A'], 'Anthias': [0.5, '#FF8A3A'], 'Parrotfish': [0.7, '#FF7AB8'], 'Coral grouper': [0.9, '#5FD0FF'], 'Lunar fusilier': [0.3, '#3FA8F0'] };
 const METAL = { 'Lunar fusilier': 0.6, 'Silversides': 1.2 };
-function swim(mat, U, len, push = 0, fx = null) {
+function swim(mat, U, len, push = 0, fx = null, inst = false) {
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uT = U;
+    if (inst) { sh.uniforms.uT = { value: 0 }; mat.userData.sh = sh; } else sh.uniforms.uT = U;
     sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       ${push ? `transformed += normalize(normal) * ${push.toFixed(4)};` : ''}
       float zn = position.z / ${len.toFixed(4)};
       float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2).toFixed(4)};
-      transformed.x += sin(uT - zn * 3.0) * env;`);
+      transformed.x += sin(${inst ? 'uT * 6.5 + float(gl_InstanceID) * 1.37' : 'uT'} - zn * 3.0) * env;`);
     if (mat.isMeshToonMaterial) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
       { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
         float fr = pow(1.0 - clamp(abs(dot(nn, vv)), 0.0, 1.0), 2.4);
@@ -49,7 +50,7 @@ function swim(mat, U, len, push = 0, fx = null) {
           outgoingLight = mix(outgoingLight, outgoingLight * 1.15 + vec3(0.75, 0.9, 1.0) * (sp2 * 0.6 + band * 0.16 + fr * 0.3), ${Math.min(1, fx.metal * 0.75).toFixed(2)}); }` : ''} }
       #include <opaque_fragment>`).replace('void main() {', 'uniform float uT;\nvoid main() {');
   };
-  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '');
+  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst;
   return mat;
 }
 let _grad = null;
@@ -63,7 +64,7 @@ function parts(d) {
   const { cols, x0, x1 } = silhouette(d.body), xm = (x0 + x1) / 2, len = (x1 - x0) * S;
   let Hmax = 0; for (let x = x0; x <= x1; x++) Hmax = Math.max(Hmax, (cols[x][1] - cols[x][0]) / 2);
   const thick = d.thick || THICK[d.en] || 0.36;
-  const N = 64, M = 24, pos = [], uv = [], idx = [], rings = [];
+  const N = 64, rings = [];
   for (let i = 0; i <= N; i++) {
     const t = i / N, xs = x0 + 0.5 + t * (x1 - x0 - 1), c = cols[Math.round(xs)] || cols[Math.floor(xs)];
     const cy = (c[0] + c[1]) / 2, h = Math.max(0.6, (c[1] - c[0]) / 2);
@@ -71,11 +72,12 @@ function parts(d) {
     rings.push({ xs, cy, h, w, t });
   }
   for (let pass = 0; pass < 3; pass++) { const c = rings.map(r => ({ ...r })); for (let i = 1; i < N; i++) for (const k of ['cy', 'h', 'w']) rings[i][k] = (c[i - 1][k] + 2 * c[i][k] + c[i + 1][k]) / 4; }
-  for (let i = 0; i <= N; i++) { const { xs, cy, h, w } = rings[i];
-    for (let j = 0; j <= M; j++) { const a = j / M * Math.PI * 2, ys = cy - h * Math.cos(a), xl = w * Math.sin(a); pos.push(xl * S, (100 - ys) * S, (xs - xm) * S); uv.push(xs / 300, 1 - ys / 200); }
-  }
-  for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
-  const body = new THREE.BufferGeometry(); body.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); body.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); body.setIndex(idx); body.computeVertexNormals();
+  const build = (step, M) => { const pos = [], uv = [], idx = [], n = N / step;
+    for (let i = 0; i <= n; i++) { const { xs, cy, h, w } = rings[i * step];
+      for (let j = 0; j <= M; j++) { const a = j / M * Math.PI * 2, ys = cy - h * Math.cos(a), xl = w * Math.sin(a); pos.push(xl * S, (100 - ys) * S, (xs - xm) * S); uv.push(xs / 300, 1 - ys / 200); } }
+    for (let i = 0; i < n; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+  const body = build(1, 24), bodyLo = build(2, 12);
   const latAt = (xs, ys) => { const r = rings[Math.max(0, Math.min(N, Math.round((xs - x0) / (x1 - x0) * N)))]; return r.w * Math.sqrt(Math.max(0.05, 1 - ((ys - r.cy) / r.h) ** 2)); };
   // textures
   const bodyTex = svgTexture((d.pattern || '') + (d.shine ? `<ellipse cx="${d.shine[0]}" cy="${d.shine[1]}" rx="${d.shine[2] || 20}" ry="5" fill="#fff" opacity=".7" transform="rotate(${d.shine[3] || -8} ${d.shine[0]} ${d.shine[1]})"/>` : '') + (d.over || '') +
@@ -89,7 +91,7 @@ function parts(d) {
     const g = new THREE.PlaneGeometry((c - a) * S, (e - b) * S); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, (a + u.getX(i) * (c - a)) / 300, 1 - (b + (1 - u.getY(i)) * (e - b)) / 200);
     g.translate(((a + c) / 2 - base[0]) * S, (base[1] - (b + e) / 2) * S, 0); g.rotateY(-Math.PI / 2);
     pec = { g, y: (100 - base[1]) * S, z: (base[0] - xm) * S, x: latAt(base[0], base[1]) * S }; }
-  return (cache[d.en] = { body, fins, pec, bodyTex, finTex, len, xm, latAt });
+  return (cache[d.en] = { body, bodyLo, fins, pec, bodyTex, finTex, len, xm, latAt });
 }
 
 export function makeFish3D(d, size = 1) {
@@ -120,4 +122,55 @@ export function animateFish3D(f, dt) {
   u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Schools for the game: the same fish, instanced (4 draw calls per school). Works with animateSchool().
+// name: [weight, min count, max count, min size, max size]
+const SCHOOLS = { 'Palette surgeonfish': [2, 1, 4, 0.7, 0.95], 'Moorish idol': [1.5, 1, 3, 0.75, 1], 'Foxface rabbitfish': [1.5, 1, 2, 0.75, 0.95], 'Emperor angelfish': [1.2, 1, 1, 0.9, 1.1],
+  'Needlefish': [1.2, 4, 9, 0.8, 1], 'Trumpetfish': [0.9, 1, 1, 1, 1.3], 'Blue-green chromis': [3, 10, 22, 0.3, 0.4], 'Yellowtail damselfish': [2, 6, 14, 0.3, 0.4], 'Pink skunk clownfish': [1, 2, 3, 0.4, 0.5],
+  'Clownfish': [0.8, 2, 2, 0.4, 0.5], 'Giant puffer': [0.5, 1, 1, 1.2, 1.5], 'Clown triggerfish': [1, 1, 1, 0.9, 1.1], 'Titan triggerfish': [0.7, 1, 1, 1.1, 1.3], 'Clown surgeonfish': [1.5, 1, 4, 0.7, 0.9],
+  'Brown sailfin tang': [1.2, 1, 3, 0.7, 0.9], 'Threadfin butterflyfish': [2, 2, 2, 0.6, 0.8], 'Orange-lined triggerfish': [1, 1, 1, 0.8, 1], 'Lunar fusilier': [2.5, 8, 18, 0.5, 0.65], 'Silversides': [2, 20, 36, 0.22, 0.3],
+  'Anthias': [3, 10, 20, 0.3, 0.4], 'Parrotfish': [1.5, 1, 3, 1.0, 1.4], 'Coral grouper': [1, 1, 1, 1.3, 1.7] };
+const byName = Object.fromEntries(DESIGNS.map(d => [d.en, d]));
+export const design = (name) => byName[name];
+function eyeGeo(d, P) {
+  const [ex, ey, er] = d.eye, lat = P.latAt(ex, ey) * S, r = Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85)), out = [];
+  const col = (g, c) => { const k = new THREE.Color(c), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([k.r, k.g, k.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); return g; };
+  const q = new THREE.Quaternion(), m = new THREE.Matrix4();
+  for (const sx of [-1, 1]) {
+    const nrm = new THREE.Vector3(sx, 0.12, -0.38).normalize(); q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), nrm);
+    m.compose(new THREE.Vector3(sx * Math.max(lat - r * 0.35, r * 0.25), (100 - ey) * S, (ex - P.xm) * S), q, new THREE.Vector3(1, 1, 1));
+    const rim = new THREE.SphereGeometry(r * 1.12, 10, 7); rim.translate(0, 0, -r * 0.28);
+    const pup = new THREE.SphereGeometry(r * 0.62, 8, 6); pup.scale(1, 1, 0.45); pup.translate(0, 0, r * 0.8);
+    const h1 = new THREE.SphereGeometry(r * 0.22, 6, 4); h1.translate(r * 0.24, r * 0.26, r * 1.04);
+    [col(rim, OUT), col(new THREE.SphereGeometry(r, 10, 7), '#ffffff'), col(pup, '#1F1A2E'), col(h1, '#ffffff')].forEach(g => out.push(g.applyMatrix4(m)));
+  }
+  return mergeGeometries(out);
+}
+export function makeSchool3D(name, n, size) {
+  const Rn = Math.random;
+  if (!name) { const keys = Object.keys(SCHOOLS), tot = keys.reduce((a, k) => a + SCHOOLS[k][0], 0); let r = Rn() * tot; name = keys.find(k => (r -= SCHOOLS[k][0]) < 0) || keys[0]; }
+  const d = byName[name], sp = SCHOOLS[name] || [1, 1, 1, 1, 1];
+  n ??= sp[1] + Math.floor(Rn() * (sp[2] - sp[1] + 1)); size ??= sp[3] + Rn() * (sp[4] - sp[3]);
+  const P = parts(d);
+  if (!P.inst) {
+    const fg = [P.fins.clone()];
+    if (P.pec) for (const sx of [-1, 1]) { const g = P.pec.g.clone(); g.rotateY(sx * 0.6); g.translate(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); fg.push(g); }
+    P.inst = { fins: mergeGeometries(fg), eyes: d.eye ? eyeGeo(d, P) : null };
+  }
+  const gl = GLOW[d.en], fx = (gl || METAL[d.en]) ? { glow: gl ? gl[0] : 0, gc: new THREE.Color(gl ? gl[1] : '#fff'), metal: METAL[d.en] || 0, key: d.en } : null;
+  const mats = [swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), null, P.len, 0.014, null, true),
+    swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), null, P.len, 0, fx, true),
+    swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), null, P.len, 0, null, true)];
+  const meshes = [new THREE.InstancedMesh(P.bodyLo, mats[0], n), new THREE.InstancedMesh(P.bodyLo, mats[1], n), new THREE.InstancedMesh(P.inst.fins, mats[2], n)];
+  if (P.inst.eyes) { const em = swim(new THREE.MeshBasicMaterial({ vertexColors: true }), null, P.len, 0, null, true); mats.push(em); meshes.push(new THREE.InstancedMesh(P.inst.eyes, em, n)); }
+  const g = new THREE.Group(); meshes.forEach(m => { m.frustumCulled = false; g.add(m); });
+  const spread = 0.55 + Math.sqrt(n) * 0.5 * Math.max(size, 0.5), fish = [];
+  for (let i = 0; i < n; i++) fish.push({
+    o: new THREE.Vector3((Rn() - 0.5) * spread * 1.4, (Rn() - 0.5) * spread * 0.7, (Rn() - 0.5) * spread * 1.4),
+    f: [0.25 + Rn() * 0.9, 0.3 + Rn() * 1.1, 0.2 + Rn() * 0.8, 0.5 + Rn() * 1.5], ph: [Rn() * 6, Rn() * 6, Rn() * 6, Rn() * 6],
+    a: (0.25 + Rn() * 0.5) * Math.max(0.6, size), s: size * (0.85 + Rn() * 0.3), dart: new THREE.Vector3(), nextDart: Rn() * 4, prev: new THREE.Vector3(), yaw: 0, pitch: 0 });
+  g.userData = { meshes, fish, mats, t: Rn() * 10, n, size, species: name };
+  return g;
 }
