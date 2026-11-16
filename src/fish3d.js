@@ -8,7 +8,7 @@ import { DESIGNS } from './fishdesigns.js';
 const OUT = '#3B2614', S = 0.006;                       // world units per design unit (body ≈ 1.2 long)
 const THICK = { 'Blackspotted puffer (yellow)': 0.92, 'Blackspotted puffer, puffed up': 1.0, 'Giant puffer': 0.92, 'Blacktip reef shark': 0.9, 'Whitetip reef shark': 0.9, 'Needlefish': 0.9, 'Trumpetfish': 0.9,
   'Coral grouper': 0.62, 'Parrotfish': 0.52, 'Lunar fusilier': 0.7, 'Silversides': 0.6, 'Anthias': 0.52, 'Clownfish': 0.5, 'Pink skunk clownfish': 0.5, 'Blue-green chromis': 0.48, 'Yellowtail damselfish': 0.48 };
-export const FISH3D = DESIGNS.filter(d => d.en !== 'Blue-spotted stingray');
+export const FISH3D = DESIGNS.filter(d => d.en !== 'Blue-spotted stingray');   // (the old side-view ray sketch; the flat 3D one is 'Bluespotted stingray')
 
 function svgTexture(inner, bg, w = 768, h = 512) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const ctx = cv.getContext('2d');
@@ -30,13 +30,14 @@ function silhouette(d) {
 // shared swimming wave: head stays calm, amplitude grows toward the tail
 const GLOW = { 'Palette surgeonfish': [0.6, '#1670FF'], 'Emperor angelfish': [0.6, '#1E4FD8'], 'Clown surgeonfish': [0.65, '#2E9BFF'], 'Orange-lined triggerfish': [0.6, '#FF9A2A'], 'Anthias': [0.5, '#FF8A3A'], 'Parrotfish': [0.7, '#FF7AB8'], 'Coral grouper': [0.9, '#5FD0FF'], 'Lunar fusilier': [0.3, '#3FA8F0'] };
 const METAL = { 'Lunar fusilier': 0.6, 'Silversides': 1.2 };
-function swim(mat, U, len, push = 0, fx = null, inst = false) {
+function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, flap: 0 }) {
   mat.onBeforeCompile = (sh) => {
     if (inst) { sh.uniforms.uT = { value: 0 }; mat.userData.sh = sh; } else sh.uniforms.uT = U;
     sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       ${push ? `transformed += normalize(normal) * ${push.toFixed(4)};` : ''}
       float zn = position.z / ${len.toFixed(4)};
-      float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2).toFixed(4)};
+      float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2 * mv.wave).toFixed(4)};
+      ${mv.flap ? `transformed.x += sin(${inst ? 'uT * 6.5' : 'uT'} * 0.55 - abs(position.y) * 5.0) * abs(position.y) * ${mv.flap.toFixed(2)} * 0.45;` : ''}
       transformed.x += sin(${inst ? 'uT * 6.5 + float(gl_InstanceID) * 1.37' : 'uT'} - zn * 3.0) * env;`);
     if (mat.isMeshToonMaterial) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
       { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
@@ -50,7 +51,7 @@ function swim(mat, U, len, push = 0, fx = null, inst = false) {
           outgoingLight = mix(outgoingLight, outgoingLight * 1.15 + vec3(0.75, 0.9, 1.0) * (sp2 * 0.6 + band * 0.16 + fr * 0.3), ${Math.min(1, fx.metal * 0.75).toFixed(2)}); }` : ''} }
       #include <opaque_fragment>`).replace('void main() {', 'uniform float uT;\nvoid main() {');
   };
-  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst;
+  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst + mv.wave + '_' + mv.flap;
   return mat;
 }
 let _grad = null;
@@ -68,7 +69,7 @@ function parts(d) {
   for (let i = 0; i <= N; i++) {
     const t = i / N, xs = x0 + 0.5 + t * (x1 - x0 - 1), c = cols[Math.round(xs)] || cols[Math.floor(xs)];
     const cy = (c[0] + c[1]) / 2, h = Math.max(0.6, (c[1] - c[0]) / 2);
-    const w = Math.max(0.5, Math.min(thick * Hmax * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.55), h * (thick > 0.8 ? 1.0 : 0.9)));
+    const w = Math.max(0.5, Math.min(thick * Hmax * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.55), h * (d.wide || (thick > 0.8 ? 1.0 : 0.9))));
     rings.push({ xs, cy, h, w, t });
   }
   for (let pass = 0; pass < 3; pass++) { const c = rings.map(r => ({ ...r })); for (let i = 1; i < N; i++) for (const k of ['cy', 'h', 'w']) rings[i][k] = (c[i - 1][k] + 2 * c[i][k] + c[i + 1][k]) / 4; }
@@ -98,27 +99,29 @@ export function makeFish3D(d, size = 1) {
   const P = parts(d), U = { value: Math.random() * 6 };
   const root = new THREE.Group(), rig = new THREE.Group(); root.add(rig);
   const gl = GLOW[d.en], fx = (gl || METAL[d.en]) ? { glow: gl ? gl[0] : 0, gc: new THREE.Color(gl ? gl[1] : '#fff'), metal: METAL[d.en] || 0, key: d.en } : null;
-  const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len, 0, fx);
+  const mv = { wave: d.wave || 1, flap: d.flap || 0 };
+  const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len, 0, fx, false, mv);
   rig.add(new THREE.Mesh(P.body, bodyM));
-  rig.add(new THREE.Mesh(P.body, swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), U, P.len, 0.014)));
-  const finM = swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), U, P.len);
+  rig.add(new THREE.Mesh(P.body, swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), U, P.len, 0.014, null, false, mv)));
+  const finM = swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), U, P.len, 0, null, false, mv);
   rig.add(new THREE.Mesh(P.fins, finM));
   const pecs = [];
   if (P.pec) for (const sx of [-1, 1]) { const m = new THREE.Mesh(P.pec.g, new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide })); const piv = new THREE.Group(); piv.position.set(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); piv.add(m); rig.add(piv); pecs.push({ piv, sx }); }
   const eyes = [];
-  if (d.eye) { const [ex, ey, er] = d.eye, lat = P.latAt(ex, ey) * S, r3 = Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85));
-    for (const sx of [-1, 1]) {
-      const e = placeEye(makeEye(r3, OUT), new THREE.Vector3(sx * Math.max(lat - r3 * 0.35, r3 * 0.25), (100 - ey) * S, (ex - P.xm) * S), new THREE.Vector3(sx, 0.12, -0.38).normalize());
+  for (const [ex, ey, er] of (d.eyes || (d.eye ? [d.eye] : []))) { const lat = P.latAt(ex, ey) * S, r3 = d.flat ? er * S * 1.3 : Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85));
+    for (const sx of (d.flat ? [1] : [-1, 1])) {
+      const e = placeEye(makeEye(r3, OUT), new THREE.Vector3(sx * Math.max(lat - r3 * 0.35, r3 * 0.25), (100 - ey) * S, (ex - P.xm) * S), new THREE.Vector3(sx, d.flat ? 0 : 0.12, d.flat ? -0.55 : -0.38).normalize());
       rig.add(e); eyes.push(e);
       if (d.grumpy) { const br = new THREE.Mesh(new THREE.CapsuleGeometry(r3 * 0.15, r3 * 1.3, 4, 8), new THREE.MeshBasicMaterial({ color: OUT })); br.position.set(0, r3 * 1.0, r3 * 0.55); br.rotation.z = Math.PI / 2 + sx * 0.45; e.add(br); }
     } }
+  if (d.flat) { const tilt = new THREE.Group(); tilt.rotation.z = Math.PI / 2; root.remove(rig); tilt.add(rig); root.add(tilt); }
   root.scale.setScalar(size);
-  root.userData = { U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 4.5 : 6.5 };
+  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 4.5 : 6.5 };
   return root;
 }
 export function animateFish3D(f, dt) {
   const u = f.userData; u.t += dt; u.U.value += dt * u.speed;
-  u.rig.rotation.y = -Math.sin(u.U.value) * 0.05; u.rig.position.y = Math.sin(u.t * 1.3) * 0.02; u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03;
+  if (!u.flat) { u.rig.rotation.y = -Math.sin(u.U.value) * 0.05; u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03; } u.rig.position.y = Math.sin(u.t * 1.3) * 0.02;
   u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });

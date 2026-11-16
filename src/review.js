@@ -28,6 +28,7 @@ function show(i) {
   idx = (i + FISH3D.length) % FISH3D.length;
   if (cur) scene.remove(cur);
   const d = FISH3D[idx]; cur = makeFish3D(d, 1); scene.add(cur);
+  if (d.flat) cam.position.set(-1.7, 2.4, -1.7); else if (cam.position.y > 1.5) cam.position.set(-1.6, 0.35, -2.6);
   $('name').textContent = d.en; $('de').textContent = d.de; $('count').textContent = `${idx + 1} / ${FISH3D.length}`;
   const n = notes[d.en] || {};
   $('note').value = n.note || ''; $('ok').setAttribute('aria-pressed', String(n.ok === true)); $('no').setAttribute('aria-pressed', String(n.ok === false));

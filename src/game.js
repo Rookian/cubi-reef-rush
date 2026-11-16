@@ -280,7 +280,7 @@ const KINDS = {
   star: { make: () => M.makeStarfish(), shape: () => [] },
   anemone: { make: () => { const c = pick([['#9B6BE8', '#D9B8FF', '#3E2370'], ['#FF7FB8', '#FFD0EA', '#7A1F3D'], ['#5FCF8A', '#D4FFE4', '#1F5A3A']]); return M.makeAnemone(...c); }, shape: () => [] },
   jelly: { make: () => pick([() => M.makeJelly(), () => M.makeJelly('#C7A4FF', '#3E2370', '#E9DCFF')])(), shape: () => [sph(0.15, 0.55), cap(-0.15, -1.0, 0.25)] },
-  puffer: { make: () => M.makePuffer(), shape: () => [] },
+  puffer: { make: () => puffer3D(), shape: () => [] },
   urchin: { make: () => M.makeUrchin(), shape: s => [sph(0.3 * s, 0.5 * s)] },
   pearl: { make: () => M.makePearl(), shape: () => [] },
   shark: { make: () => M.makeShark(), shape: () => [] },
@@ -292,9 +292,13 @@ function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 function rf(a, b) { return a + Math.random() * (b - a); }
 
+// yellow blackspotted puffer: slim model swaps to the round one as it puffs up; faces the player
+function puffer3D() { const g = new THREE.Group(), turn = new THREE.Group(); turn.rotation.y = Math.PI * 0.7; g.add(turn);
+  const a = F3.makeFish3D(F3.design('Blackspotted puffer (yellow)'), 0.8), b = F3.makeFish3D(F3.design('Blackspotted puffer, puffed up'), 1); turn.add(a, b); g.userData = { a, b }; setPuff3D(g, 0); return g; }
+function setPuff3D(g, k) { const { a, b } = g.userData; a.visible = k < 0.3; b.visible = !a.visible; a.scale.setScalar(0.8 * (1 + k * 0.8)); b.scale.setScalar(0.62 + 0.5 * k); }
 function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), 2.1); g.add(f); g.userData = f.userData; return g; }
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
-const NOGLOW = ['school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
+const NOGLOW = ['puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
   if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
@@ -306,7 +310,7 @@ function spawn(kind, x, y, z, opt = {}) {
   mesh.visible = true;
   scene.add(mesh);
   const o = { kind, mesh, x, y, z, s, shapes: opt.solid === false ? [] : KINDS[kind].shape(s), hit: false, ph: Math.random() * 6, hazard: HAZARDS.includes(kind) && opt.solid !== false, grounded: y <= 0.05 && !opt.swim, ...opt };
-  if (kind === 'puffer') { o.puff = 0; M.setPuff(mesh, 0); }
+  if (kind === 'puffer') { o.puff = 0; setPuff3D(mesh, 0); }
   if (kind === 'shark') { M.setSharkMouth(mesh, 0); mesh.userData.sick = 0; }
   objs.push(o);
   return o;
@@ -1057,9 +1061,8 @@ function step(dt) {
       const pd = Math.hypot(o.x - P.x, o.y - P.y, o.z);
       if (!o.sick) o.puff = pd < 3.0 ? Math.min(1, o.puff + dt * 4.5) : Math.max(0, o.puff - dt * 0.7);
       if (o.sick) o.puff = Math.max(0, o.puff - dt * 2);
-      M.setPuff(o.mesh, o.puff);
+      setPuff3D(o.mesh, o.puff); F3.animateFish3D(o.mesh.userData.a, dt); F3.animateFish3D(o.mesh.userData.b, dt);
       if (!o.sick) o.shapes = [sph(0, 0.42 * (1 + o.puff * 0.6) + o.puff * 0.1)];
-      o.mesh.userData.tail.rotation.y = Math.sin(t * 12 + o.ph) * 0.5;
     }
     if (o.kind === 'shark') updateShark(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
