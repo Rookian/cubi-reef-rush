@@ -128,22 +128,31 @@ function makeBrain() {
   return g;
 }
 
-// 5 SCROLL / PLATE CORAL (Turbinaria): yellow-green whorl of wavy cups
+// 5 SCROLL CORAL (Turbinaria reniformis): ruffled, lettuce-like fronds spiralling into a rose; olive heart, bright yellow blades, cream growing edge,
+//   growth rings, and neat rows of little raised cups, each with a yellow polyp flower (this species keeps them open by day)
 function makeScroll() {
-  seed = 19; const g = new THREE.Group(), pfs = []; g.userData.pfs = pfs;
-  [[0, 0.05, 0, 1.0], [0.18, 0.2, -0.1, 0.7], [-0.14, 0.3, 0.12, 0.5]].forEach(([x, y, z, s], t) => {
-    const pts = []; for (let k = 0; k <= 10; k++) { const u = k / 10; pts.push(new THREE.Vector2(0.08 + u * 0.62, Math.pow(u, 1.4) * 0.19)); }
-    const geo = new THREE.LatheGeometry(pts, 72); const p = geo.attributes.position;
-    for (let i = 0; i < p.count; i++) { const px = p.getX(i), pz = p.getZ(i), r = Math.hypot(px, pz), a = Math.atan2(pz, px), w = (r / 0.7); p.setY(i, p.getY(i) + Math.sin(a * 5 + t) * 0.07 * w * w); const k = 1 + Math.sin(a * 3 + t * 2) * 0.06 * w; p.setX(i, px * k); p.setZ(i, pz * k); }
-    geo.computeVertexNormals();
-    const cA = new THREE.Color('#9AA83A'), cB = new THREE.Color('#E8F08A'); paint(geo, (c, px, py, pz) => c.copy(cA).lerp(cB, Math.min(1, Math.hypot(px, pz) / 0.72)));
-    const m = new THREE.Mesh(geo, vmat({ side: THREE.DoubleSide })); m.position.set(x, y, z); m.scale.setScalar(s); m.rotation.y = t * 1.3; g.add(m);
-    const fl = polypField(starGeo({ arms: 10, cIn: '#FFD83A', cOut: '#FFFBD0', mouth: '#B8860A', stem: 0.35, stemW: 0.3, cStem: '#B8C050', tilt: 1.35, w: 0.13 }), pmat({ emissive: '#3A2A00' }), sprinkle(geo, Math.round(260 * s), rnd, (pp, n) => n.y > 0.25 && Math.hypot(pp.x, pp.z) > 0.14, true), { size: [0.034, 0.046], rnd, opt: { speed: 1.3, wave: 4, lo: 0.35, stretch: 0.3 } });
-    m.add(fl); pfs.push(fl);
-    const rim = []; for (let k = 0; k <= 72; k++) { const j = (k % 72) * 11 + 10; rim.push(V(p.getX(j), p.getY(j), p.getZ(j))); }
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 140, 0.012, 5, true), new THREE.MeshBasicMaterial({ color: OUT })); tube.position.copy(m.position); tube.scale.copy(m.scale); tube.rotation.copy(m.rotation); g.add(tube);
-  });
-  const base = new THREE.CylinderGeometry(0.07, 0.12, 0.12, 10); base.translate(0, 0.04, 0); g.add(lined(new THREE.Mesh(base, cmat('#7A8A3A'))));
+  seed = 19; const g = new THREE.Group(), pfs = [], S = THREE.MathUtils.smoothstep, C = (h) => new THREE.Color(h); g.userData.pfs = pfs;
+  const c0 = C('#6E7A26'), c1 = C('#C2CC3A'), c2 = C('#F0EC72'), ring = C('#8E9A2C'), u0 = C('#8A8A46'), u1 = C('#D8D48A');
+  const topMat = vmat({ side: THREE.DoubleSide }), rimMat = cmat('#FBF3A8'), pts = [], bumps = [];
+  for (let k = 0; k < 7; k++) { const a0 = k * 2.3 + 0.4, arc = 3.3 - k * 0.12, r0 = 0.05, r1 = 0.74 - k * 0.075, y0 = 0.06 + k * 0.04, rise = 0.07 + k * 0.055, ph = rnd() * 6;
+    const P = (u, v) => { const ang = a0 + u * arc, taper = 0.15 + 0.85 * Math.pow(Math.sin(Math.PI * u), 0.5), R = (r0 + (r1 - r0) * v * taper) * (1 + 0.05 * Math.sin(ang * 6 + ph) * v);
+      return V(Math.cos(ang) * R, y0 + rise * Math.pow(v, 1.5) * taper + (0.05 * Math.sin(ang * 7 + ph) + 0.025 * Math.sin(ang * 13 + ph * 2)) * v * v, Math.sin(ang) * R); };
+    const geo = new THREE.PlaneGeometry(1, 1, 84, 16), p = geo.attributes.position, vs = new Float32Array(p.count), edge = [];
+    for (let i = 0; i < p.count; i++) { const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5, q = P(u, v); p.setXYZ(i, q.x, q.y, q.z); vs[i] = v; if (v > 0.999) edge.push(q); }
+    geo.deleteAttribute('uv'); geo.computeVertexNormals(); const under = geo.clone(), up = under.attributes.position; for (let i = 0; i < up.count; i++) up.setY(i, up.getY(i) - 0.02 * (1 - vs[i] * 0.55));
+    let n = 0; paint(geo, (c) => { const v = vs[n++]; c.copy(c0).lerp(c1, S(v, 0.1, 0.55)).lerp(c2, S(v, 0.6, 1)).lerp(ring, 0.3 * Math.pow(Math.abs(Math.sin(v * 22)), 10)); });
+    n = 0; paint(under, (c) => { const v = vs[n++]; c.copy(u0).lerp(u1, v); });
+    g.add(new THREE.Mesh(geo, topMat), new THREE.Mesh(under, topMat));
+    g.add(lined(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge), 110, 0.008, 6, false), rimMat), 0.005));
+    for (let row = 0; row < 6; row++) { const v = 0.3 + row * 0.115, cnt = Math.max(2, Math.round(arc * (r0 + (r1 - r0) * v) / 0.085));
+      for (let j = 0; j < cnt; j++) { const u = 0.07 + (j + 0.5 + (row % 2) * 0.5) / (cnt + 0.5) * 0.86; if (Math.sin(Math.PI * u) < 0.35) continue;
+        const q = P(u, v), nn = new THREE.Vector3().crossVectors(P(u + 0.01, v).sub(q), P(u, v + 0.01).sub(q)).normalize(); if (nn.y < 0) nn.negate(); pts.push({ p: q, n: nn }); } } }
+  // raised cups + flowers
+  const cup = new THREE.SphereGeometry(1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); cup.scale(1, 0.7, 1); cup.deleteAttribute('uv'); paint(cup, (c, x, y) => c.set('#A8B434').lerp(C('#E6E46A'), y / 0.7));
+  const cf = polypField(cup.toNonIndexed(), pmat(), pts, { size: [0.017, 0.021], rnd, opt: { lo: 1 } });
+  const fl = polypField(starGeo({ arms: 10, cIn: '#FFD224', cOut: '#FFFBD6', mouth: '#A87A08', tilt: 1.2, w: 0.1, curl: 0.35 }), pmat({ emissive: '#3A2A00' }), pts.map(q => ({ p: q.p.clone().addScaledVector(q.n, 0.011), n: q.n })), { size: [0.024, 0.03], rnd, opt: { speed: 1.2, wave: 4, lo: 0.45, stretch: 0.35 } });
+  g.add(cf, fl); pfs.push(fl);
+  const base = new THREE.CylinderGeometry(0.09, 0.15, 0.1, 14); base.translate(0, 0.04, 0); g.add(lined(new THREE.Mesh(base, cmat('#6E7A26')), 0.008));
   return g;
 }
 
