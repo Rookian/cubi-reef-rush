@@ -40,7 +40,7 @@ function makeStaghorn() {
   g.add(new THREE.Mesh(mergeGeometries(tips), cmat('#E6F4FF', { emissive: '#3A5A8A' })));
   const cups = polypField(tubeGeo({ cA: '#6E62C8', cB: '#C6D2FF' }), pmat(), sprinkle(body, 900, rnd, (p) => p.y > 0.06), { size: [0.02, 0.03], rnd, lean: 0.4, sink: 0.25, opt: { lo: 1 } });
   const stars = polypField(starGeo({ arms: 8, cIn: '#BFD4FF', cOut: '#FFFFFF', mouth: '#7A6AE0', tilt: 1.15 }), pmat({ emissive: '#20305A' }), tipPts, { size: [0.022, 0.03], rnd, opt: { speed: 1.6 } });
-  g.add(cups, stars); g.userData.pfs = [stars];
+  g.add(cups); g.userData.pfs = [];
   return g;
 }
 
@@ -62,7 +62,7 @@ function makeTable() {
     tops.push({ p: bp.clone().addScaledVector(d, 0.09 * sy), n: d.clone() }); }
   bl.instanceColor.needsUpdate = true; g.add(bl);
   const stars = polypField(starGeo({ arms: 8, cIn: '#BFF2E6', cOut: '#FFFFFF', mouth: '#4AA890', tilt: 1.2 }), pmat({ emissive: '#103A34' }), tops, { size: [0.013, 0.018], rnd, opt: { speed: 1.8, wave: 5 } });
-  g.add(stars); g.userData.pfs = [stars];
+  g.userData.pfs = [];
   return g;
 }
 
@@ -88,7 +88,7 @@ function makeCauliflower() {
   const base = new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1.2, 0.5, 1.2); base.deleteAttribute('uv'); parts.push(solid(base.toNonIndexed(), '#A8405E'));
   const body = mergeGeometries(parts), g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.009)); g.scale.setScalar(1.3);
   const stars = polypField(starGeo({ arms: 8, cIn: '#FFE4EC', cOut: '#FFFFFF', mouth: '#A8204A', tilt: 1.2, w: 0.13 }), pmat({ emissive: '#3A0A1A' }), sprinkle(body, 380, rnd, (p) => p.y > 0.08), { size: [0.015, 0.021], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
-  g.add(stars); g.userData.pfs = [stars];
+  g.userData.pfs = [];
   return g;
 }
 
@@ -124,7 +124,7 @@ function makeBrain() {
   paint(geo, c => { const r = ridge[i]; c.copy(valD).lerp(val, Math.min(1, r * 2.2)).lerp(rid, THREE.MathUtils.smoothstep(r, 0.35, 0.75)).lerp(cr, THREE.MathUtils.smoothstep(r, 0.82, 1) * 0.8).lerp(base, lo[i] * 0.55); i++; });
   const g = new THREE.Group(); g.add(new THREE.Mesh(geo, vmat()), new THREE.Mesh(hull, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide })));
   seed = 5; const stars = polypField(starGeo({ arms: 8, cIn: '#3EDC8E', cOut: '#D6FFE6', mouth: '#F2E2A8', tilt: 1.3, w: 0.14 }), pmat({ emissive: '#0A3A22' }), sprinkle(geo, 460, rnd, (p, n, c) => c.g > c.r * 1.5 && p.y > 0.0), { size: [0.02, 0.028], rnd, sink: 0.3, opt: { speed: 1.4, wave: 5, lo: 0.25 } });
-  g.add(stars); g.userData.pfs = [stars];
+  g.userData.pfs = [];
   return g;
 }
 
@@ -165,7 +165,7 @@ function makeBubble() {
     items.push({ p: V(Math.cos(a) * r * 0.4, 0.1 + y * 0.2, Math.sin(a) * r * 0.36), q: new THREE.Quaternion().setFromUnitVectors(UP, n.clone().lerp(UP, 0.35).normalize()), s: (0.085 + rnd() * 0.05) * (0.85 + y * 0.3), ph: rnd() * 6 }); }
   const ring = []; for (let k = 0; k < 64; k++) { const a = k / 64 * Math.PI * 2 + rnd() * 0.08, o = V(Math.cos(a), 0, Math.sin(a)); ring.push({ p: V(o.x * 0.44, 0.035 + rnd() * 0.02, o.z * 0.39), n: o.clone().multiplyScalar(1).add(V(0, 0.45 + rnd() * 0.5, 0)).normalize() }); }
   const tent = polypField(hairGeo({ w: 0.11, cA: '#7FB494', cB: '#FFFFFF', knob: 1.6 }), pmat(), ring, { size: [0.07, 0.11], rnd, opt: { speed: 1.2, lo: 0.75, stretch: 0.6 } });
-  g.add(hm, bm, gl, tent); g.userData = { bm, hm, gl, items, t: 0, tent };
+  g.add(hm, bm, gl); g.userData = { bm, hm, gl, items, t: 0 };
   animateBubble(g, 0); return g;
 }
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _gl = new THREE.Vector3(-0.42, 0.62, -0.66).normalize(), _v = new THREE.Vector3();
@@ -200,7 +200,7 @@ function makeMushroom() {
     const m = new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph), vmat({ side: THREE.DoubleSide })); m.add(new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph, true), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.FrontSide })));
     m.position.set(x, y + 0.05, z); m.rotation.set(tilt, r, tilt * 0.6); g.add(m);
     const tn = polypField(hairGeo({ w: 0.13, cA: cR, cB: '#FFFFFF', knob: 1.7 }), pmat(), sprinkle(m.geometry, Math.round(420 * a * b * 4), rnd, (pp) => pp.y > 0.035 && Math.hypot(pp.x / a, pp.z / b) > 0.2, true), { size: [0.02, 0.03], rnd, lean: 0.3, opt: { speed: 1.3, wave: 7, lo: 0.7, stretch: 0.5 } });
-    m.add(tn); pfs.push(tn); });
+    });
   return g;
 }
 
@@ -215,7 +215,7 @@ function makePurplePore() {
       const R = (r0 + (r1 - r0) * v * taper) * (1 + 0.07 * Math.sin(ang * 5 + ph) * v), y = y0 + rise * Math.pow(v, 1.6) * taper + 0.035 * Math.sin(ang * 4 + ph) * v * v;
       p.setXYZ(i, Math.cos(ang) * R, y, Math.sin(ang) * R); uv.setXY(i, u * arc * 2.2, v * 2.4); vs[i] = v; if (v > 0.999) rim.push(V(Math.cos(ang) * R, y, Math.sin(ang) * R)); }
     geo.computeVertexNormals(); let n = 0; paint(geo, (c) => { const v = vs[n++]; c.copy(c0).lerp(c1, S(v, 0.15, 0.8)).lerp(c2, S(v, 0.86, 1)); });
-    const pf = polypField(star, pmat({ emissive: '#1A0A3A' }), sprinkle(geo, 150 - k * 10, rnd, (pp, nn) => nn.y > 0.2, true), { size: [0.013, 0.018], rnd, opt: { speed: 1.4, wave: 6, lo: 0.3 } }); g.add(pf); pfs.push(pf);
+    const pf = polypField(star, pmat({ emissive: '#1A0A3A' }), sprinkle(geo, 150 - k * 10, rnd, (pp, nn) => nn.y > 0.2, true), { size: [0.013, 0.018], rnd, opt: { speed: 1.4, wave: 6, lo: 0.3 } }); 
     g.add(new THREE.Mesh(geo, mat)); rim.sort((A, B) => Math.atan2(A.z, A.x) - Math.atan2(B.z, B.x));
     const ordered = []; for (let i = 0; i < p.count; i++) if (vs[i] > 0.999) ordered.push(V(p.getX(i), p.getY(i), p.getZ(i)));
     g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ordered), 90, 0.0065, 5, false), rimMat)); }
@@ -314,7 +314,7 @@ function makeFinger() {
   const geo = mergeGeometries(parts);
   const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.01));
   const fuzz = polypField(starGeo({ arms: 8, cIn: '#A8B848', cOut: '#FFFFFF', mouth: '#4E5A1E', tilt: 1.2, w: 0.15, seg: 2 }), pmat(), sprinkle(geo, 700, rnd, (p) => p.y > 0.07), { size: [0.016, 0.022], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
-  g.add(fuzz); g.userData.pfs = [fuzz]; return g;
+  g.userData.pfs = []; return g;
 }
 
 const still = () => {};
