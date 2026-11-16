@@ -38,7 +38,7 @@ function makeStaghorn() {
   const a0 = new THREE.Color('#6A5878'), a = new THREE.Color('#5A4AB8'), b = new THREE.Color('#9AB0F6'); paint(body, (c, x, y) => { const t = Math.min(1, y / top); c.copy(a0).lerp(a, Math.min(1, t * 3)).lerp(b, Math.max(0, (t - 0.3) / 0.7)); });
   const g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.012));
   g.add(new THREE.Mesh(mergeGeometries(tips), cmat('#E6F4FF', { emissive: '#3A5A8A' })));
-  const cups = polypField(tubeGeo({ cA: '#6E62C8', cB: '#C6D2FF' }), pmat(), sprinkle(body, 1500, rnd, (p) => p.y > 0.06), { size: [0.024, 0.036], rnd, lean: 0.4, sink: 0.25, opt: { lo: 1 } });
+  const cups = polypField(tubeGeo({ cA: '#6E62C8', cB: '#C6D2FF' }), pmat(), sprinkle(body, 900, rnd, (p) => p.y > 0.06), { size: [0.02, 0.03], rnd, lean: 0.4, sink: 0.25, opt: { lo: 1 } });
   const stars = polypField(starGeo({ arms: 8, cIn: '#BFD4FF', cOut: '#FFFFFF', mouth: '#7A6AE0', tilt: 1.15 }), pmat({ emissive: '#20305A' }), tipPts, { size: [0.022, 0.03], rnd, opt: { speed: 1.6 } });
   g.add(cups, stars); g.userData.pfs = [stars];
   return g;
@@ -87,7 +87,7 @@ function makeCauliflower() {
     for (let j = 0; j < nl; j++) { const dd = bend(d, 0.38 + rnd() * 0.2, 0.05), lobe = cauliLobe(0.11 + rnd() * 0.05, 0.045, 0.55, rnd() * 6); lobe.rotateY(rnd() * 3.14); parts.push(place(lobe, e, dd)); } }
   const base = new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1.2, 0.5, 1.2); base.deleteAttribute('uv'); parts.push(solid(base.toNonIndexed(), '#A8405E'));
   const body = mergeGeometries(parts), g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.009)); g.scale.setScalar(1.3);
-  const stars = polypField(starGeo({ arms: 8, cIn: '#FFE4EC', cOut: '#FFFFFF', mouth: '#A8204A', tilt: 1.2, w: 0.13 }), pmat({ emissive: '#3A0A1A' }), sprinkle(body, 750, rnd, (p) => p.y > 0.08), { size: [0.015, 0.021], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
+  const stars = polypField(starGeo({ arms: 8, cIn: '#FFE4EC', cOut: '#FFFFFF', mouth: '#A8204A', tilt: 1.2, w: 0.13 }), pmat({ emissive: '#3A0A1A' }), sprinkle(body, 380, rnd, (p) => p.y > 0.08), { size: [0.015, 0.021], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
   g.add(stars); g.userData.pfs = [stars];
   return g;
 }
@@ -199,7 +199,7 @@ function makeMushroom() {
    [0.12, 0.0, 0.52, 0.2, 0.18, '#3E8A7A', '#A8E0C0', '#F0FFF0', 4.4, 0.9, -0.06]].forEach(([x, y, z, a, b, cI, cO, cR, ph, r, tilt]) => {
     const m = new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph), vmat({ side: THREE.DoubleSide })); m.add(new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph, true), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.FrontSide })));
     m.position.set(x, y + 0.05, z); m.rotation.set(tilt, r, tilt * 0.6); g.add(m);
-    const tn = polypField(hairGeo({ w: 0.13, cA: cR, cB: '#FFFFFF', knob: 1.7 }), pmat(), sprinkle(m.geometry, Math.round(900 * a * b * 4), rnd, (pp) => pp.y > 0.035 && Math.hypot(pp.x / a, pp.z / b) > 0.2, true), { size: [0.022, 0.036], rnd, lean: 0.3, opt: { speed: 1.3, wave: 7, lo: 0.55, stretch: 0.7 } });
+    const tn = polypField(hairGeo({ w: 0.13, cA: cR, cB: '#FFFFFF', knob: 1.7 }), pmat(), sprinkle(m.geometry, Math.round(420 * a * b * 4), rnd, (pp) => pp.y > 0.035 && Math.hypot(pp.x / a, pp.z / b) > 0.2, true), { size: [0.02, 0.03], rnd, lean: 0.3, opt: { speed: 1.3, wave: 7, lo: 0.7, stretch: 0.5 } });
     m.add(tn); pfs.push(tn); });
   return g;
 }
@@ -289,8 +289,7 @@ function makeFireCoral() {
     const f = fireFan(w, h, 0.8); f.applyMatrix4(new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, rot), V(1, 1, 1))); parts.push(f); });
   const base = new THREE.IcosahedronGeometry(0.16, 2), bp = base.attributes.position; for (let i = 0; i < bp.count; i++) { const k = 0.85 + vnoise(bp.getX(i) * 9, bp.getY(i) * 9, bp.getZ(i) * 9) * 0.35; bp.setXYZ(i, bp.getX(i) * k * 1.5, Math.max(-0.02, bp.getY(i) * k * 0.55), bp.getZ(i) * k * 1.2); } base.deleteAttribute('uv'); base.computeVertexNormals(); parts.push(solid(base.toNonIndexed(), '#A8781C'));
   const body = mergeGeometries(parts), g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.006));
-  const hairs = polypField(hairGeo({ w: 0.07, cA: '#FFE08A', cB: '#FFFFFF', knob: 1 }), pmat(), sprinkle(body, 1400, rnd, (p) => p.y > 0.1), { size: [0.014, 0.026], rnd, opt: { speed: 1.6, lo: 0.6, stretch: 0.4 } });
-  g.add(hairs); g.userData.pfs = [hairs];
+    g.userData.pfs = [];
   return g;
 }
 
@@ -314,7 +313,7 @@ function makeFinger() {
   const mound = new THREE.SphereGeometry(0.44, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2); mound.scale(1, 0.3, 1); parts.push(solid(mound.toNonIndexed(), '#7E7434'));
   const geo = mergeGeometries(parts);
   const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.01));
-  const fuzz = polypField(starGeo({ arms: 8, cIn: '#A8B848', cOut: '#FFFFFF', mouth: '#4E5A1E', tilt: 1.2, w: 0.15, seg: 2 }), pmat(), sprinkle(geo, 1300, rnd, (p) => p.y > 0.07), { size: [0.016, 0.022], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
+  const fuzz = polypField(starGeo({ arms: 8, cIn: '#A8B848', cOut: '#FFFFFF', mouth: '#4E5A1E', tilt: 1.2, w: 0.15, seg: 2 }), pmat(), sprinkle(geo, 700, rnd, (p) => p.y > 0.07), { size: [0.016, 0.022], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
   g.add(fuzz); g.userData.pfs = [fuzz]; return g;
 }
 

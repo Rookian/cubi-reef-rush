@@ -11,7 +11,7 @@ const fin = g => { g.deleteAttribute('uv'); return g.index ? g.toNonIndexed() : 
 export function starGeo(o = {}) {
   const { arms = 8, w = 0.11, tilt = 1.05, curl = 0.3, cIn = '#fff', cOut = '#fff', mouth = null, stem = 0, stemW = 0.1, cStem = null, seg = 3 } = o;
   const parts = [], A = new THREE.Color(cIn), B = new THREE.Color(cOut);
-  for (let k = 0; k < arms; k++) { const c = new THREE.ConeGeometry(w, 1, 4, seg); c.translate(0, 0.5, 0); const p = c.attributes.position;
+  for (let k = 0; k < arms; k++) { const c = new THREE.ConeGeometry(w * 2.6, 1, 6, seg); c.scale(1, 1, 0.45); c.translate(0, 0.5, 0); const p = c.attributes.position;
     for (let i = 0; i < p.count; i++) { const t = p.getY(i); p.setZ(i, p.getZ(i) - curl * t * t); }
     paintY(c, 1, A, B); c.rotateX(tilt); c.rotateY(k / arms * Math.PI * 2); c.translate(0, stem, 0); parts.push(fin(c)); }
   const m = new THREE.SphereGeometry(w * 1.7, 6, 4); m.scale(1, 0.6, 1); m.translate(0, stem, 0); const mc = new THREE.Color(mouth || cIn); parts.push(fin(paintY(m, 1, mc, mc)));
@@ -20,8 +20,8 @@ export function starGeo(o = {}) {
 }
 // a single tapered tentacle with a little knob tip, length 1
 export function hairGeo(o = {}) { const { w = 0.12, cA = '#fff', cB = '#fff', knob = 1.3 } = o;
-  const pts = [[w, 0], [w * 0.8, 0.5], [w * 0.55, 0.85], [w * 0.55 * knob, 0.93], [w * 0.3, 0.99], [0.0001, 1]].map(([x, y]) => new THREE.Vector2(x, y));
-  const g = new THREE.LatheGeometry(pts, 5); paintY(g, 1, new THREE.Color(cA), new THREE.Color(cB)); return fin(g); }
+  const W = w * 2.4, pts = [[W, 0], [W * 0.8, 0.5], [W * 0.6, 0.8], [W * 0.6 * knob, 0.9], [W * 0.35, 0.98], [0.0001, 1]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.LatheGeometry(pts, 7); paintY(g, 1, new THREE.Color(cA), new THREE.Color(cB)); return fin(g); }
 // a corallite: tiny open tube, length 1
 export function tubeGeo(o = {}) { const { w = 0.4, cA = '#fff', cB = '#fff' } = o; const g = new THREE.CylinderGeometry(w * 0.8, w, 1, 6, 1, true); g.translate(0, 0.4, 0); paintY(g, 1, new THREE.Color(cA), new THREE.Color(cB), -0.1); return fin(g); }
 
