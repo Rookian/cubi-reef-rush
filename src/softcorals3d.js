@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toonGradient, outline } from './materials.js';
+import { makeFish3D, animateFish3D, design } from './fish3d.js';
 
 const OUT = '#3B2614';
 const V = (x, y, z) => new THREE.Vector3(x, y, z), UP = V(0, 1, 0);
@@ -121,28 +122,54 @@ function animateWhips(g, dt) { const u = g.userData; u.t += dt;
     p.needsUpdate = true; w.geo.computeVertexNormals(); });
 }
 
-// 5 BUBBLE-TIP ANEMONE (Entacmaea quadricolor): red column, crowded rose tentacles each with a swollen bulb and a pale tip
+// 5 BUBBLE-TIP ANEMONE (Entacmaea quadricolor): frilly column, striped oral disc, a crowd of curved tentacles each with a banded bulb and
+//   a pointed magenta tip, and a pair of clownfish nestling inside
 function makeBubbleTip() {
-  seed = 79; const g = new THREE.Group();
-  const col = new THREE.CylinderGeometry(0.26, 0.2, 0.14, 32, 2); col.translate(0, 0.07, 0); g.add(lined(new THREE.Mesh(col, cmat('#B8202E')), 0.01));
-  const disc = new THREE.CircleGeometry(0.27, 32); disc.rotateX(-Math.PI / 2); disc.translate(0, 0.141, 0); g.add(new THREE.Mesh(disc, cmat('#7A5A3A')));
-  const mouth = new THREE.SphereGeometry(0.035, 12, 8); mouth.scale(1, 0.4, 1); mouth.translate(0, 0.145, 0); g.add(new THREE.Mesh(mouth, cmat('#E8A0A8')));
-  const prof = [[0.009, 0], [0.009, 0.05], [0.008, 0.1], [0.012, 0.125], [0.021, 0.145], [0.025, 0.165], [0.022, 0.185], [0.012, 0.2], [0.007, 0.212], [0.005, 0.222], [0.0001, 0.228]].map(([r, y]) => new THREE.Vector2(r, y));
-  const tg = new THREE.LatheGeometry(prof, 12); paint(tg, (c, x, y) => { c.set('#C8506A'); if (y > 0.12) c.lerp(new THREE.Color('#FF8FA6'), Math.min(1, (y - 0.12) / 0.04)); if (y > 0.205) c.lerp(new THREE.Color('#FFF2F4'), 0.85); });
-  const items = [];
-  for (let i = 0; i < 110; i++) { const r = Math.sqrt((i + 0.5) / 110) * 0.26, a = i * 2.39996, out = V(Math.cos(a), 0, Math.sin(a));
-    items.push({ p: V(out.x * r, 0.14, out.z * r), d: out.clone().multiplyScalar(0.35 + r * 2.2).add(UP).normalize(), s: 0.85 + rnd() * 0.35, ph: a, r }); }
-  const f = field(tg, vmat({ emissive: '#2A0008' }), items); g.add(f);
-  g.userData = { t: 0, f }; animateBubbleTip(g, 0); return g;
+  seed = 79; const g = new THREE.Group(), S = THREE.MathUtils.smoothstep, C = (h) => new THREE.Color(h);
+  // column: flares from a narrow foot into a wavy collar
+  const cp = []; for (let k = 0; k <= 14; k++) { const t = k / 14; cp.push(new THREE.Vector2(0.15 + 0.03 * Math.sin(t * 5) + Math.pow(t, 2.2) * 0.2, t * 0.2)); }
+  const col = new THREE.LatheGeometry(cp, 64), p = col.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), y = p.getY(i), an = Math.atan2(z, x), w = Math.pow(y / 0.2, 2), k = 1 + 0.07 * Math.sin(an * 9) * w; p.setXYZ(i, x * k, y + 0.02 * Math.sin(an * 9 + 1) * w, z * k); }
+  col.computeVertexNormals(); const cA = C('#7A1626'), cB = C('#C8303E'), cS = C('#F2A0A0');
+  paint(col, (c, x, y, z) => { const an = Math.atan2(z, x); c.copy(cA).lerp(cB, y / 0.2); c.lerp(cS, 0.5 * Math.pow(Math.max(0, Math.sin(an * 14) * Math.sin(y * 90)), 6)); });
+  g.add(lined(new THREE.Mesh(ni(col), vmat({ side: THREE.DoubleSide })), 0.009));
+  // oral disc with radial stripes and a raised mouth
+  const disc = new THREE.CircleGeometry(0.33, 64, 0, Math.PI * 2); disc.rotateX(-Math.PI / 2); const dp = disc.attributes.position;
+  for (let i = 0; i < dp.count; i++) { const r = Math.hypot(dp.getX(i), dp.getZ(i)); dp.setY(i, 0.185 + 0.03 * Math.exp(-r * r / 0.004)); }
+  disc.computeVertexNormals(); paint(disc, (c, x, y, z) => { const r = Math.hypot(x, z), an = Math.atan2(z, x); c.set('#8A4A3E').lerp(C('#E8B8A0'), 0.5 * Math.pow(Math.abs(Math.sin(an * 12)), 4)); if (r < 0.05) c.lerp(C('#FFD0C8'), 1 - r / 0.05); });
+  g.add(new THREE.Mesh(ni(disc), vmat()));
+  // tentacle: slim striped stalk curving outward, swollen bulb with a pale band, pointed tip
+  const L = 0.3, prof = [[0.011, 0], [0.011, 0.25], [0.0095, 0.5], [0.0095, 0.6], [0.014, 0.66], [0.024, 0.73], [0.029, 0.8], [0.027, 0.86], [0.019, 0.91], [0.011, 0.95], [0.006, 0.985], [0.0001, 1]];
+  const mk = (grow) => { const t = new THREE.LatheGeometry(new THREE.SplineCurve(prof.map(([r, y]) => new THREE.Vector2(r + grow, y * L))).getPoints(34), 12), q = t.attributes.position;
+    for (let i = 0; i < q.count; i++) { const y = q.getY(i) / L; q.setX(i, q.getX(i) + 0.3 * y * y * L); q.setY(i, q.getY(i) - 0.1 * y * y * y * L); } t.computeVertexNormals(); return t; };
+  const tg = mk(0), st0 = C('#8E3A4E'), st1 = C('#D0607A'), bulb = C('#FF86A0'), band = C('#FFE6EA'), tipc = C('#E0207A');
+  { const q = tg.attributes.position; let i = 0; paint(tg, (c, x, y0, z) => { const row = i % 35, colm = Math.floor(i / 35); i++; const y = row / 34;
+      c.copy(st0).lerp(st1, y * 1.4); if (colm % 2) c.lerp(band, 0.22 * (1 - S(y, 0.5, 0.66))); c.lerp(bulb, S(y, 0.6, 0.72)); c.lerp(band, 0.85 * S(y, 0.76, 0.79) * (1 - S(y, 0.82, 0.85))); c.lerp(tipc, S(y, 0.9, 0.97)); }); }
+  const items = [], N = 150;
+  for (let i = 0; i < N; i++) { const f = (i + 0.5) / N, r = 0.05 + Math.sqrt(f) * 0.27, a = i * 2.39996, out = V(Math.cos(a), 0, Math.sin(a)), tilt = 0.1 + f * 0.8;
+    items.push({ p: V(out.x * r, 0.185, out.z * r), out, tilt, s: (0.6 + f * 0.55) * (0.85 + rnd() * 0.3), w: 0.9 + rnd() * 0.35, ph: rnd() * 6.28, r, a }); }
+  const im = new THREE.InstancedMesh(tg, vmat({ emissive: '#30000C' }), N), hm = new THREE.InstancedMesh(mk(0.0035), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N); g.add(hm, im);
+  // clownfish pair
+  const fish = []; const d = design('Clownfish');
+  if (d) [[0.3, 0.1], [0.2, 2.4]].forEach(([size, ph]) => { const f = makeFish3D(d, size); g.add(f); fish.push({ f, ph, size }); });
+  g.userData = { t: 0, im, hm, items, fish }; animateBubbleTip(g, 0); return g;
 }
-function animateBubbleTip(g, dt) { const u = g.userData; u.t += dt;
-  updField(u.f, u.t, (it, t) => [Math.sin(t * 1.3 + it.r * 9 + it.ph * 0.2) * 0.28, 1 + 0.06 * Math.sin(t * 0.8 + it.ph)]); }
+const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _b = new THREE.Matrix4();
+function animateBubbleTip(g, dt) { const u = g.userData; u.t += dt; const t = u.t;
+  u.items.forEach((it, i) => { const tilt = it.tilt + Math.sin(t * 1.1 - it.r * 7 + it.a) * 0.16, sw = Math.sin(t * 0.8 + it.ph) * 0.14;
+    _y.set(it.out.x * Math.sin(tilt), Math.cos(tilt), it.out.z * Math.sin(tilt)); _z.set(-it.out.z, 0, it.out.x); _y.addScaledVector(_z, sw).normalize(); _x.crossVectors(_y, _z).normalize(); _z.crossVectors(_x, _y);
+    _b.makeBasis(_x, _y, _z); _q.setFromRotationMatrix(_b); const len = it.s * (1 + 0.05 * Math.sin(t * 0.9 + it.ph));
+    _m.compose(it.p, _q, _s.set(it.w, len, it.w)); u.im.setMatrixAt(i, _m); u.hm.setMatrixAt(i, _m); });
+  u.im.instanceMatrix.needsUpdate = u.hm.instanceMatrix.needsUpdate = true;
+  u.fish.forEach((o, k) => { const a = t * 0.5 * (k ? -1 : 1) + o.ph, R = 0.12 + 0.05 * Math.sin(t * 0.7 + o.ph); o.f.position.set(Math.cos(a) * R, 0.42 + k * 0.06 + Math.sin(t * 1.3 + o.ph) * 0.03, Math.sin(a) * R);
+    o.f.rotation.y = -a + (k ? Math.PI / 2 : -Math.PI / 2) + Math.PI / 2; animateFish3D(o.f, dt); });
+}
 
 export const SOFT3D = [
   { en: 'Toadstool leather coral', de: 'Lederkoralle (Sarcophyton)', make: makeLeather, anim: animateLeather, cam: [-2.2, 1.9, -2.8], target: [0, 0.25, 0] },
   { en: 'Carnation tree coral', de: 'Bäumchenweichkoralle (Dendronephthya)', make: makeTreeCoral, anim: animateTree, cam: [-2.7, 1.6, -3.4], target: [0, 0.7, 0] },
   { en: 'Pulsing Xenia', de: 'Pumpende Xenia', make: makeXenia, anim: animateXenia, cam: [-1.2, 1.0, -1.5], target: [0, 0.2, 0] },
   { en: 'Sea whips', de: 'Peitschenkorallen', make: makeWhips, anim: animateWhips, cam: [-2.6, 1.4, -3.2], target: [0, 0.65, 0] },
-  { en: 'Bubble-tip anemone', de: 'Blasenanemone', make: makeBubbleTip, anim: animateBubbleTip, cam: [-1.1, 1.0, -1.4], target: [0, 0.12, 0] },
+  { en: 'Bubble-tip anemone', de: 'Blasenanemone', make: makeBubbleTip, anim: animateBubbleTip, cam: [-1.25, 1.15, -1.6], target: [0, 0.28, 0] },
 ];
 export { makeLeather, animateLeather, makeTreeCoral, animateTree, makeXenia, animateXenia, makeWhips, animateWhips, makeBubbleTip, animateBubbleTip };
