@@ -128,23 +128,23 @@ export function animateSeaTurtle(o, dt) {
 export function makeOctopus() {
   seed = 41;
   const root = new THREE.Group(), rig = new THREE.Group(); root.add(rig);
-  const skinTex = tex(512, 256, (g, W, H) => { g.fillStyle = '#C8503A'; g.fillRect(0, 0, W, H);
-    for (let i = 0; i < 90; i++) { g.beginPath(); g.arc(rnd() * W, rnd() * H, 4 + rnd() * 9, 0, 7); g.fillStyle = rnd() < 0.7 ? '#F29A6A' : '#8A2A1E'; g.globalAlpha = 0.85; g.fill(); } g.globalAlpha = 1; });
+  const skinTex = tex(512, 256, (g, W, H) => { g.fillStyle = '#5E4E72'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) { g.beginPath(); g.arc(rnd() * W, rnd() * H, 4 + rnd() * 9, 0, 7); g.fillStyle = rnd() < 0.7 ? '#9C86BC' : '#2E2A36'; g.globalAlpha = 0.85; g.fill(); } g.globalAlpha = 1; });
   const mg = new THREE.SphereGeometry(0.42, 44, 30); mg.scale(1.0, 1.28, 1.08);
   const mp = mg.attributes.position; for (let i = 0; i < mp.count; i++) { const y = mp.getY(i); if (y < -0.1) { const k = (-y - 0.1) / 0.44; mp.setX(i, mp.getX(i) * (1 + k * 0.15)); mp.setZ(i, mp.getZ(i) * (1 + k * 0.15)); } } mg.computeVertexNormals();
   const mantle = new THREE.Group(); mantle.position.set(0, 0.72, 0.18); mantle.rotation.x = 0.4; rig.add(mantle);
   mantle.add(lined(new THREE.Mesh(mg, mat({ map: skinTex })), 0.02));
-  for (let i = 0; i < 9; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.03 + rnd() * 0.025, 10, 8), mat({ color: '#E87A50' })); const a = rnd() * Math.PI * 2, h = rnd() * 0.4; b.position.set(Math.cos(a) * 0.36, h, Math.sin(a) * 0.38); mantle.add(b); }
+  for (let i = 0; i < 9; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.03 + rnd() * 0.025, 10, 8), mat({ color: '#7A6A92' })); const a = rnd() * Math.PI * 2, h = rnd() * 0.4; b.position.set(Math.cos(a) * 0.36, h, Math.sin(a) * 0.38); mantle.add(b); }
   const eyes = [], head = new THREE.Group(); head.position.set(0, 0.38, -0.12); rig.add(head);
   const hd = new THREE.SphereGeometry(0.3, 32, 22); hd.scale(1.15, 0.85, 0.95); head.add(lined(new THREE.Mesh(hd, mat({ map: skinTex })), 0.018));
   for (const sx of [-1, 1]) { const e = eye(0.12, V(sx * 0.22, 0.08, -0.17), V(sx * 0.7, 0.25, -0.8)); head.add(e); eyes.push(e);
-    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat({ color: '#E87A50' })); lid.scale.set(1.2, 0.7, 1); lid.position.set(sx * 0.25, 0.22, -0.12); head.add(lid);
+    const lid = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat({ color: '#7A6A92' })); lid.scale.set(1.2, 0.7, 1); lid.position.set(sx * 0.25, 0.22, -0.12); head.add(lid);
     const bl = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), new THREE.MeshBasicMaterial({ color: '#FF8FA3', transparent: true, opacity: 0.7 })); bl.scale.set(0.5, 0.6, 1); bl.position.set(sx * 0.27, -0.06, -0.2); head.add(bl); }
-  const siph = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.12, 10), mat({ color: '#B8402E' })); siph.position.set(0.24, 0.24, 0.02); siph.rotation.z = -1.1; rig.add(siph);
+  const siph = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.12, 10), mat({ color: '#4A3E5C' })); siph.position.set(0.24, 0.24, 0.02); siph.rotation.z = -1.1; rig.add(siph);
   // arms
   const armTex = skinTex.clone(); armTex.repeat.set(3, 1); armTex.needsUpdate = true;
   const am = mat({ map: armTex }), hull = new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), arms = [];
-  const sucker = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), mat({ color: '#FFE2D2' }), 8 * 14); sucker.frustumCulled = false; rig.add(sucker);
+  const sucker = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), mat({ color: '#E6DCF0' }), 8 * 14); sucker.frustumCulled = false; rig.add(sucker);
   const NS = 26;
   for (let i = 0; i < 8; i++) {
     const g = taperTube(NS, 10), hg = taperTube(NS, 10), m = new THREE.Mesh(g, am), h = new THREE.Mesh(hg, hull);
