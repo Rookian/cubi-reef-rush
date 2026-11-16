@@ -80,14 +80,15 @@ function cauliLobe(len, R, flare, ph) {
   return g.toNonIndexed();
 }
 function makeCauliflower() {
-  seed = 11; const parts = [], o = V(0, 0.02, 0), N = 17;
-  for (let k = 0; k < N; k++) { const y = 1 - (k + 0.5) / N * 0.86, r = Math.sqrt(1 - y * y), a = k * 2.39996, d = V(Math.cos(a) * r, y * 0.9 + 0.12, Math.sin(a) * r).normalize(), len = 0.24 + rnd() * 0.08;
-    const stem = cauliLobe(len, 0.055, 0.25, rnd() * 6); stem.rotateY(rnd() * 3.14); parts.push(place(stem, o, d));
+  seed = 11; const parts = [], o = V(0, 0.02, 0), N = 26;
+  for (let k = 0; k < N; k++) { const y = 1 - (k + 0.5) / N * 0.86, r = Math.sqrt(1 - y * y), a = k * 2.39996, d = V(Math.cos(a) * r, y * 0.9 + 0.12, Math.sin(a) * r).normalize(), len = 0.25 + rnd() * 0.08;
+    const stem = cauliLobe(len, 0.042, 0.3, rnd() * 6); stem.rotateY(rnd() * 3.14); parts.push(place(stem, o, d));
     const e = o.clone().addScaledVector(d, len * 0.85), nl = 2 + (rnd() < 0.5 ? 1 : 0);
-    for (let j = 0; j < nl; j++) { const dd = bend(d, 0.38 + rnd() * 0.2, 0.05), lobe = cauliLobe(0.11 + rnd() * 0.05, 0.045, 0.55, rnd() * 6); lobe.rotateY(rnd() * 3.14); parts.push(place(lobe, e, dd)); } }
+    for (let j = 0; j < nl; j++) { const dd = bend(d, 0.38 + rnd() * 0.2, 0.05), lobe = cauliLobe(0.09 + rnd() * 0.05, 0.036, 0.6, rnd() * 6); lobe.rotateY(rnd() * 3.14); parts.push(place(lobe, e, dd)); } }
   const base = new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1.2, 0.5, 1.2); base.deleteAttribute('uv'); parts.push(solid(base.toNonIndexed(), '#A8405E'));
   const body = mergeGeometries(parts), g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.009)); g.scale.setScalar(1.3);
-  const stars = polypField(starGeo({ arms: 8, cIn: '#FFE4EC', cOut: '#FFFFFF', mouth: '#A8204A', tilt: 1.2, w: 0.13 }), pmat({ emissive: '#3A0A1A' }), sprinkle(body, 380, rnd, (p) => p.y > 0.08), { size: [0.015, 0.021], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
+  const wart = new THREE.SphereGeometry(1, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2); wart.scale(1, 0.75, 1); wart.deleteAttribute('uv'); paint(wart, (c, x, y) => c.set('#E06A90').lerp(new THREE.Color('#FFE2EA'), y / 0.75));
+  g.add(polypField(wart.toNonIndexed(), pmat(), sprinkle(body, 2400, rnd, (p) => p.y > 0.05), { size: [0.0085, 0.012], rnd, sink: 0.25, opt: { lo: 1 } }));
   g.userData.pfs = [];
   return g;
 }
@@ -158,7 +159,7 @@ function makeScroll() {
 
 // 6 BUBBLE CORAL (Plerogyra sinuosa): plump pearly vesicles like a bunch of grapes on a pale ridged skeleton, slowly breathing
 function makeBubble() {
-  seed = 23; const g = new THREE.Group(), N = 44;
+  seed = 23; const g = new THREE.Group(), NB = 30, N = 74;
   const base = new THREE.SphereGeometry(0.4, 40, 12, 0, Math.PI * 2, 0, Math.PI / 2), bp = base.attributes.position;
   for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), z = bp.getZ(i), an = Math.atan2(z, x), k = 1 + 0.06 * Math.abs(Math.sin(an * 16)); bp.setXYZ(i, x * k * 1.08, bp.getY(i) * 0.42, z * k * 0.95); }
   base.computeVertexNormals(); paint(base, (c, x, y) => c.set('#8E8468').lerp(new THREE.Color('#C8BFA2'), Math.min(1, y / 0.12))); g.add(lined(new THREE.Mesh(base, vmat()), 0.008));
@@ -166,12 +167,14 @@ function makeBubble() {
   for (let i = 0; i < sp.count; i++) { const y = sp.getY(i), k = y < 0 ? 1 + 0.4 * y : 1; sp.setXYZ(i, sp.getX(i) * k, y * 1.18, sp.getZ(i) * k); }
   sg.computeVertexNormals();
   const lo = new THREE.Color('#6FB08E'), mid = new THREE.Color('#D2E6C6'), hi = new THREE.Color('#F2F6E6'), vein = new THREE.Color('#FFFFFF');
-  paint(sg, (c, x, y, z) => { const t = (y / 1.18 + 1) / 2; c.copy(lo).lerp(mid, Math.min(1, t * 1.7)).lerp(hi, Math.max(0, (t - 0.55) / 0.45)); c.lerp(vein, 0.35 * Math.pow(Math.max(0, Math.cos(Math.atan2(z, x) * 12)), 10) * (1 - Math.abs(t - 0.5) * 1.6)); });
-  const bm = new THREE.InstancedMesh(sg, new THREE.MeshLambertMaterial({ vertexColors: true, emissive: new THREE.Color('#2E3E34') }), N), hm = new THREE.InstancedMesh(sg, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N);
+  paint(sg, (c, x, y, z) => { const t = (y / 1.18 + 1) / 2; c.copy(lo).lerp(mid, Math.min(1, t * 1.7)).lerp(hi, Math.max(0, (t - 0.55) / 0.45)); const an = Math.atan2(z, x); c.lerp(vein, 0.45 * Math.pow(Math.abs(Math.sin(t * 26 + 1.5 * Math.sin(an * 3))), 8) * (0.3 + 0.7 * t)); c.lerp(new THREE.Color('#E6D2F0'), 0.25 * Math.max(0, Math.sin(an * 2 + t * 3))); });
+  const bm = new THREE.InstancedMesh(sg, new THREE.MeshPhongMaterial({ vertexColors: true, emissive: new THREE.Color('#18221C'), specular: new THREE.Color('#DDE6DD'), shininess: 70 }), N), hm = new THREE.InstancedMesh(sg, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N);
   const gl = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: '#F2F6EA' }), N);
   const items = [];
-  for (let i = 0; i < N; i++) { const y = 1 - (i + 0.5) / N * 0.9, r = Math.sqrt(1 - y * y), a = i * 2.39996, n = V(Math.cos(a) * r, y * 1.4, Math.sin(a) * r).normalize();
-    items.push({ p: V(Math.cos(a) * r * 0.4, 0.1 + y * 0.2, Math.sin(a) * r * 0.36), q: new THREE.Quaternion().setFromUnitVectors(UP, n.clone().lerp(UP, 0.35).normalize()), s: (0.085 + rnd() * 0.05) * (0.85 + y * 0.3), ph: rnd() * 6 }); }
+  for (let i = 0; i < N; i++) { const big = i < NB, y = big ? 1 - (i + 0.5) / NB * 0.9 : 0.1 + rnd() * 0.85, r = Math.sqrt(1 - y * y), a = big ? i * 2.39996 : rnd() * 6.28, n = V(Math.cos(a) * r, y * 1.4, Math.sin(a) * r).normalize(), out = big ? 1 : 1.16;
+    items.push({ p: V(Math.cos(a) * r * 0.4 * out, 0.1 + y * 0.2 * out, Math.sin(a) * r * 0.36 * out), q: new THREE.Quaternion().setFromUnitVectors(UP, n.clone().lerp(UP, 0.3).normalize()), s: big ? (0.1 + rnd() * 0.05) * (0.85 + y * 0.3) : 0.04 + rnd() * 0.03, ph: rnd() * 6 }); }
+  const teeth = []; for (let k = 0; k < 46; k++) { const a = k / 46 * Math.PI * 2, b = new THREE.SphereGeometry(1, 6, 5); b.scale(0.055, 0.03 + rnd() * 0.015, 0.008); b.rotateY(-a); b.translate(Math.cos(a) * 0.44, 0.045, Math.sin(a) * 0.395); b.deleteAttribute('uv'); teeth.push(solid(b.toNonIndexed(), '#EFE8D2')); }
+  g.add(lined(new THREE.Mesh(mergeGeometries(teeth), vmat()), 0.005));
   const ring = []; for (let k = 0; k < 64; k++) { const a = k / 64 * Math.PI * 2 + rnd() * 0.08, o = V(Math.cos(a), 0, Math.sin(a)); ring.push({ p: V(o.x * 0.44, 0.035 + rnd() * 0.02, o.z * 0.39), n: o.clone().multiplyScalar(1).add(V(0, 0.45 + rnd() * 0.5, 0)).normalize() }); }
   const tent = polypField(hairGeo({ w: 0.11, cA: '#7FB494', cB: '#FFFFFF', knob: 1.6 }), pmat(), ring, { size: [0.07, 0.11], rnd, opt: { speed: 1.2, lo: 0.75, stretch: 0.6 } });
   g.add(hm, bm, gl); g.userData = { bm, hm, gl, items, t: 0 };

@@ -27,29 +27,35 @@ function updField(g, t, fn) { const { im, hm, items, hullScale } = g.userData.f;
     if (hm) { _s.multiplyScalar(hullScale); _m.compose(it.p, _q, _s); hm.setMatrixAt(i, _m); } });
   im.instanceMatrix.needsUpdate = true; if (hm) hm.instanceMatrix.needsUpdate = true; }
 
-// 1 TOADSTOOL LEATHER CORAL (Sarcophyton): fat stalk, wavy folded cap carpeted with tiny polyps that slowly extend and retract
+// 1 TOADSTOOL LEATHER CORAL (Sarcophyton): wrinkled cream stalk flaring into a thick, deeply folded cap with a curled pale margin;
+//   the top is carpeted with slender golden polyps that retract and re-emerge in a slow wave
 function makeLeather() {
-  seed = 61; const g = new THREE.Group();
-  const prof = []; for (let k = 0; k <= 24; k++) { const u = k / 24; prof.push(new THREE.Vector2(u < 0.55 ? 0.16 + 0.03 * Math.sin(u * 6) : 0.16 + Math.pow((u - 0.55) / 0.45, 1.6) * 0.48, u < 0.55 ? u * 0.62 : 0.34 + (u - 0.55) / 0.45 * 0.12)); }
-  for (let k = 1; k <= 10; k++) { const u = k / 10; prof.push(new THREE.Vector2(0.64 * (1 - u * u), 0.46 + 0.05 * Math.sin(u * Math.PI))); }
-  const geo = new THREE.LatheGeometry(prof, 96), p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), r = Math.hypot(x, z), a = Math.atan2(z, x), w = Math.max(0, (r - 0.18) / 0.46) * (p.getY(i) > 0.3 ? 1 : 0);
-    p.setY(i, p.getY(i) + Math.sin(a * 6 + 0.7) * 0.075 * w * w + Math.sin(a * 11) * 0.02 * w * w * w); const k = 1 + Math.sin(a * 6 + 0.7) * 0.05 * w; p.setX(i, x * k); p.setZ(i, z * k); }
+  seed = 61; const g = new THREE.Group(), S = THREE.MathUtils.smoothstep, C = (h) => new THREE.Color(h);
+  const ctrl = [[0.25, 0], [0.19, 0.04], [0.155, 0.12], [0.15, 0.22], [0.17, 0.3], [0.3, 0.37], [0.5, 0.41], [0.63, 0.43], [0.665, 0.455], [0.64, 0.485], [0.5, 0.49], [0.3, 0.475], [0.12, 0.455], [0.0001, 0.45]];
+  const NP = 56, prof = new THREE.SplineCurve(ctrl.map(([x, y]) => new THREE.Vector2(x, y))).getPoints(NP - 1), jTop = Math.round(NP * 0.66);
+  const geo = new THREE.LatheGeometry(prof, 128), p = geo.attributes.position, fold = (a) => 0.1 * Math.sin(a * 5 + 0.7) + 0.045 * Math.sin(a * 9 + 2.1) + 0.02 * Math.sin(a * 17);
+  const bend = (x, y, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x), w = y > 0.3 ? Math.pow(S(r, 0.2, 0.66), 1.4) : 0, k = 1 + 0.09 * Math.sin(a * 5 + 1.9) * w, wr = y < 0.3 ? 1 + 0.035 * Math.sin(y * 80) * S(y, 0.03, 0.1) : 1;
+    return V(x * k * wr, y + fold(a) * w, z * k * wr); };
+  for (let i = 0; i < p.count; i++) { const q = bend(p.getX(i), p.getY(i), p.getZ(i)); p.setXYZ(i, q.x, q.y, q.z); }
   geo.computeVertexNormals();
-  const stalk = new THREE.Color('#EDE2BE'), capU = new THREE.Color('#C9B25E'), capT = new THREE.Color('#D7C66E');
-  paint(geo, (c, x, y) => { c.copy(stalk).lerp(y > 0.3 ? capT : capU, THREE.MathUtils.smoothstep(y, 0.28, 0.42)); });
-  const cap = lined(new THREE.Mesh(ni(geo), vmat({ side: THREE.DoubleSide })), 0.012); g.add(cap);
-  // polyps on the cap top
-  const pg = starGeo({ arms: 8, cIn: '#CFE8A8', cOut: '#FFFFFF', mouth: '#7A8A3A', stem: 2.6, stemW: 0.22, cStem: '#D9CC84', tilt: 1.1, w: 0.14 }); pg.scale(0.017, 0.017, 0.017);
-  const ray = new THREE.Raycaster(), items = [];
-  for (let k = 0; k < 900; k++) { const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.6; ray.set(V(Math.cos(a) * r, 2, Math.sin(a) * r), V(0, -1, 0)); const hit = ray.intersectObject(cap, true).find(h => h.object.isMesh && h.face && h.object.material.type !== 'MeshBasicMaterial');
-    if (!hit || hit.point.y < 0.3) continue; const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld); if (n.y < 0) n.negate();
-    items.push({ p: hit.point.clone(), d: n.lerp(UP, 0.3).normalize(), s: 0.8 + rnd() * 0.5, ph: rnd() * 6.28, r }); }
-  const f = field(pg, vmat(), items); g.add(f); g.userData = { t: 0, f };
+  const st0 = C('#C9B48C'), st1 = C('#F0E2C2'), un = C('#D9CFA0'), t0 = C('#8E9A46'), t1 = C('#C4C46A'), mar = C('#F4EEC0'), groove = C('#A8906A'); let n = 0;
+  paint(geo, (c, x, y, z) => { const j = n++ % NP, r = Math.hypot(x, z);
+    if (j < NP * 0.36) { c.copy(st0).lerp(st1, S(y, 0, 0.3)).lerp(groove, 0.35 * Math.max(0, -Math.sin(y * 80))); }
+    else if (j < jTop - 4) c.copy(st1).lerp(un, S(r, 0.2, 0.6)).lerp(groove, 0.18 * Math.pow(Math.abs(Math.sin(Math.atan2(z, x) * 30)), 6));
+    else if (j <= jTop + 3) c.copy(mar);
+    else c.copy(t0).lerp(t1, S(r, 0.1, 0.55)).lerp(mar, S(r, 0.56, 0.66) * 0.8); });
+  const cap = lined(new THREE.Mesh(ni(geo), vmat({ side: THREE.DoubleSide })), 0.011); g.add(cap);
+  const pg = starGeo({ arms: 8, cIn: '#F2E27A', cOut: '#FFFFFF', mouth: '#6E9A22', stem: 1.9, stemW: 0.16, cStem: '#CFC47A', tilt: 1.15, w: 0.105, curl: 0.35 }); pg.scale(0.027, 0.027, 0.027);
+  const items = [], N = 560;
+  for (let k = 0; k < N; k++) { const a = k * 2.39996, r = 0.06 + Math.sqrt((k + 0.5) / N) * 0.56, x = Math.cos(a) * r, z = Math.sin(a) * r, e = 0.01;
+    const q = bend(x, topY(r), z), nx = bend(x + e, topY(Math.hypot(x + e, z)), z).sub(q), nz = bend(x, topY(Math.hypot(x, z + e)), z + e).sub(q), nn = new THREE.Vector3().crossVectors(nz, nx).normalize(); if (nn.y < 0) nn.negate();
+    items.push({ p: q, d: nn.lerp(UP, 0.25).normalize(), s: 0.85 + rnd() * 0.4, ph: rnd() * 6.28, r }); }
+  function topY(r) { return r < 0.12 ? 0.45 + (r / 0.12) * 0.005 : r < 0.3 ? 0.455 + (r - 0.12) / 0.18 * 0.02 : r < 0.5 ? 0.475 + (r - 0.3) / 0.2 * 0.015 : 0.49 - (r - 0.5) / 0.14 * 0.005; }
+  const f = field(pg, vmat({ emissive: '#2A2400' }), items); g.add(f); g.userData = { t: 0, f };
   animateLeather(g, 0); return g;
 }
 function animateLeather(g, dt) { const u = g.userData; u.t += dt;
-  updField(u.f, u.t, (it, t) => [Math.sin(t * 1.6 + it.ph) * 0.18, 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.45 - it.r * 4))]);
+  updField(u.f, u.t, (it, t) => [Math.sin(t * 1.4 + it.ph) * 0.16, 0.35 + 0.65 * THREE.MathUtils.smoothstep(Math.sin(t * 0.5 - it.r * 5), -1.0, -0.3)]);
 }
 
 // 2 CARNATION TREE CORAL (Dendronephthya): see-through pink trunk, branches ending in bright magenta polyp bunches
@@ -181,7 +187,7 @@ function animateBubbleTip(g, dt) { const u = g.userData; u.t += dt; const t = u.
 }
 
 export const SOFT3D = [
-  { en: 'Toadstool leather coral', de: 'Lederkoralle (Sarcophyton)', make: makeLeather, anim: animateLeather, cam: [-2.2, 1.9, -2.8], target: [0, 0.25, 0] },
+  { en: 'Toadstool leather coral', de: 'Lederkoralle (Sarcophyton)', make: makeLeather, anim: animateLeather, cam: [-1.9, 1.7, -2.4], target: [0, 0.3, 0] },
   { en: 'Carnation tree coral', de: 'Bäumchenweichkoralle (Dendronephthya)', make: makeTreeCoral, anim: animateTree, cam: [-2.7, 1.6, -3.4], target: [0, 0.7, 0] },
   { en: 'Pulsing Xenia', de: 'Pumpende Xenia', make: makeXenia, anim: animateXenia, cam: [-1.05, 0.95, -1.35], target: [0, 0.24, 0] },
   { en: 'Sea whips', de: 'Peitschenkorallen', make: makeWhips, anim: animateWhips, cam: [-2.6, 1.4, -3.2], target: [0, 0.65, 0] },
