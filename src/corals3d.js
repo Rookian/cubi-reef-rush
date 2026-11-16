@@ -134,34 +134,49 @@ function animateBubble(g, dt) { const u = g.userData; u.t += dt; u.items.forEach
   _m.compose(it.p, _q, _s.set(s, s * 0.92, s)); u.bm.setMatrixAt(i, _m); _m.compose(it.p, _q, _s.set(s + 0.012, s * 0.92 + 0.012, s + 0.012)); u.hm.setMatrixAt(i, _m); });
   u.bm.instanceMatrix.needsUpdate = u.hm.instanceMatrix.needsUpdate = true; }
 
-// 7 MUSHROOM CORAL (Fungia): free-living oval discs with fine radial ridges
-function mushroomDisc(a, b, cA, cB) {
-  const seg = 180, rings = 14, geo = new THREE.PlaneGeometry(1, 1, seg, rings), p = geo.attributes.position;
-  const ridge = new Float32Array(p.count);
-  for (let i = 0; i < p.count; i++) { const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5, ang = u * Math.PI * 2, x = Math.cos(ang) * v * a, z = Math.sin(ang) * v * b;
-    const rr = Math.max(0, Math.abs(Math.sin(ang * 34))); ridge[i] = rr * Math.min(1, v * 3); const y = 0.14 * (1 - v * v) + 0.025 * ridge[i] - (Math.abs(z) < 0.03 && v < 0.35 ? 0.03 : 0);
-    p.setXYZ(i, x, y, z); }
-  geo.computeVertexNormals(); const c0 = new THREE.Color(cA), c1 = new THREE.Color(cB); let i = 0;
-  paint(geo, (c, x, y, z) => { const v = Math.hypot(x / a, z / b); c.copy(c0).lerp(c1, ridge[i++] * 0.8); if (v > 0.85) c.lerp(new THREE.Color('#E8F0B0'), 0.5); if (v < 0.3 && Math.abs(z) < 0.035) c.set('#3A2A3A'); });
+// 7 MUSHROOM CORAL (Fungia): thick, free-living oval discs lying on the sand; fine radial septa run from a central mouth slit to the rim
+function mushroomDisc(a, b, cIn, cOut, cRidge, ph, hull) {
+  const seg = 432, N = 36, H = 0.11, S = THREE.MathUtils.smoothstep;
+  const prof = []; for (let k = 0; k <= 18; k++) { const v = k / 18; prof.push([v, H * (1 - 0.8 * Math.pow(v, 2.4)), 1]); }
+  const yR = H * 0.2; prof.push([1.035, yR - 0.022, 0.5], [1.02, yR - 0.045, 0], [0.9, yR - 0.06, 0], [0.5, yR - 0.062, 0], [0, yR - 0.062, 0]);
+  const rings = prof.length - 1, geo = new THREE.PlaneGeometry(1, 1, seg, rings), p = geo.attributes.position, ridge = new Float32Array(p.count), vv = new Float32Array(p.count), top = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) { const u = p.getX(i) + 0.5, j = Math.round((0.5 - p.getY(i)) * rings), [v, y0, tp] = prof[j], ang = u * Math.PI * 2;
+    const wob = 1 + 0.045 * Math.sin(ang * 2 + ph) + 0.03 * Math.sin(ang * 3 + ph * 2), x = Math.cos(ang) * v * a * wob, z = Math.sin(ang) * v * b * wob;
+    const prim = Math.pow(0.5 + 0.5 * Math.cos(ang * N), 3), sec = Math.pow(0.5 + 0.5 * Math.cos(ang * N + Math.PI), 3) * S(v, 0.4, 0.6) * 0.75;
+    const r = Math.max(prim, sec) * S(v, 0.06, 0.25) * tp, slit = Math.exp(-Math.pow(z / 0.022, 2)) * (1 - S(Math.abs(x) / a, 0.2, 0.34)) * tp;
+    ridge[i] = r; vv[i] = v; top[i] = tp + slit * 10;
+    if (hull) p.setXYZ(i, x * 1.035, y0 + (tp ? 0.012 : -0.008), z * 1.035); else p.setXYZ(i, x, y0 + 0.02 * r * (1 + 0.25 * Math.sin(v * 40 + ang * 7)) - 0.035 * slit, z); }
+  geo.deleteAttribute('uv'); geo.computeVertexNormals(); if (hull) return geo;
+  const c0 = new THREE.Color(cIn), c1 = new THREE.Color(cOut), cr = new THREE.Color(cRidge), under = new THREE.Color('#E8DCC0'), mouth = new THREE.Color('#3A2440'); let n = 0;
+  paint(geo, (c) => { const i = n++; c.copy(c0).lerp(c1, S(vv[i], 0.35, 0.95)).lerp(cr, ridge[i] * 0.75); if (top[i] < 0.5) c.lerp(under, 0.8); if (top[i] > 1.5) c.lerp(mouth, Math.min(1, (top[i] - 1) / 6)); });
   return geo;
 }
 function makeMushroom() {
   const g = new THREE.Group();
-  [[0, 0, 0, 0.42, 0.3, '#8A5AA8', '#D8B8F0', 0.2], [0.55, 0, 0.3, 0.3, 0.22, '#7A8A4A', '#D8F0A0', 1.4], [-0.5, 0, 0.35, 0.26, 0.2, '#A86A4A', '#F4C8A0', 2.6]].forEach(([x, y, z, a, b, cA, cB, r]) => {
-    const m = lined(new THREE.Mesh(mushroomDisc(a, b, cA, cB), vmat({ side: THREE.DoubleSide })), 0.01); m.position.set(x, y, z); m.rotation.y = r; g.add(m); });
+  [[0, 0.01, 0, 0.4, 0.33, '#5E8A4A', '#B86AA8', '#F2E8C8', 0.3, 0.2, 0.05],
+   [0.58, 0, 0.22, 0.27, 0.24, '#A8643A', '#E0A060', '#FFF0D0', 1.7, 1.4, -0.08],
+   [-0.5, 0.02, 0.3, 0.46, 0.17, '#7A6AB8', '#C8B0F0', '#F6F0FF', 2.9, 2.5, 0.1],
+   [0.12, 0.0, 0.52, 0.2, 0.18, '#3E8A7A', '#A8E0C0', '#F0FFF0', 4.4, 0.9, -0.06]].forEach(([x, y, z, a, b, cI, cO, cR, ph, r, tilt]) => {
+    const m = new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph), vmat({ side: THREE.DoubleSide })); m.add(new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph, true), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.FrontSide })));
+    m.position.set(x, y + 0.05, z); m.rotation.set(tilt, r, tilt * 0.6); g.add(m); });
   return g;
 }
 
-// 8 PURPLE PORE CORAL (Montipora): tiers of purple shelves with pale rims and tiny pores
+// 8 PURPLE PORE CORAL (Montipora): deep-purple plates spiralling up like a rose, thin lavender growing edge, tiny pores
 function makePurplePore() {
-  seed = 31; const g = new THREE.Group();
-  const lump = new THREE.SphereGeometry(0.4, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2); lump.scale(1, 0.5, 0.9); g.add(lined(new THREE.Mesh(solid(lump, '#6A3A9A'), vmat({ map: poreTex() }))));
-  [[0, 0.14, 0, 0.62, 0], [0.18, 0.3, -0.1, 0.46, 1.2], [-0.16, 0.42, 0.12, 0.36, 2.3], [0.06, 0.54, 0.02, 0.26, 3.1]].forEach(([x, y, z, r, rot]) => {
-    const sh = new THREE.CylinderGeometry(r, r * 0.9, 0.045, 48); const p = sh.attributes.position;
-    for (let i = 0; i < p.count; i++) { const px = p.getX(i), pz = p.getZ(i), a = Math.atan2(pz, px), k = 1 + 0.12 * Math.sin(a * 4 + rot) + 0.05 * Math.sin(a * 11); if (Math.hypot(px, pz) > r * 0.3) { p.setX(i, px * k); p.setZ(i, pz * k); } p.setY(i, p.getY(i) + Math.hypot(px, pz) * 0.12 * Math.sin(a * 2 + rot)); }
-    sh.computeVertexNormals();
-    paint(sh, (c, px, py, pz) => c.set('#7A3AC0').lerp(new THREE.Color('#E8C8FF'), Math.max(0, Math.hypot(px, pz) / r - 0.7) * 2.5));
-    const m = lined(new THREE.Mesh(sh, vmat({ map: poreTex() })), 0.012); m.position.set(x, y, z); m.rotation.y = rot; g.add(m); });
+  seed = 31; const g = new THREE.Group(), S = THREE.MathUtils.smoothstep;
+  const c0 = new THREE.Color('#34145E'), c1 = new THREE.Color('#5A26A0'), c2 = new THREE.Color('#A07ADC');
+  const rimMat = new THREE.MeshBasicMaterial({ color: OUT }), mat = vmat({ map: poreTex(), side: THREE.DoubleSide });
+  for (let k = 0; k < 8; k++) { const a0 = k * 2.25, arc = 3.5 - k * 0.12, r0 = 0.04, r1 = 0.66 - k * 0.065, y0 = 0.04 + k * 0.05, rise = 0.14 + k * 0.035, ph = rnd() * 6;
+    const geo = new THREE.PlaneGeometry(1, 1, 64, 12), p = geo.attributes.position, uv = geo.attributes.uv, vs = new Float32Array(p.count), rim = [];
+    for (let i = 0; i < p.count; i++) { const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5, ang = a0 + u * arc, taper = 0.12 + 0.88 * Math.pow(Math.sin(Math.PI * u), 0.55);
+      const R = (r0 + (r1 - r0) * v * taper) * (1 + 0.07 * Math.sin(ang * 5 + ph) * v), y = y0 + rise * Math.pow(v, 1.6) * taper + 0.035 * Math.sin(ang * 4 + ph) * v * v;
+      p.setXYZ(i, Math.cos(ang) * R, y, Math.sin(ang) * R); uv.setXY(i, u * arc * 2.2, v * 2.4); vs[i] = v; if (v > 0.999) rim.push(V(Math.cos(ang) * R, y, Math.sin(ang) * R)); }
+    geo.computeVertexNormals(); let n = 0; paint(geo, (c) => { const v = vs[n++]; c.copy(c0).lerp(c1, S(v, 0.15, 0.8)).lerp(c2, S(v, 0.86, 1)); });
+    g.add(new THREE.Mesh(geo, mat)); rim.sort((A, B) => Math.atan2(A.z, A.x) - Math.atan2(B.z, B.x));
+    const ordered = []; for (let i = 0; i < p.count; i++) if (vs[i] > 0.999) ordered.push(V(p.getX(i), p.getY(i), p.getZ(i)));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ordered), 90, 0.0065, 5, false), rimMat)); }
+  const lump = new THREE.SphereGeometry(0.3, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2); lump.scale(1, 0.4, 1); g.add(lined(new THREE.Mesh(solid(lump, '#34145E'), vmat({ map: poreTex() })), 0.01));
   return g;
 }
 
@@ -234,14 +249,26 @@ function makeFireCoral() {
   return g;
 }
 
-// 11 FINGER CORAL (Porites cylindrica): cluster of blunt cream fingers with pastel tips
+// 11 FINGER CORAL (Porites cylindrica): dense clump of knobby, gently bent fingers that fork near the top, olive base fading to creamy tips
+function fingerGeo(len, R, bendAmt, ph) {
+  const pts = [], n = 16; for (let k = 0; k <= n; k++) { const t = k / n; pts.push(new THREE.Vector2(R * (1 - 0.22 * t) * (1 + 0.09 * Math.sin(t * 8 + ph) + 0.05 * Math.sin(t * 17 + ph * 2)), len * t)); }
+  const rt = pts[n].x; for (let k = 1; k <= 6; k++) { const a = k / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rt * Math.cos(a)), len + rt * 0.9 * Math.sin(a))); }
+  const g = new THREE.LatheGeometry(pts, 14), p = g.attributes.position, top = len + rt;
+  for (let i = 0; i < p.count; i++) { const t = p.getY(i) / top; p.setX(i, p.getX(i) + bendAmt * t * t * len); }
+  g.computeVertexNormals();
+  const c0 = new THREE.Color('#7E7434'), c1 = new THREE.Color('#C9C25A'), c2 = new THREE.Color('#F6F2BE');
+  paint(g, (c, x, y) => { const t = Math.max(0, Math.min(1, y / top)); c.copy(c0).lerp(c1, Math.min(1, t * 1.8)).lerp(c2, Math.max(0, (t - 0.6) / 0.4)); });
+  return g.toNonIndexed();
+}
 function makeFinger() {
   seed = 47; const parts = [];
-  const finger = (p, d, len, r, depth) => { const c = new THREE.CapsuleGeometry(r, len, 4, 10); c.translate(0, len / 2, 0); parts.push(place(c, p, d)); if (depth > 0 && rnd() < 0.6) { const e = p.clone().addScaledVector(d, len * 0.6); finger(e, bend(d, 0.5 + rnd() * 0.3, 0.4), len * 0.7, r * 0.9, depth - 1); } };
-  for (let k = 0; k < 15; k++) { const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.35; finger(V(Math.cos(a) * r, 0, Math.sin(a) * r), V(Math.cos(a) * r * 1.3 + (rnd() - 0.5) * 0.3, 1, Math.sin(a) * r * 1.3 + (rnd() - 0.5) * 0.3), 0.3 + rnd() * 0.35, 0.06 + rnd() * 0.02, 1); }
-  const geo = mergeGeometries(parts.map(p => p.toNonIndexed())); geo.computeBoundingBox(); const top = geo.boundingBox.max.y;
-  const a = new THREE.Color('#D8C08A'), b = new THREE.Color('#B8D8F4'); paint(geo, (c, x, y) => c.copy(a).lerp(b, Math.pow(Math.max(0, Math.min(1, y / top)), 1.8)));
-  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat({ map: poreTex() })), 0.012)); return g;
+  const finger = (p, d, len, R, depth) => { const bendAmt = (rnd() - 0.5) * 0.35, g = fingerGeo(len, R, bendAmt, rnd() * 6); g.rotateY(rnd() * 6.28); parts.push(place(g, p, d));
+    if (depth > 0 && rnd() < 0.7) { const n = rnd() < 0.35 ? 2 : 1; for (let k = 0; k < n; k++) finger(p.clone().addScaledVector(d, len * (0.45 + rnd() * 0.2)), bend(d, 0.45 + rnd() * 0.3, 0.35), len * (0.5 + rnd() * 0.2), R * 0.85, depth - 1); } };
+  for (let k = 0; k < 24; k++) { const a = k * 2.39996, r = Math.sqrt((k + 0.5) / 24) * 0.36, lean = r * 1.5;
+    finger(V(Math.cos(a) * r, 0.03, Math.sin(a) * r), V(Math.cos(a) * lean + (rnd() - 0.5) * 0.2, 1, Math.sin(a) * lean + (rnd() - 0.5) * 0.2), (0.62 - r * 0.9) * (0.8 + rnd() * 0.4), 0.05 + rnd() * 0.018, 1); }
+  const mound = new THREE.SphereGeometry(0.44, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2); mound.scale(1, 0.3, 1); parts.push(solid(mound.toNonIndexed(), '#7E7434'));
+  const geo = mergeGeometries(parts);
+  const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat({ map: poreTex() })), 0.01)); return g;
 }
 
 const still = () => {};
