@@ -165,23 +165,39 @@ function makePurplePore() {
   return g;
 }
 
-// 9 ORANGE CUP CORAL (Tubastraea): bright orange cups with yellow polyp crowns that open and close
+// 9 ORANGE CUP CORAL (Tubastraea): squat, ribbed orange cups packed on a rock; at night-like moments they bloom into fluffy yellow polyp flowers
+function cupGeo(R, h, seedA) {   // short barrel with fine ribs, flared lip and a hollow mouth
+  const pr = [[R * 0.85, 0], [R * 0.95, h * 0.3], [R, h * 0.7], [R * 1.12, h * 0.95], [R * 1.08, h * 1.02], [R * 0.86, h * 1.0], [R * 0.6, h * 0.86], [0.0001, h * 0.8]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.LatheGeometry(new THREE.SplineCurve(pr).getPoints(22), 40), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), r = Math.hypot(x, z), an = Math.atan2(z, x), y = p.getY(i), outer = y < h * 0.97 && r > R * 0.8 ? 1 : 0;
+    const k = 1 + outer * 0.045 * Math.max(0, Math.cos(an * 18)) + (y > h * 0.9 && r < R * 0.95 ? 0.05 * Math.cos(an * 18) : 0); p.setX(i, x * k); p.setZ(i, z * k); }
+  g.computeVertexNormals();
+  const dark = new THREE.Color('#B8360E'), mid = new THREE.Color('#F2601A'), lip = new THREE.Color('#FF9A3A'), mouth = new THREE.Color('#E8A020');
+  paint(g, (c, x, y, z) => { const r = Math.hypot(x, z); c.copy(dark).lerp(mid, Math.min(1, y / (h * 0.6))); if (y > h * 0.88) c.lerp(lip, 0.7); if (r < R * 0.7 && y > h * 0.75) c.copy(mouth); });
+  g.deleteAttribute('uv'); return g.toNonIndexed();
+}
 function makeCupCoral() {
   seed = 37; const g = new THREE.Group();
-  const rock = new THREE.SphereGeometry(0.4, 20, 12); rock.scale(1, 0.45, 0.85); g.add(lined(new THREE.Mesh(rock, cmat('#6A5A5A'))));
+  const rock = new THREE.IcosahedronGeometry(0.4, 3), rp = rock.attributes.position;
+  for (let i = 0; i < rp.count; i++) { const k = 0.85 + vnoise(rp.getX(i) * 5, rp.getY(i) * 5, rp.getZ(i) * 5) * 0.3; rp.setXYZ(i, rp.getX(i) * k * 1.1, rp.getY(i) * k * 0.5, rp.getZ(i) * k * 0.9); }
+  rock.computeVertexNormals(); g.add(lined(new THREE.Mesh(rock, cmat('#5E5260'))));
   const cups = [], parts = [];
-  for (let k = 0; k < 14; k++) { const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 0.3, h = 0.1 + rnd() * 0.16, d = V(Math.cos(a) * r * 1.2, 1, Math.sin(a) * r * 1.2).normalize(), base = V(Math.cos(a) * r, 0.12 - r * 0.2, Math.sin(a) * r);
-    const c = new THREE.CylinderGeometry(0.065, 0.07, h, 14, 1, true); c.translate(0, h / 2, 0); parts.push(place(c, base, d)); const top = base.clone().addScaledVector(d, h);
-    const disc = new THREE.CircleGeometry(0.06, 14); disc.rotateX(-Math.PI / 2); parts.push(place(disc, top, d)); cups.push({ top, d }); }
-  g.add(lined(new THREE.Mesh(mergeGeometries(parts.map(p => { p.deleteAttribute('uv'); return p.toNonIndexed(); })), cmat('#FF6A12', { emissive: '#5A1A00', side: THREE.DoubleSide })), 0.01));
-  const T = 12, tm = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.012, 0.07, 2, 5).translate(0, 0.045, 0), cmat('#FFC23A', { emissive: '#6A3A00' }), cups.length * T);
+  for (let k = 0; k < 22; k++) { const a = k * 2.39996, r = Math.sqrt((k + 0.5) / 22) * 0.34, R = 0.05 + rnd() * 0.025, h = 0.06 + rnd() * 0.06;
+    const base = V(Math.cos(a) * r, 0.18 * Math.sqrt(Math.max(0, 1 - (r / 0.42) ** 2)) - 0.01, Math.sin(a) * r), d = V(Math.cos(a) * r * 1.6, 1, Math.sin(a) * r * 1.6).normalize();
+    parts.push(place(cupGeo(R, h), base, d)); cups.push({ top: base.clone().addScaledVector(d, h * 0.86), d, R, ph: rnd() * 6.28 }); }
+  g.add(lined(new THREE.Mesh(mergeGeometries(parts), vmat({ emissive: '#3A0E00' })), 0.008));
+  // polyp crown: 20 tapered tentacles with pale knobby tips around a little orange mouth disc
+  const tg = new THREE.LatheGeometry([[0.008, 0], [0.007, 0.03], [0.005, 0.06], [0.008, 0.07], [0.006, 0.078], [0.0001, 0.082]].map(([x, y]) => new THREE.Vector2(x, y)), 6);
+  paint(tg, (c, x, y) => c.set('#FFC22E').lerp(new THREE.Color('#FFF2B0'), Math.max(0, (y - 0.055) / 0.025)));
+  const T = 20, tm = new THREE.InstancedMesh(tg, vmat({ emissive: '#5A3000' }), cups.length * T);
   g.add(tm); g.userData = { cups, tm, T, t: 0 }; animateCup(g, 0);
   return g;
 }
 function animateCup(g, dt) { const u = g.userData; u.t += dt; let i = 0;
-  u.cups.forEach((c, k) => { const open = 0.55 + 0.45 * Math.sin(u.t * 0.8 + k); const q0 = new THREE.Quaternion().setFromUnitVectors(UP, c.d);
-    for (let j = 0; j < u.T; j++) { const a = j / u.T * Math.PI * 2, tilt = 0.3 + open * 0.9; const dir = V(Math.cos(a) * Math.sin(tilt), Math.cos(tilt), Math.sin(a) * Math.sin(tilt)).applyQuaternion(q0);
-      _m.compose(c.top.clone().addScaledVector(V(Math.cos(a), 0, Math.sin(a)).applyQuaternion(q0), 0.045), _q.setFromUnitVectors(UP, dir), _s.set(1, 0.4 + open * 0.8, 1)); u.tm.setMatrixAt(i++, _m); } });
+  u.cups.forEach((c) => { const open = THREE.MathUtils.smoothstep(Math.sin(u.t * 0.5 + c.ph), -0.6, 0.6); const q0 = new THREE.Quaternion().setFromUnitVectors(UP, c.d);
+    for (let j = 0; j < u.T; j++) { const a = j / u.T * Math.PI * 2 + (j % 2) * 0.15, tilt = 0.25 + open * (j % 2 ? 1.0 : 1.35) + Math.sin(u.t * 2 + j + c.ph) * 0.08;
+      const dir = V(Math.cos(a) * Math.sin(tilt), Math.cos(tilt), Math.sin(a) * Math.sin(tilt)).applyQuaternion(q0), sc = (c.R / 0.06) * (0.25 + open * 0.95) * (j % 2 ? 0.8 : 1);
+      _m.compose(c.top.clone().addScaledVector(V(Math.cos(a), 0, Math.sin(a)).applyQuaternion(q0), c.R * 0.55), _q.setFromUnitVectors(UP, dir), _s.set(c.R / 0.06, sc, c.R / 0.06)); u.tm.setMatrixAt(i++, _m); } });
   u.tm.instanceMatrix.needsUpdate = true; }
 
 // 10 FIRE CORAL (Millepora dichotoma): upright fans of thin, flattened, forking branches fused into a net, mustard with white tips
