@@ -3,6 +3,7 @@ import * as M from './models.js';
 import * as RF from './reef.js';
 import * as CR from './critters.js';
 import * as F3 from './fish3d.js';
+import * as C3 from './critters3d.js';
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
 import * as LB from './leaderboard.js';
@@ -238,7 +239,7 @@ const KINDS = {
   clam: { make: () => pick([() => M.makeClam(), () => M.makeClam('#5FD3C8', '#D4FFF8', '#13504B'), () => M.makeClam('#FF9A6B', '#FFE0D0', '#7A2E14')])(), shape: () => [] },
   arch: { make: () => M.makeArch(1, ri(1, 9)), shape: () => [] },
   vent: { make: () => M.makeVent(), shape: () => [] },
-  turtle: { make: () => M.makeTurtle(), shape: () => [] },
+  turtle: { make: () => wrapC(C3.makeSeaTurtle(Math.random() < 0.5 ? 'green' : 'hawksbill'), C3.animateSeaTurtle), shape: () => [] },
   school: { make: () => { const g = F3.makeSchool3D(); M.animateSchool(g, 0.016); return g; }, shape: () => [] },
   wall: { make: () => RF.makeReefWall(ri(1, 999), false), shape: () => [] },
   mound: { make: () => RF.makeReefMound(ri(1, 9999), 1), shape: () => [] },
@@ -265,7 +266,10 @@ const KINDS = {
   debris: { make: () => RF.makeDebris(ri(0, 89)), shape: () => [] },
   seagrass: { make: () => RF.makeSeagrass(ri(0, 50), rf(1.1, 1.8), ri(110, 170)), shape: () => [] },
   grazer: { make: () => CR.makeGrazer(ri(0, 7)), shape: () => [] },
-  shrimp: { make: () => CR.makeShrimp(ri(0, 3)), shape: () => [] },
+  shrimp: { make: () => wrapC(C3.makeCoralShrimp(), C3.animateCoralShrimp, 0.42, 0, 25), shape: () => [] },
+  octopus: { make: () => wrapC(C3.makeOctopus(), C3.animateOctopus, 0.8, 0, 28), shape: () => [] },
+  featherstar: { make: () => wrapC(C3.makeFeatherStar(ri(0, 2)), C3.animateFeatherStar, 0.9, 0, 22), shape: () => [] },
+  bloodstar: { make: () => wrapC(C3.makeBloodStar(), C3.animateBloodStar, 0.75, 0, 22), shape: () => [] },
   magnifica: { make: () => anemK(RF.makeMagnifica(ri(0, 3), rf(1.5, 2.0))), shape: () => [] },
   gigantea: { make: () => anemK(RF.makeGigantea(ri(0, 3), rf(1.6, 2.1))), shape: () => [] },
   mertensii: { make: () => anemK(RF.makeMertensii(ri(0, 3), rf(1.4, 1.8))), shape: () => [] },
@@ -289,7 +293,7 @@ const KINDS = {
   anemone: { make: () => { const c = pick([['#9B6BE8', '#D9B8FF', '#3E2370'], ['#FF7FB8', '#FFD0EA', '#7A1F3D'], ['#5FCF8A', '#D4FFE4', '#1F5A3A']]); return M.makeAnemone(...c); }, shape: () => [] },
   jelly: { make: () => pick([() => M.makeJelly(), () => M.makeJelly('#C7A4FF', '#3E2370', '#E9DCFF')])(), shape: () => [sph(0.15, 0.55), cap(-0.15, -1.0, 0.25)] },
   puffer: { make: () => puffer3D(), shape: () => [] },
-  urchin: { make: () => M.makeUrchin(), shape: s => [sph(0.3 * s, 0.5 * s)] },
+  urchin: { make: () => wrapC(C3.makeLongSpineUrchin(), C3.animateLongSpineUrchin, 0.62, 0, 30), shape: s => [sph(0.3 * s, 0.5 * s)] },
   pearl: { make: () => M.makePearl(), shape: () => [] },
   shark: { make: () => M.makeShark(), shape: () => [] },
 };
@@ -305,10 +309,12 @@ function puffer3D() { const g = new THREE.Group(), turn = new THREE.Group(); tur
   const a = F3.makeFish3D(F3.design('Blackspotted puffer (yellow)'), 0.8), b = F3.makeFish3D(F3.design('Blackspotted puffer, puffed up'), 1); turn.add(a, b); g.userData = { a, b }; setPuff3D(g, 0); return g; }
 function setPuff3D(g, k) { const { a, b } = g.userData; a.visible = k < 0.3; b.visible = !a.visible; a.scale.setScalar(0.8 * (1 + k * 0.8)); b.scale.setScalar(0.62 + 0.5 * k); }
 // any reviewed 3D design as a scene object (lift: raise ground dwellers so they rest on the sand)
+// a reviewed hand-built model (critters3d.js) with its own animation; animated only when near (far = z beyond -far)
+function wrapC(m, anim, size = 1, lift = 0, far = 45) { const g = new THREE.Group(); m.scale.setScalar(size); m.position.y = lift; g.add(m); g.userData.c3 = { m, anim, far }; return g; }
 function wrap3D(name, size, lift = 0) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), size); f.position.y = lift; g.add(f); g.userData.f3 = f; return g; }
 function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), 2.1); g.add(f); g.userData = f.userData; return g; }
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
-const NOGLOW = ['stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
+const NOGLOW = ['turtle', 'shrimp', 'octopus', 'featherstar', 'bloodstar', 'urchin', 'stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
   if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
@@ -528,6 +534,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.45) spawn('seagrass', side * rf(3.8, 9), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) });
   if (Math.random() < 0.18) spawn('seagrass', rf(-3, 3), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.6, 0.85) });
   // reef residents from the design review: ground dwellers rest on the sand, lionfish and squid hover, dolphins pass by high up
+  for (const [k, p, a, b] of [['octopus', 0.022, 3.2, 5.5], ['featherstar', 0.04, 3.4, 6.5], ['bloodstar', 0.045, 2.6, 5.5]]) if (Math.random() < p) spawn(k, side * rf(a, b), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
   for (const [k, p] of [['scorpion', 0.06], ['croco', 0.04], ['flounder', 0.05], ['snakeeel', 0.04], ['catshark', 0.04]]) if (Math.random() < p) spawn(k, side * rf(2.8, 5.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
   if (Math.random() < 0.06) spawn('lionfish', side * rf(3.6, 5.4), rf(1.0, 2.4), z + rf(-2, 2), { solid: false, ry: side * rf(1.2, 1.9) });
   if (Math.random() < 0.035) { const n = 2 + Math.floor(Math.random() * 3), y0 = rf(3.2, 5); for (let k = 0; k < n; k++) spawn('squid', side * rf(4, 6) + k * 0.5, y0 + rf(-0.3, 0.3), z + k * 0.7, { solid: false, ry: side * Math.PI / 2 }); }
@@ -538,7 +545,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.45) spawn('rubble', side * rf(2.8, 7), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) });
   if (Math.random() < 0.2) spawn('rubble', rf(-2.6, 2.6), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.7, 1.0) });
   if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
-  if (Math.random() < 0.16) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
+  if (Math.random() < 0.07) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
@@ -565,8 +572,8 @@ function spawnItem(it, z) {
     }
     case 'shark': spawn('shark', x, y, z - 6, { vz: 4, shark: true }); break;
     case 'decor': {
-      const SC = { scorpion: 1, croco: 1, flounder: 1, snakeeel: 1, catshark: 1, lionfish: 1, squid: 1, stingray: 1.3, gorgonian: 1.2, rubble: 1, xmas: 1.25, star: 1.3, shrimp: 1.8, debris: 1.05, seagrass: 1.1, clam: 1, sponge: 0.9, mushroom: 0.9, crab: 1, nudi: 1.8, kelp: 1 };
-      const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'squid', 'stingray', 'gorgonian', 'rubble'].includes(it.kind) ? it.kind : 'magnifica';
+      const SC = { octopus: 1, featherstar: 1, bloodstar: 1, scorpion: 1, croco: 1, flounder: 1, snakeeel: 1, catshark: 1, lionfish: 1, squid: 1, stingray: 1.3, gorgonian: 1.2, rubble: 1, xmas: 1.25, star: 1.3, shrimp: 1.8, debris: 1.05, seagrass: 1.1, clam: 1, sponge: 0.9, mushroom: 0.9, crab: 1, nudi: 1.8, kelp: 1 };
+      const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp', 'octopus', 'featherstar', 'bloodstar', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'squid', 'stingray', 'gorgonian', 'rubble'].includes(it.kind) ? it.kind : 'magnifica';
       spawn(k, x, 0, z, { solid: false, ry: rf(0, 6), scale: SC[k] ?? 1, xmas: k === 'xmas', keepKind: true });
       break;
     }
@@ -1083,6 +1090,7 @@ function step(dt) {
     if (o.kind === 'shark') updateShark(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
     if (o.kind === 'anemone' && o.z > -40 && o.z < 10) M.animateAnemone(o.mesh, dt);
+    { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt); }
     if (o.mesh.userData.f3 && o.z > -45 && o.z < 12) F3.animateFish3D(o.mesh.userData.f3, dt);
     if (o.mesh.userData.anem && o.z > -40 && o.z < 10) RF.animateAnemone(o.mesh, dt, Math.abs(o.z) < 3.2 && Math.abs(o.x - P.x) < 2.8 && P.y < 3.2);
     if (o.xmas && o.z > -30) RF.animateXmas(o.mesh, dt, Math.abs(o.z) < 4.5 && Math.abs(o.x - P.x) < 3.6 && P.y < 3.4);
@@ -1099,7 +1107,6 @@ function step(dt) {
     }
     if (o.z > -48) {
       if (o.kind === 'school') M.animateSchool(o.mesh, dt);
-      else if (o.kind === 'turtle') M.animateTurtle(o.mesh, dt);
       else if (o.kind === 'clam') M.animateClam(o.mesh, dt);
       else if (o.kind === 'vent') M.animateVent(o.mesh, dt);
       else if (o.kind === 'crab') RF.animateCrab(o.mesh, dt);
@@ -1109,7 +1116,6 @@ function step(dt) {
       else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
       else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
       else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
-      else if (o.kind === 'shrimp' && o.z > -25) CR.animateShrimp(o.mesh, dt);
       else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, dt);
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
     }

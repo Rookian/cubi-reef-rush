@@ -67,6 +67,7 @@ const DE = {
   'Reef shark (crosses)': 'Riffhai (kreuzt)', 'Reef shark': 'Riffhai', 'Reef shark!': 'Riffhai!', 'Bonk! Reef shark!': 'Bonk! Riffhai!', 'Type': 'Typ', 'Blacktip': 'Schwarzspitze', 'Whitetip': 'Weißspitze',
   'Blue-spotted stingray': 'Blaupunktrochen', 'Sea fan': 'Fächerkoralle', 'Dead coral': 'Tote Korallen',
   'Scorpionfish': 'Skorpionsfisch', 'Crocodilefish': 'Krokodilfisch', 'Peacock flounder': 'Pfauenbutt', 'Banded snake eel': 'Ringel-Schlangenaal', 'Coral catshark': 'Korallen-Katzenhai', 'Lionfish': 'Rotfeuerfisch', 'Bigfin reef squid': 'Großflossen-Riffkalmar', 'Dolphins': 'Delfine',
+  'Octopus': 'Krake (Oktopus)', 'Feather star': 'Haarstern', 'Blood star': 'Blutstern',
   'English': 'Englisch', 'Deutsch': 'Deutsch', 'Language': 'Sprache',
 };
 const lvl = (s) => DE[s] || s;

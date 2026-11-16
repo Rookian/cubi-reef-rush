@@ -2,6 +2,7 @@
 // Same look as the fish: toon shading, dark outline, painted textures, big Cubi-style eyes.
 import * as THREE from 'three';
 import { toonGradient, outline } from './materials.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeEye, placeEye } from './models.js';
 
 const OUT = '#3B2614';
@@ -188,7 +189,7 @@ export function makeCoralShrimp() {
   const carap = new THREE.SphereGeometry(0.17, 28, 18); carap.scale(0.85, 0.8, 1.9);
   const cm = lined(new THREE.Mesh(carap, mat({ map: bandTex(WHITE, RED, 3) })), 0.012); cm.material.map.rotation = 0; cm.position.set(0, 0.32, -0.12); rig.add(cm);
   planarUV(carap, 'z', 'y');
-  for (let k = 0; k < 7; k++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.06, 6), mat({ color: WHITE })); sp.position.set(0, 0.45, -0.38 + k * 0.08); sp.rotation.x = -0.4; rig.add(sp); }
+  const spikes = []; for (let k = 0; k < 7; k++) { const sp = new THREE.ConeGeometry(0.012, 0.06, 6); sp.rotateX(-0.4); sp.translate(0, 0.45, -0.38 + k * 0.08); spikes.push(sp); } rig.add(new THREE.Mesh(mergeGeometries(spikes), mat({ color: WHITE })));
   // arched abdomen: 6 segments, red / white
   for (let k = 0; k < 6; k++) {
     const a = 0.25 + k * 0.22, r = 0.13 * (1 - k * 0.09);
@@ -197,24 +198,26 @@ export function makeCoralShrimp() {
     m.position.set(0, 0.32 - (1 - Math.cos(a)) * 0.42 + 0.02, 0.18 + Math.sin(a) * 0.42); m.rotation.x = a * 0.9; rig.add(m); segs.push(m);
   }
   const fan = new THREE.Group(); const last = segs[segs.length - 1]; fan.position.copy(last.position).add(V(0, -0.06, 0.02)); fan.rotation.x = 1.9; rig.add(fan);
-  for (const a of [-0.6, -0.2, 0.2, 0.6]) { const f = lined(new THREE.Mesh(new THREE.CircleGeometry(0.08, 14), mat({ map: bandTex(WHITE, RED, 3), side: THREE.DoubleSide })), 0.008); f.scale.set(0.5, 1, 1); f.position.set(Math.sin(a) * 0.07, -Math.cos(a) * 0.07 - 0.03, 0); f.rotation.z = a; fan.add(f); }
+  const fanM = mat({ map: bandTex(WHITE, RED, 3), side: THREE.DoubleSide });
+  for (const a of [-0.6, -0.2, 0.2, 0.6]) { const f = new THREE.Mesh(new THREE.CircleGeometry(0.08, 14), fanM); f.scale.set(0.5, 1, 1); f.position.set(Math.sin(a) * 0.07, -Math.cos(a) * 0.07 - 0.03, 0); f.rotation.z = a; fan.add(f); }
   const eyes = [];
   for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.08, 8), mat({ color: WHITE })); st.position.set(sx * 0.07, 0.42, -0.42); st.rotation.set(-0.5, 0, -sx * 0.5); rig.add(st);
     const e = eye(0.055, V(sx * 0.1, 0.46, -0.45), V(sx * 0.6, 0.3, -0.8)); rig.add(e); eyes.push(e); }
   // walking legs
-  const legM = mat({ color: WHITE });
-  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.26, 3, 6), legM); l.position.set(sx * 0.14, 0.14, -0.2 + k * 0.1); l.rotation.set(0.1, 0, sx * 0.6); rig.add(l); }
+  const legs = [], lo = new THREE.Object3D();
+  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) { lo.position.set(sx * 0.14, 0.14, -0.2 + k * 0.1); lo.rotation.set(0.1, 0, sx * 0.6); lo.updateMatrix(); legs.push(new THREE.CapsuleGeometry(0.011, 0.26, 3, 6).applyMatrix4(lo.matrix)); }
+  rig.add(new THREE.Mesh(mergeGeometries(legs), mat({ color: WHITE })));
   // big banded claws
   const clawTex = bandTex(WHITE, RED, 7), claws = [];
   for (const sx of [-1, 1]) {
     const arm = new THREE.Group(); arm.position.set(sx * 0.1, 0.26, -0.32); rig.add(arm);
-    const seg1 = lined(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.42, 10), mat({ map: clawTex })), 0.01); seg1.rotation.x = Math.PI / 2; seg1.position.z = -0.2; arm.add(seg1);
+    const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.42, 10), mat({ map: clawTex })); seg1.rotation.x = Math.PI / 2; seg1.position.z = -0.2; arm.add(seg1);
     const fore = new THREE.Group(); fore.position.set(0, 0, -0.4); arm.add(fore);
-    const seg2 = lined(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.4, 10), mat({ map: clawTex })), 0.01); seg2.rotation.x = Math.PI / 2; seg2.position.z = -0.2; fore.add(seg2);
+    const seg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.4, 10), mat({ map: clawTex })); seg2.rotation.x = Math.PI / 2; seg2.position.z = -0.2; fore.add(seg2);
     const palm = lined(new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), mat({ map: clawTex })), 0.01); palm.scale.set(0.8, 0.7, 1.8); palm.position.z = -0.46; fore.add(palm);
-    const fixed = lined(new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.16, 4, 8), mat({ color: WHITE })), 0.008); fixed.rotation.x = Math.PI / 2; fixed.position.set(0, -0.02, -0.62); fore.add(fixed);
+    const fixed = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.16, 4, 8), mat({ color: WHITE })); fixed.rotation.x = Math.PI / 2; fixed.position.set(0, -0.02, -0.62); fore.add(fixed);
     const moving = new THREE.Group(); moving.position.set(0, 0.03, -0.54); fore.add(moving);
-    const mf = lined(new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.16, 4, 8), mat({ color: RED })), 0.008); mf.rotation.x = Math.PI / 2; mf.position.z = -0.08; moving.add(mf);
+    const mf = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.16, 4, 8), mat({ color: RED })); mf.rotation.x = Math.PI / 2; mf.position.z = -0.08; moving.add(mf);
     arm.rotation.set(-0.15, -sx * 0.45, 0); fore.rotation.y = sx * 0.55;
     claws.push({ arm, fore, moving, sx });
   }

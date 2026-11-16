@@ -86,7 +86,7 @@ function parts(d) {
     (d.mouth ? `<path d="M${d.mouth[0]},${d.mouth[1]} q${5 * (d.mouthS || 1)},${6 * (d.mouthS || 1)} ${11 * (d.mouthS || 1)},${d.mouthS || 1}" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>` : ''), d.fill);
   const finTex = svgTexture((d.fins || []).join('') + (d.pec || ''));
   // median fins: one cut-out sheet in the centre plane
-  const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
+  const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, d.flap ? 40 : 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
   let pec = null;
   if (d.pec) { const [a, b, c, e] = bbox(d.pec), base = firstPt(d.pec);
     const g = new THREE.PlaneGeometry((c - a) * S, (e - b) * S); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, (a + u.getX(i) * (c - a)) / 300, 1 - (b + (1 - u.getY(i)) * (e - b)) / 200);
