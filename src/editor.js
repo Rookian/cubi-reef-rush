@@ -32,8 +32,8 @@ const TOOLS = [
 // emoji symbols for items without a picture (map + palette)
 const DECOR = [['magnifica', 'Magnificent anemone', '🪸'], ['gigantea', 'Giant carpet anemone', '🌸'], ['mertensii', "Merten's carpet anemone", '🌼'], ['heroanem', 'Fluffy anemone', '🌺'], ['xmas', 'Christmas tree worms', '🎄'],
   ['debris', 'Sunken debris', '⚓'], ['seagrass', 'Seagrass meadow', '🌿'], ['grazer', 'Turtle eating coral', '🐢'], ['shrimp', 'Shrimp', '🦐'], ['star', 'Sea star', '⭐'],
-  ['clam', 'Giant clam', '🐚'], ['sponge', 'Sponge', '🧽'], ['mushroom', 'Mushroom coral', '🍄'], ['crab', 'Crab', '🦀'], ['nudi', 'Nudibranch', '🐌'], ['kelp', 'Kelp', '🌱'], ['stingray', 'Blue-spotted stingray', '🔵'], ['gorgonian', 'Sea fan', '🎐'], ['rubble', 'Dead coral', '🦴']];
-const VISITORS = [['whaleshark', 'Whale shark', '🐋'], ['turtle', 'Sea turtle', '🐢'], ['babyturtles', 'Baby turtles', '🐣'], ['manta', 'Manta ray', '🪽']];
+  ['clam', 'Giant clam', '🐚'], ['sponge', 'Sponge', '🧽'], ['mushroom', 'Mushroom coral', '🍄'], ['crab', 'Crab', '🦀'], ['nudi', 'Nudibranch', '🐌'], ['kelp', 'Kelp', '🌱'], ['stingray', 'Blue-spotted stingray', '🔵'], ['gorgonian', 'Sea fan', '🎐'], ['rubble', 'Dead coral', '🦴'], ['scorpion', 'Scorpionfish', '🦂'], ['croco', 'Crocodilefish', '🐊'], ['flounder', 'Peacock flounder', '🫓'], ['snakeeel', 'Banded snake eel', '〰️'], ['catshark', 'Coral catshark', '🐈'], ['lionfish', 'Lionfish', '🦁'], ['squid', 'Bigfin reef squid', '🦑']];
+const VISITORS = [['whaleshark', 'Whale shark', '🐋'], ['turtle', 'Sea turtle', '🐢'], ['babyturtles', 'Baby turtles', '🐣'], ['manta', 'Manta ray', '🪽'], ['dolphin', 'Dolphins', '🐬']];
 const EMOJI = { wreckgate: '🚢', moray: '🐉', kraken: '🐙', hammer: '🦈', seasnake: '🐍', stream: '⇄', decor: '🪸', visitor: '🐋' };
 const emojiFor = (it) => it.t === 'decor' ? (DECOR.find(d => d[0] === it.kind) || DECOR[0])[2] : it.t === 'visitor' ? (VISITORS.find(d => d[0] === it.kind) || VISITORS[0])[2] : EMOJI[it.t];
 const FLOATERS = ['pearl', 'pearls', 'jelly', 'puffer', 'shark', 'hammer', 'seasnake'];
