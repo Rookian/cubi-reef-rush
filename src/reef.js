@@ -544,6 +544,8 @@ function xmasTreeGeo(pal) {
 }
 let _xmasMat = null;
 function xmasMat() { return (_xmasMat ||= new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toon('#fff').gradientMap, side: THREE.DoubleSide })); }
+// a single worm (pair of spiral trees) to plant on any coral
+export function makeXmasWorm(pal = 0) { const w = new THREE.Group(); for (const sx of [-1, 1]) { const t = new THREE.Mesh(xmasTreeGeo(pal % XMAS.length), xmasMat()); t.position.x = sx * 0.17; t.rotation.z = -sx * 0.14; w.add(t); } return w; }
 export function makeXmasRock(seed = 1) {
   const g = new THREE.Group(); const R = rng(seed * 11 + 5);
   const rock = outline(new THREE.Mesh(xf(lumpGeo(seed, 2), 0, 0.35, 0, 0.9, 0.55, 0.8), toon('#C8BC92')), 0.03, '#5A5034'); g.add(rock);
