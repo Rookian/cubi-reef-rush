@@ -261,8 +261,8 @@ function spotsAny(geo, n, R, dir, gap) {
   for (let t = 0; t < n * 80 && out.length < n; t++) { s.sample(p, nr); const ok = dir === 'up' ? nr.y > 0.3 : dir === 'down' ? nr.y < -0.4 : Math.abs(nr.y) < 0.5; if (!ok || out.some(q => q.p.distanceTo(p) < gap)) continue; out.push({ p: p.clone(), n: nr.clone() }); }
   return out;
 }
-function dress(R, geo, corals, list, n, dir, scale, lean = 0.5) {
-  spotsAny(geo, n, R, dir, 0.55).forEach(q => { const kind = pickR(R, list), v = Math.floor(R() * variants(kind)), g = baked(kind, v), k = scale * (0.8 + R() * 0.4) * SIZE[kind] / Math.max(0.6, g.userData.w);
+function dress(R, geo, corals, list, n, dir, scale, lean = 0.5, keep = null) {
+  spotsAny(geo, keep ? n * 4 : n, R, dir, 0.55).filter(q => !keep || keep(q.p)).slice(0, n).forEach(q => { const kind = pickR(R, list), v = Math.floor(R() * variants(kind)), g = baked(kind, v), k = scale * (0.8 + R() * 0.4) * SIZE[kind] / Math.max(0.6, g.userData.w);
     const nd = dir === 'down' ? q.n.clone() : q.n.clone().lerp(UP, lean).normalize();
     corals.push({ key: kind + ':' + v, m: local(q.p.x, q.p.y, q.p.z, k, R() * 6.28, nd) }); });
 }
@@ -282,7 +282,7 @@ export function makeSlabSeg(seed = 1, y0 = 2.0, y1 = 3.0, x0 = -3.6, x1 = 3.6) {
   const legs = [slab]; for (const ex of [x0, x1]) if (Math.abs(ex) > 3) { const lg = lumpC(R, 0.9, (y0 + 0.3) / 2 + 0.4, 1.4, pal, 2); lg.translate(Math.sign(ex) * 3.25, (y0 + 0.3) / 2, -SEG / 2); legs.push(lg); }
   const geo = mergeGeometries(legs);
   const corals = []; dress(R, slab, corals, ['table', 'cauli', 'brain', 'leather', 'finger', 'scroll', 'stag', 'xenia'], 5, 'up', 0.85);
-  dress(R, slab, corals, ['tree', 'tree', 'whips', 'purple'], 4, 'down', 0.6);   // tree corals hang from ceilings, as they do in real reef caves
+  dress(R, slab, corals, ['tree', 'tree', 'purple'], 3, 'down', 0.4, 0.5, (p) => Math.abs(p.x) > 2.3);   // only at the sides: the swim path under the ledge stays clear   // tree corals hang from ceilings, as they do in real reef caves
   const g = new THREE.Group(); g.add(rockMesh(geo, 0.035)); g.userData.corals = corals; return g;
 }
 // a rock tunnel over the lane: open space inside up to ~4 m, corals outside and hanging from the roof
@@ -298,7 +298,7 @@ export function makeTunnelSeg(seed = 1, mouth = false) {
   // thickness: an outer skin a little larger so the roof reads as solid rock from outside
   const outer = shell.clone(); outer.scale(1.12, 1.1, 1); outer.translate(0, 0.05, 0);
   const corals = []; dress(R, outer, corals, ['table', 'stag', 'tree', 'cauli', 'brain', 'whips', 'leather', 'xenia'], mouth ? 6 : 4, 'up', 0.9);
-  dress(R, shell, corals, ['tree', 'purple', 'tree'], 2, 'down', 0.5);
+  dress(R, shell, corals, ['tree', 'purple', 'tree'], 2, 'down', 0.4, 0.5, (p) => Math.abs(p.x) > 2.4);
   const m = new THREE.Mesh(mergeGeometries([shell, outer]), toon('#ffffff', { vertexColors: true, side: THREE.DoubleSide })); outline(m, 0.04, '#2E2238'); m.castShadow = false;
   const g = new THREE.Group(); g.add(m); g.userData.corals = corals; return g;
 }

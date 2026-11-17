@@ -137,17 +137,17 @@ const SCHOOLS = { 'Palette surgeonfish': [2, 1, 4, 0.7, 0.95], 'Moorish idol': [
   'Anthias': [3, 10, 20, 0.3, 0.4], 'Parrotfish': [1.5, 1, 3, 1.0, 1.4], 'Coral grouper': [1, 1, 1, 1.3, 1.7] };
 const byName = Object.fromEntries(DESIGNS.map(d => [d.en, d]));
 export const design = (name) => byName[name];
-function eyeGeo(d, P) {
+function eyeGeo(d, P, lo = false) {   // lo: tiny school fish, where eye detail can't be seen anyway
   const [ex, ey, er] = d.eye, lat = P.latAt(ex, ey) * S, r = Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85)), out = [];
   const col = (g, c) => { const k = new THREE.Color(c), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([k.r, k.g, k.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); return g; };
   const q = new THREE.Quaternion(), m = new THREE.Matrix4();
   for (const sx of [-1, 1]) {
     const nrm = new THREE.Vector3(sx, 0.12, -0.38).normalize(); q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), nrm);
     m.compose(new THREE.Vector3(sx * Math.max(lat - r * 0.35, r * 0.25), (100 - ey) * S, (ex - P.xm) * S), q, new THREE.Vector3(1, 1, 1));
-    const rim = new THREE.SphereGeometry(r * 1.12, 10, 7); rim.translate(0, 0, -r * 0.28);
-    const pup = new THREE.SphereGeometry(r * 0.62, 8, 6); pup.scale(1, 1, 0.45); pup.translate(0, 0, r * 0.8);
+    const rim = new THREE.SphereGeometry(r * 1.12, lo ? 6 : 10, lo ? 4 : 7); rim.translate(0, 0, -r * 0.28);
+    const pup = new THREE.SphereGeometry(r * 0.62, lo ? 5 : 8, lo ? 3 : 6); pup.scale(1, 1, 0.45); pup.translate(0, 0, r * 0.8);
     const h1 = new THREE.SphereGeometry(r * 0.22, 6, 4); h1.translate(r * 0.24, r * 0.26, r * 1.04);
-    [col(rim, OUT), col(new THREE.SphereGeometry(r, 10, 7), '#ffffff'), col(pup, '#1F1A2E'), col(h1, '#ffffff')].forEach(g => out.push(g.applyMatrix4(m)));
+    (lo ? [col(rim, OUT), col(new THREE.SphereGeometry(r, 6, 4), '#ffffff'), col(pup, '#1F1A2E')] : [col(rim, OUT), col(new THREE.SphereGeometry(r, 10, 7), '#ffffff'), col(pup, '#1F1A2E'), col(h1, '#ffffff')]).forEach(g => out.push(g.applyMatrix4(m)));
   }
   return mergeGeometries(out);
 }
@@ -156,17 +156,18 @@ export function makeSchool3D(name, n, size) {
   if (!name) { const keys = Object.keys(SCHOOLS), tot = keys.reduce((a, k) => a + SCHOOLS[k][0], 0); let r = Rn() * tot; name = keys.find(k => (r -= SCHOOLS[k][0]) < 0) || keys[0]; }
   const d = byName[name], sp = SCHOOLS[name] || [1, 1, 1, 1, 1];
   n ??= sp[1] + Math.floor(Rn() * (sp[2] - sp[1] + 1)); size ??= sp[3] + Rn() * (sp[4] - sp[3]);
-  const P = parts(d);
+  const P = parts(d), tiny = sp[4] < 0.5;   // tiny species: light eyes, no outline
   if (!P.inst) {
     const fg = [P.fins.clone()];
     if (P.pec) for (const sx of [-1, 1]) { const g = P.pec.g.clone(); g.rotateY(sx * 0.6); g.translate(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); fg.push(g); }
-    P.inst = { fins: mergeGeometries(fg), eyes: d.eye ? eyeGeo(d, P) : null };
+    P.inst = { fins: mergeGeometries(fg), eyes: d.eye ? eyeGeo(d, P, tiny) : null };
   }
   const gl = GLOW[d.en], fx = (gl || METAL[d.en]) ? { glow: gl ? gl[0] : 0, gc: new THREE.Color(gl ? gl[1] : '#fff'), metal: METAL[d.en] || 0, key: d.en } : null;
   const mats = [swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), null, P.len, 0.014, null, true),
     swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), null, P.len, 0, fx, true),
     swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), null, P.len, 0, null, true)];
-  const meshes = [new THREE.InstancedMesh(P.bodyLo, mats[0], n), new THREE.InstancedMesh(P.bodyLo, mats[1], n), new THREE.InstancedMesh(P.inst.fins, mats[2], n)];
+  const meshes = [new THREE.InstancedMesh(P.bodyLo, mats[0], tiny ? 0 : n), new THREE.InstancedMesh(P.bodyLo, mats[1], n), new THREE.InstancedMesh(P.inst.fins, mats[2], n)];
+  if (tiny) meshes[0].visible = false;
   if (P.inst.eyes) { const em = swim(new THREE.MeshBasicMaterial({ vertexColors: true }), null, P.len, 0, null, true); mats.push(em); meshes.push(new THREE.InstancedMesh(P.inst.eyes, em, n)); }
   const g = new THREE.Group(); meshes.forEach(m => { m.frustumCulled = false; g.add(m); });
   const spread = 0.55 + Math.sqrt(n) * 0.5 * Math.max(size, 0.5), fish = [];

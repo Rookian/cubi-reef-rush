@@ -196,7 +196,7 @@ function animateBubble(g, dt) { const u = g.userData; u.t += dt; u.items.forEach
 
 // 7 MUSHROOM CORAL (Fungia): thick, free-living oval discs lying on the sand; fine radial septa run from a central mouth slit to the rim
 function mushroomDisc(a, b, cIn, cOut, cRidge, ph, hull) {
-  const seg = Q(432, 108, 30), N = 36, H = 0.11, S = THREE.MathUtils.smoothstep;
+  const seg = Q(432, 48, 30), N = 36, H = 0.11, S = THREE.MathUtils.smoothstep;
   const prof = []; for (let k = 0; k <= 18; k++) { const v = k / 18; prof.push([v, H * (1 - 0.8 * Math.pow(v, 2.4)), 1]); }
   const yR = H * 0.2; prof.push([1.035, yR - 0.022, 0.5], [1.02, yR - 0.045, 0], [0.9, yR - 0.06, 0], [0.5, yR - 0.062, 0], [0, yR - 0.062, 0]);
   const rings = prof.length - 1, geo = new THREE.PlaneGeometry(1, 1, seg, rings), p = geo.attributes.position, ridge = new Float32Array(p.count), vv = new Float32Array(p.count), top = new Float32Array(p.count);

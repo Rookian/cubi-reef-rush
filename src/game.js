@@ -352,8 +352,8 @@ function spawn(kind, x, y, z, opt = {}) {
   if (decorMap) x = mapX(x);
   if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
-  let mesh = pool.pop();
-  if (!mesh) { mesh = KINDS[kind].make(); if (!NOGLOW.includes(kind)) glowAll(mesh); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
+  let mesh = kind === 'school' && opt.species ? null : pool.pop();
+  if (!mesh) { mesh = kind === 'school' && opt.species ? F3.makeSchool3D(opt.species, opt.n, opt.size) : KINDS[kind].make(); if (!NOGLOW.includes(kind)) glowAll(mesh); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
   const s = opt.scale ?? 1;
   mesh.scale.setScalar(s);
   mesh.rotation.set(0, opt.ry ?? 0, 0);
@@ -363,13 +363,40 @@ function spawn(kind, x, y, z, opt = {}) {
   if (kind === 'puffer') { o.puff = 0; setPuff3D(mesh, 0); }
   if (kind === 'shark') { M.setSharkMouth(mesh, 0); mesh.userData.sick = 0; }
   objs.push(o);
+  if (RESIDENT_HOMES.includes(kind) && !opt.noRes) residents(o);
   return o;
+}
+let hungry = null, hungryCD = 25, hungryTipShown = false;   // the one hungry shark (see SHARKS WITH MOODS)
+// ---- who lives where: each reef structure gets the fish that really hang around that kind of coral
+const RESIDENT_HOMES = ['mound', 'moundbig', 'wall', 'pinnacle'];
+const BIG_ROCKS = new Set(['mound', 'moundbig', 'wall', 'pinnacle', 'rock', 'patch', 'xmas']);
+const RESIDENTS = {
+  thicket: [['Blue-green chromis', 0.55], ['Yellowtail damselfish', 0.3]],     // damsels & chromis hover over branching coral and dive into it
+  terrace: [['Anthias', 0.5], ['Yellowtail damselfish', 0.25]],
+  garden: [['Anthias', 0.6], ['Moorish idol', 0.2]],                          // orange anthias clouds over soft corals
+  boulder: [['Threadfin butterflyfish', 0.6], ['Coral grouper', 0.25], ['Parrotfish', 0.25]],
+  bommie: [['Clownfish', 0.9], ['Blue-green chromis', 0.35]],
+  mixed: [['Anthias', 0.3], ['Blue-green chromis', 0.2], ['Threadfin butterflyfish', 0.3], ['Palette surgeonfish', 0.2]],
+  wall: [['Anthias', 0.3], ['Lunar fusilier', 0.2], ['Clown triggerfish', 0.12], ['Emperor angelfish', 0.15]],
+  pinnacle: [['Anthias', 0.95], ['Lunar fusilier', 0.6], ['Blue-green chromis', 0.5], ['Titan triggerfish', 0.15]],
+};
+function residents(home) {
+  if (mode === 'menu' && Math.random() < 0.5) return;
+  const th = home.mesh.userData.theme || (home.kind === 'pinnacle' ? 'pinnacle' : home.kind.startsWith('wall') ? 'wall' : 'mixed');
+  const top = home.kind === 'pinnacle' ? 4.5 * home.s : home.kind === 'wall' ? 3.2 : (home.kind === 'moundbig' ? 2.6 : 1.9) * (home.s || 1);
+  const was = decorMap; decorMap = false;
+  for (const [sp, p] of RESIDENTS[th] || RESIDENTS.mixed) if (Math.random() < p) {
+    const low = sp === 'Clownfish' || sp === 'Threadfin butterflyfish' || sp === 'Coral grouper' || sp === 'Parrotfish';
+    spawn('school', home.x + rf(-0.6, 0.6), low ? top * rf(0.55, 0.8) : top + rf(0.3, 1.4), home.z + rf(-0.8, 0.8), { solid: false, species: sp, noRes: true, ry: rf(0, 6), size: sp === 'Clownfish' ? 0.28 : undefined });
+  }
+  decorMap = was;
 }
 const PREWARM = ['brain', 'treec', 'stag', 'table', 'cauli', 'bubble', 'scroll', 'purplec', 'cupc', 'tube', 'finger', 'leather', 'xenia', 'whips', 'btanem', 'mushroom'];
 let prewarmI = 0;
 function prewarmStep() { if (prewarmI >= PREWARM.length * 2) return; const k = PREWARM[prewarmI % PREWARM.length]; prewarmI++;
   const m = KINDS[k].make(); if (!NOGLOW.includes(k)) glowAll(m); m.traverse(q => { q.castShadow = false; }); (pools[k] ||= []).push(m); }
 function despawn(o) {
+  if (o === hungry) { hungry = null; hungryCD = rf(35, 60); const w = $('sharkwarn'); if (w) w.classList.remove('show'); }
   scene.remove(o.mesh);
   if (o.extra) o.extra.forEach(e => scene.remove(e));
   if (o.clown && !o.clownTaken) scene.remove(o.clown);
@@ -419,7 +446,7 @@ let whaleTimes = [];
 function resetWorld() {
   whaleTimes = [rf(0.15, 0.3), rf(0.55, 0.75)];
   buildZones();
-  [...objs].forEach(despawn); objs.length = 0; finishObj = null;
+  [...objs].forEach(despawn); objs.length = 0; finishObj = null; hungry = null; hungryCD = 25;
   if (buddy) { scene.remove(buddy); buddy = null; }
   endParty(); ink.level = 0;
   s = 0; pearls = 0; lives = 3; invuln = 0; nextDecor = 0; shake = 0; caught = null; toxin.cd = 0;
@@ -603,7 +630,10 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.3) spawn('weed', side * rf(9, 15), 0, z + rf(-2, 2), { solid: false, scale: rf(1.8, 2.6), ry: rf(0, 6) });
   if (Math.random() < 0.1) spawn('vent', side * rf(4.6, 7), 0, z, { solid: false, scale: 1 });
   // reef life swimming by
-  const nSchools = Math.random() < 0.45 ? 1 : Math.random() < 0.3 ? 2 : 0;
+  // open-water life: fusilier streams high up, silverside bait balls, surgeonfish and tangs roving over the reef
+  if (Math.random() < 0.16) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('school', side * rf(5, 9), rf(5.2, 7.2), z, { solid: false, species: pick(['Lunar fusilier', 'Lunar fusilier', 'Silversides', 'Needlefish']), ry: dir > 0 ? Math.PI : 0, swim: [rf(-0.3, 0.3), dir * rf(1.5, 3.5)], noRes: true }); }
+  if (Math.random() < 0.14) spawn('school', side * rf(3.6, 6), rf(1.6, 3.4), z + rf(-2, 2), { solid: false, species: pick(['Palette surgeonfish', 'Clown surgeonfish', 'Brown sailfin tang', 'Foxface rabbitfish', 'Moorish idol', 'Orange-lined triggerfish', 'Parrotfish']), ry: rf(0, 6), swim: [rf(-0.4, 0.4), -rf(0.3, 1.2)], noRes: true });
+  const nSchools = Math.random() < 0.35 ? 1 : 0;
   for (let k = 0; k < nSchools; k++) {
     const sd = Math.random() < 0.5 ? -1 : 1;
     const across = Math.random() < 0.4;
@@ -614,7 +644,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.012) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whaleshark', -dir * 26, rf(8.5, 10.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.5, 0], maxX: 32 }); }
   else if (Math.random() < 0.01) { const sd = Math.random() < 0.5 ? -1 : 1; spawn('whaleshark', sd * rf(9, 12), rf(7.5, 9.5), z - 10, { solid: false, scale: rf(2.3, 2.8), ry: 0, swim: [0, -rf(1.8, 2.6)] }); }
   if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3), y0 = rf(4.4, 5.6); for (let k = 0; k < n; k++) spawn('babyturtle', -dir * (10 + k * rf(0.9, 1.6)), y0 + rf(-0.5, 0.5), z - 6 + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
-  if (Math.random() < 0.22) spawn('xmas', side * rf(2.4, 3.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15), xmas: true });
+  if (Math.random() < 0.13) spawn('xmas', side * rf(2.4, 3.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15), xmas: true });
   if (Math.random() < 0.13) spawn('debris', side * rf(3.7, 6.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.2) });
   if (Math.random() < 0.04) spawn('debris', rf(-2.6, 2.6), 0, z, { solid: false, ry: rf(0, 6) });
   if (Math.random() < 0.45) spawn('seagrass', side * rf(3.8, 9), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) });
@@ -632,6 +662,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.2) spawn('rubble', rf(-2.6, 2.6), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.7, 1.0) });
   if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
   if (Math.random() < 0.07) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
+  if (!bg) sharkLife(z, side);
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
@@ -656,7 +687,7 @@ function spawnItem(it, z) {
       spawn(kind, -dir * 12, hammer ? (+it.y || LANE.mid) : (+it.y || LANE.low), z, { crosser: dir, ry: -dir * Math.PI / 2, scale: hammer ? 1.15 : 1.8, halfL: hammer ? 1.35 : 1.25, rad: hammer ? 0.42 : 0.2, cOff: hammer ? 0.2 : -1.1, warn: hammer ? 'Reef shark!' : 'Sea snake!' });
       break;
     }
-    case 'shark': spawn('shark', x, y, z - 6, { vz: 4, shark: true }); break;
+    case 'shark': hungryShark(z - 10, x); break;
     case 'decor': {
       const SC = { octopus: 1, featherstar: 1, bloodstar: 1, scorpion: 1, croco: 1, flounder: 1, snakeeel: 1, catshark: 1, lionfish: 1, squid: 1, stingray: 1.3, gorgonian: 1.2, rubble: 1, xmas: 1.25, star: 1.3, shrimp: 1.8, debris: 1.05, seagrass: 1.1, clam: 1, sponge: 0.9, mushroom: 0.9, crab: 1, nudi: 1.8, kelp: 1 };
       const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp', 'octopus', 'featherstar', 'bloodstar', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'squid', 'stingray', 'gorgonian', 'rubble', 'treec', 'table', 'cauli', 'scroll', 'purplec', 'cupc', 'finger', 'leather', 'xenia', 'whips', 'btanem', 'brain', 'bubble', 'stag'].includes(it.kind) ? it.kind : 'magnifica';
@@ -1056,6 +1087,7 @@ function step(dt) {
   else speed = Math.max(0, speed - dt * 6);
   const move = speed * dt;
   if (mode === 'play' || mode === 'caught') s += move;
+  if (mode === 'play' && hungryCD > 0) hungryCD -= dt;
   if (mode === 'menu') menuS += move;
   if (mode === 'menu' || mode === 'splash' || mode === 'over' || mode === 'win') prewarmStep();
   if (mode === 'splash') splashT += dt;
@@ -1209,6 +1241,7 @@ function step(dt) {
       if (!o.sick) o.shapes = [sph(0, 0.42 * (1 + o.puff * 0.6) + o.puff * 0.1)];
     }
     if (o.kind === 'shark') updateShark(o, dt);
+    if (o.mood) updateMood(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
     if (o.kind === 'anemone' && o.z > -40 && o.z < 10) M.animateAnemone(o.mesh, dt);
     { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt); }
@@ -1237,7 +1270,7 @@ function step(dt) {
       else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
       else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
       else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
-      else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, dt);
+      else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, o.mood === 'rest' ? dt * 0.3 : o.mood === 'hungry' && o.phase === 'lunge' ? dt * 2.2 : dt);
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
     }
     if (o.kind === 'pearl') { o.mesh.children[0].rotation.y += dt * 2; o.mesh.position.y = o.y + Math.sin(t * 2 + o.ph) * 0.08; }
@@ -1246,6 +1279,9 @@ function step(dt) {
     if (o.kind === 'finish') o.mesh.children.forEach((m, k) => { m.position.z = Math.sin(t * 3 + k) * 0.1; });
 
     const dd = curD - o.z, ox = relX(dd), oy = o.grounded ? groundAt(o.x, dd) : relY(dd);
+    if (o.z > 1.0 && !o.pearl && !o.hazard && !o.mood && !o.crosser && !o.shapes.length && o.kind !== 'school' && o.kind !== 'finish') {   // never let the camera sit inside scenery
+      const r = BIG_ROCKS.has(o.kind) ? (o.kind === 'wall' || o.kind === 'moundbig' ? 5.5 : 3.8) : 1.3 * (o.s || 1) + 0.4;
+      o.mesh.visible = Math.hypot(o.x + ox - camera.position.x, o.z - camera.position.z) > r || o.z < 1.0; }
     o.mesh.position.x = o.x + ox; o.mesh.position.z = o.z;
     if (o.kind === 'stream') { o.mesh.position.y = oy; o.chev.position.set(ox, oy, 0); }
     else if (o.kind === 'pearl') o.mesh.position.y += oy;
@@ -1271,7 +1307,7 @@ function step(dt) {
         if (o.hazard) hurt(); else if (o.bumpY) bumpY(o); else if (o.bump) bump(o);
       }
     }
-    if (o.z > 9 || (o.swim && Math.abs(o.x) > (o.maxX || 18)) || (o.sick && Math.abs(o.x) > 16) || (o.kind === 'flee' && Math.abs(o.x) > 14)) { if (o === finishObj) finishObj = null; despawn(o); objs.splice(i, 1); }
+    if (o.z > 9 || o.gone || (o.swim && Math.abs(o.x) > (o.maxX || 18)) || (o.sick && Math.abs(o.x) > 16) || (o.kind === 'flee' && Math.abs(o.x) > 14)) { if (o === finishObj) finishObj = null; despawn(o); objs.splice(i, 1); }
   }
 
   // ambient
@@ -1296,12 +1332,17 @@ function step(dt) {
   if (mode === 'splash') { cx = P.x * 0.5; cy = P.y + 0.1; cz = portrait ? 4.4 : 3.6; lx = P.x * 0.5; ly = P.y + (portrait ? -0.05 : 0.55); lz = -2; }
   else if (mode === 'win' || (mode === 'over' && party)) { const wide = camera.aspect > 1.25; const mx = P.x + 0.78; cx = mx; cy = P.y + 0.2; cz = portrait ? 5.2 : 4.4; lx = mx + (wide ? 1.9 : 0); ly = P.y - (portrait ? 0.95 : wide ? 0.05 : 0.45); lz = -2; }
   else if (mode === 'menu') { const wide = camera.aspect > 1.25; cx = P.x * 0.6; cy = P.y + 0.05; cz = portrait ? 3.7 : 3.0; lx = P.x * 0.6 + (wide ? 1.15 : 0); ly = P.y - (portrait ? 0.75 : wide ? 0.05 : 0.35); lz = -2; }
-  else { cx = P.x * 0.72; cy = P.y * 0.55 + (portrait ? 2.5 : 2.15); cz = portrait ? 5.2 : 4.2; lx = P.x * 0.82; ly = P.y * 0.7 + (portrait ? 0.55 : 0.3); lz = -8; }
+  else { cx = P.x * 0.5; cy = P.y * 0.55 + (portrait ? 2.5 : 2.15); cz = portrait ? 5.2 : 4.2; lx = P.x * 0.75; ly = P.y * 0.7 + (portrait ? 0.55 : 0.3); lz = -8; }
   const k = 1 - Math.pow(0.002, dt);
   camera.position.x += (cx - camera.position.x) * k;
   camera.position.y += (cy - camera.position.y) * k;
   camera.position.z += (cz - camera.position.z) * k;
   if (mode !== 'menu' && mode !== 'splash' && mode !== 'win') { const ahead = relY(curD + 12); ly += ahead * 0.55; cy += Math.max(-1.2, ahead * 0.15); }
+  // roofs and ledges: keep the camera on Cubi's side of the rock (below a tunnel roof, under or over a ledge)
+  if (mode === 'play' || mode === 'over') for (const o of objs) { const sh = o.shapes && o.shapes[0]; if (!sh || sh.t !== 'b' || o.z < -1.5 || o.z > 7.5) continue;
+    if (cx < sh.x0 - 0.6 || cx > sh.x1 + 0.6) continue;
+    const oy = relY(curD - o.z), cp = camera.position; if (P.y < sh.y0) cp.y = Math.min(cp.y, sh.y0 + oy - 0.35); else if (cp.y < sh.y1 + oy + 0.5) cp.y = Math.max(cp.y, sh.y1 + oy + 0.5); }
+  if (mode === 'play' || mode === 'over') camera.position.y = Math.max(camera.position.y, groundAt(camera.position.x, curD - camera.position.z) + 0.5);   // and never under the sand
   camLook.x += (lx - camLook.x) * k; camLook.y += (ly - camLook.y) * k; camLook.z += (lz - camLook.z) * k;
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.6; camera.position.y += (Math.random() - 0.5) * shake * 0.6; }
   camera.lookAt(camLook);
@@ -1508,6 +1549,77 @@ function updateShark(o, dt) {
   }
 }
 
+// ================= SHARKS WITH MOODS =================
+// patrol: a few reef sharks cruising together · rest: whitetips lying on the sand by the reef edge ·
+// curious: one swims close past Cubi and turns away · hungry (max one): stalks ahead, warns, lunges — a bite costs a life,
+// unless Cubi hides (tunnel, under a ledge, tight in the coral at the reef edge, next to a coral head) or sprays toxin
+function sharkLife(z, side) {
+  const sp = Math.random() < 0.6 ? 'blacktip' : 'whitetip';
+  if (Math.random() < 0.035) {                                                          // patrol group
+    const n = 2 + Math.floor(Math.random() * 3), dir = Math.random() < 0.5 ? 1 : -1, along = Math.random() < 0.5, y0 = rf(4.4, 6.4), x0 = side * rf(6, 10);
+    for (let k = 0; k < n; k++) { const kk = Math.random() < 0.8 ? sp : (sp === 'blacktip' ? 'whitetip' : 'blacktip');
+      if (along) spawn(kk, x0 + rf(-1.5, 1.5), y0 + rf(-0.6, 0.6), z - k * rf(1.6, 2.6), { solid: false, scale: rf(0.95, 1.25), mood: 'patrol', ry: 0, swim: [rf(-0.2, 0.2), -rf(2.2, 3.4)], noRes: true });
+      else spawn(kk, -dir * (12 + k * rf(1.6, 2.4)), y0 + rf(-0.6, 0.6), z + rf(-1.5, 1.5), { solid: false, scale: rf(0.95, 1.25), mood: 'patrol', ry: -dir * Math.PI / 2, swim: [dir * rf(2.2, 3), 0], maxX: 20, noRes: true }); }
+  }
+  if (Math.random() < 0.04) { const n = Math.random() < 0.5 ? 1 : 2;                     // whitetips resting on the sand
+    for (let k = 0; k < n; k++) spawn('whitetip', side * rf(3.1, 4.6), 0.18, z + k * rf(1.2, 2), { solid: false, scale: rf(0.9, 1.1), mood: 'rest', ry: rf(0, 6), noRes: true }); }
+  if (Math.random() < 0.02) spawn(sp, side * rf(7, 10), rf(2.2, 4), z, { solid: false, scale: rf(1, 1.2), mood: 'curious', phase: 'in', side, noRes: true });
+  if (mode === 'play' && !hungry && hungryCD <= 0 && s > 60 && Math.random() < 0.012) hungryShark(z + 10, side * 4);
+}
+function hungryShark(z, x) {
+  if (hungry || mode !== 'play') return;
+  const was = decorMap; decorMap = false;
+  hungry = spawn('blacktip', THREE.MathUtils.clamp(x, -6, 6), 3.2, Math.min(z, -24), { solid: false, scale: 1.65, mood: 'hungry', phase: 'approach', pt: 0, shark: true, noRes: true });
+  decorMap = was;
+  if (!hungryTipShown) { hungryTipShown = true; toast('Hungry shark! Hide: tunnel, under a ledge, tight at the reef edge – or use your toxin'); }
+  else toast('Hungry shark!');
+}
+function inCover() {
+  if (Math.abs(P.x) > 2.0 && P.y < 2.0) return true;                                     // tucked low into the coral at the reef edge
+  for (const o of objs) { if (Math.abs(o.z) > 1.7) continue;
+    if (o.cover) return true;                                                           // tunnel
+    const sh = o.shapes && o.shapes[0];
+    if (sh && sh.t === 'b' && sh.y0 < 3.5 && P.y < sh.y0 && P.x > sh.x0 - 0.3 && P.x < sh.x1 + 0.3) return true;   // under a ledge
+    if (o.bump && Math.hypot(P.x - o.x, o.z) < 1.6) return true;                        // pressed against a coral head or the ridge
+  }
+  return false;
+}
+const _hv2 = new THREE.Vector3();
+function faceTo(o, vx, vy, vz, k, dt) { const ry = Math.atan2(-vx, -vz); let d = ry - o.mesh.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.mesh.rotation.y += d * Math.min(1, dt * k); o.mesh.rotation.x = THREE.MathUtils.lerp(o.mesh.rotation.x, THREE.MathUtils.clamp(vy * 0.08, -0.4, 0.4), Math.min(1, dt * 3)); }
+function steerTo(o, tx, ty, tz, spd, dt, move) {   // swim toward a point in lane space; move cancels the scroll so it keeps pace
+  _hv2.set(tx - o.x, ty - o.y, tz - o.z); const d = _hv2.length(); if (d > 0.01) _hv2.multiplyScalar(Math.min(spd, d * 2.5) / d);
+  o.vx = THREE.MathUtils.lerp(o.vx || 0, _hv2.x, Math.min(1, dt * 2.2)); o.vy = THREE.MathUtils.lerp(o.vy || 0, _hv2.y, Math.min(1, dt * 2.2)); o.vz = THREE.MathUtils.lerp(o.vzz || 0, _hv2.z, Math.min(1, dt * 2.2)); o.vzz = o.vz;
+  o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt - move;
+  faceTo(o, o.vx, o.vy, o.vz - 0.001, 4, dt); return d;
+}
+function updateMood(o, dt) {
+  const move = (mode === 'play' || mode === 'caught') ? speed * dt : 0;
+  if (o.mood === 'patrol') { faceTo(o, o.swim[0], 0, o.swim[1], 2, dt); return; }
+  if (o.mood === 'rest') { o.mesh.rotation.z = Math.sin(t * 0.8 + o.ph) * 0.03; return; }
+  if (o.mood === 'curious') {                                                           // glide in, pass close, peel away
+    if (o.phase === 'in') { if (steerTo(o, o.side * 2.9, Math.max(1.4, P.y), 1.5, 3.2, dt, 0) < 1.5 || o.z > 0.5) o.phase = 'out'; }
+    else { steerTo(o, o.side * 14, 4.5, o.z - 6, 3.5, dt, 0); if (Math.abs(o.x) > 13) o.gone = true; }
+    return;
+  }
+  if (o.mood !== 'hungry') return;
+  // ---- the hungry one
+  const warn = $('sharkwarn');
+  if (o.sick && o.phase !== 'leave') { o.phase = 'leave'; toast('The shark swims off!'); }
+  o.pt += dt;
+  if (o.phase === 'approach') { if (steerTo(o, P.x + (o.x > P.x ? 3 : -3), P.y + 0.6, -9, 9, dt, move) < 2 || o.pt > 6) { o.phase = 'stalk'; o.pt = 0; } }
+  else if (o.phase === 'stalk') {                                                       // circles ahead of Cubi, matching his pace
+    const a = o.pt * 1.3 + o.ph; steerTo(o, P.x + Math.sin(a) * 3.2, P.y + 0.5 + Math.sin(a * 1.7) * 0.6, -8 + Math.cos(a) * 2, 7, dt, move);
+    if (o.pt > 3.6) { o.phase = 'lunge'; o.pt = 0; o.tx = P.x; o.ty = P.y; sound.bump(); shake = Math.max(shake, 0.15); }
+  } else if (o.phase === 'lunge') {                                                    // a straight, fast rush at where Cubi was
+    steerTo(o, o.tx, o.ty, 2.5, 15, dt, move);
+    if (o.z > -1.2 && o.z < 1.2 && Math.hypot(P.x - o.x, P.y - o.y) < 1.25) {
+      if (inCover()) { toast('Hidden! The shark gives up'); o.phase = 'leave'; o.pt = 0; window.__sharkResult = 'hidden'; }
+      else if (invuln <= 0) { hurt('Shark bite!'); o.phase = 'leave'; o.pt = 0; window.__sharkResult = 'bite'; }
+    }
+    if (o.z > 1.8 || o.pt > 2.2) { if (o.phase === 'lunge') { const h = inCover(); if (h) toast('Hidden! The shark gives up'); window.__sharkResult = h ? 'hidden' : 'missed'; } o.phase = 'leave'; o.pt = 0; }
+  } else if (o.phase === 'leave') { steerTo(o, (o.x >= 0 ? 1 : -1) * 16, 6, o.z - 10, 6, dt, 0); if (Math.abs(o.x) > 14 || o.pt > 6) o.gone = true; }
+  if (warn) warn.classList.toggle('show', mode === 'play' && (o.phase === 'stalk' || o.phase === 'lunge' || o.phase === 'approach') && !o.gone);
+}
 function updateStream(o) {
   const pos = o.mesh.geometry.attributes.position.array;
   const [dx, dy] = o.dir;
@@ -1536,7 +1648,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
 window.__grade = (o) => { for (const k in o) if (GRADE[k]) GRADE[k].value = o[k]; else if (k === 'fogNear') scene.fog.near = o[k]; else if (k === 'glow') glowU.uGlowK.value = o[k]; };
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
-window.__game = { scene,
+window.__game = { scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },
