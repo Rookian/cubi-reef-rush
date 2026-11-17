@@ -127,7 +127,7 @@ export function syncField(roots, cam) {
     for (const c of r.userData.corals) { const s = slots[c.key]; _w.multiplyMatrices(r.matrixWorld, c.m);
       const dx = _w.elements[12] - cx, dz = _w.elements[14] - cz;
       if (!c.far && dx * dx + dz * dz < NEAR_D2) { s.im.setMatrixAt(s.n, _w); s.hull.setMatrixAt(s.n, _w); s.n++; } else { s.far.setMatrixAt(s.nf, _w); s.nf++; } } }
-  for (const k in slots) { const s = slots[k]; s.im.count = s.hull.count = s.n; s.far.count = s.nf; s.im.instanceMatrix.needsUpdate = s.hull.instanceMatrix.needsUpdate = s.far.instanceMatrix.needsUpdate = true; }
+  for (const k in slots) { const s = slots[k]; s.im.count = s.hull.count = s.n; s.far.count = s.nf; s.im.visible = s.hull.visible = s.n > 0; s.far.visible = s.nf > 0; s.im.instanceMatrix.needsUpdate = s.hull.instanceMatrix.needsUpdate = s.far.instanceMatrix.needsUpdate = true; }
 }
 // Christmas tree worms as a bakeable "coral" too
 const wormCache = {};
