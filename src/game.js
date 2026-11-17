@@ -4,6 +4,10 @@ import * as RF from './reef.js';
 import * as CR from './critters.js';
 import * as F3 from './fish3d.js';
 import * as C3 from './critters3d.js';
+import { setLite } from './polyps.js';
+import * as K from './corals3d.js';
+import * as SK from './softcorals3d.js';
+setLite(true);   // game-weight corals (the review page keeps full detail)
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
 import * as LB from './leaderboard.js';
@@ -227,15 +231,27 @@ const objs = [];
 const pools = {};
 const C = M.COR;
 const KINDS = {
-  branch: { make: () => M.makeBranchCoral(pick([C.pink, C.pink, C.red]), 5 + ri(0, 3)), shape: s => [pillar(0.55 * s, 1.75 * s)] },
-  stag: { make: () => M.makeStaghorn(pick([C.red, C.orange]), 9 + ri(0, 2)), shape: s => [pillar(0.6 * s, 1.85 * s)] },
-  tube: { make: () => M.makeTubeCoral(pick([C.orange, C.purple, C.yellow]), 1, ri(1, 9)), shape: s => [pillar(0.55 * s, 1.4 * s)] },
-  brain: { make: () => M.makeBrainCoral(pick([C.green, C.yellow, C.orange])), shape: s => [pillar(0.75 * s, 0.55 * s)] },
-  bubble: { make: () => M.makeBubbleCoral(1, ri(1, 9), pick([C.yellow, C.pink])), shape: s => [pillar(0.55 * s, 0.95 * s)] },
+  branch: { make: () => coral(SK.makeTreeCoral, SK.animateTree, 1.25), shape: s => [pillar(0.55 * s, 1.75 * s)] },
+  stag: { make: () => coral(K.makeStaghorn, K.animatePF, 1.75, 0.72), shape: s => [pillar(0.6 * s, 1.85 * s)] },
+  tube: { make: () => coral(K.makeFireCoral, K.animatePF, 1.7), shape: s => [pillar(0.55 * s, 1.4 * s)] },
+  brain: { make: () => coral(K.makeBrain, K.animWorms, 1.15), shape: s => [pillar(0.75 * s, 0.55 * s)] },
+  bubble: { make: () => coral(K.makeBubble, K.animateBubble, 1.3), shape: s => [pillar(0.55 * s, 0.95 * s)] },
+  // reviewed Komodo corals as scenery
+  treec: { make: () => coral(SK.makeTreeCoral, SK.animateTree, 1.25), shape: () => [] },
+  table: { make: () => coral(K.makeTable, K.animatePF, 1.3), shape: () => [] },
+  cauli: { make: () => coral(K.makeCauliflower, K.animatePF, 1.5), shape: () => [] },
+  scroll: { make: () => coral(K.makeScroll, K.animatePF, 1.4), shape: () => [] },
+  purplec: { make: () => coral(K.makePurplePore, K.animatePF, 1.35), shape: () => [] },
+  cupc: { make: () => coral(K.makeCupCoral, K.animateCup, 1.5), shape: () => [] },
+  finger: { make: () => coral(K.makeFinger, K.animWorms, 1.35), shape: () => [] },
+  leather: { make: () => coral(SK.makeLeather, SK.animateLeather, 1.4), shape: () => [] },
+  xenia: { make: () => coral(SK.makeXenia, SK.animateXenia, 2.0), shape: () => [] },
+  whips: { make: () => coral(SK.makeWhips, SK.animateWhips, 1.6), shape: () => [] },
+  btanem: { make: () => coral(SK.makeBubbleTip, SK.animateBubbleTip, 1.5), shape: () => [] },
   fan: { make: () => M.makeSeaFan(pick([C.purple, C.pink, C.red])), shape: s => [pillar(0.8 * s, 2.0 * s)] },
   rock: { make: () => M.makeRock(1, ri(1, 20)), shape: s => [sph(0.25 * s, 0.85 * s)] },
   sponge: { make: () => M.makeSponge(pick([C.purple, C.orange, C.pink, C.yellow])), shape: () => [] },
-  mushroom: { make: () => M.makeMushroom(pick([C.teal, C.pink, C.green, C.purple])), shape: () => [] },
+  mushroom: { make: () => coral(K.makeMushroom, K.animatePF, 0.75), shape: () => [] },
   clam: { make: () => pick([() => M.makeClam(), () => M.makeClam('#5FD3C8', '#D4FFF8', '#13504B'), () => M.makeClam('#FF9A6B', '#FFE0D0', '#7A2E14')])(), shape: () => [] },
   arch: { make: () => M.makeArch(1, ri(1, 9)), shape: () => [] },
   vent: { make: () => M.makeVent(), shape: () => [] },
@@ -310,6 +326,8 @@ function puffer3D() { const g = new THREE.Group(), turn = new THREE.Group(); tur
 function setPuff3D(g, k) { const { a, b } = g.userData; a.visible = k < 0.3; b.visible = !a.visible; a.scale.setScalar(0.8 * (1 + k * 0.8)); b.scale.setScalar(0.62 + 0.5 * k); }
 // any reviewed 3D design as a scene object (lift: raise ground dwellers so they rest on the sand)
 // a reviewed hand-built model (critters3d.js) with its own animation; animated only when near (far = z beyond -far)
+// a reviewed coral (corals3d / softcorals3d): sx squeezes the footprint without changing the height; animated only when near
+function coral(make, anim, size, sx = 1) { const m = make(); m.scale.set(size * sx, size, size * sx); const g = new THREE.Group(); g.add(m); g.userData.c3 = { m, anim, far: 32 }; return g; }
 function wrapC(m, anim, size = 1, lift = 0, far = 45) { const g = new THREE.Group(); m.scale.setScalar(size); m.position.y = lift; g.add(m); g.userData.c3 = { m, anim, far }; return g; }
 function wrap3D(name, size, lift = 0) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), size); f.position.y = lift; g.add(f); g.userData.f3 = f; return g; }
 function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), 2.1); g.add(f); g.userData = f.userData; return g; }
@@ -331,6 +349,10 @@ function spawn(kind, x, y, z, opt = {}) {
   objs.push(o);
   return o;
 }
+const PREWARM = ['brain', 'treec', 'stag', 'table', 'cauli', 'bubble', 'scroll', 'purplec', 'cupc', 'tube', 'finger', 'leather', 'xenia', 'whips', 'btanem', 'mushroom'];
+let prewarmI = 0;
+function prewarmStep() { if (prewarmI >= PREWARM.length * 2) return; const k = PREWARM[prewarmI % PREWARM.length]; prewarmI++;
+  const m = KINDS[k].make(); if (!NOGLOW.includes(k)) glowAll(m); m.traverse(q => { q.castShadow = false; }); (pools[k] ||= []).push(m); }
 function despawn(o) {
   scene.remove(o.mesh);
   if (o.extra) o.extra.forEach(e => scene.remove(e));
@@ -405,10 +427,17 @@ function reefCluster(x, z, big = 1) {
   const n = ri(2, 4);
   for (let k = 0; k < n; k++) {
     const a = rf(0, 6.28), r = rf(0.6, 1.4) * big;
-    const kind = pick(['branch', 'branch', 'stag', 'tube', 'brain', 'bubble', 'fan', 'anemone', 'weed', 'sponge', 'mushroom', 'mushroom', 'clam']);
+    const kind = pick(['treec', 'stag', 'table', 'cauli', 'brain', 'bubble', 'scroll', 'purplec', 'cupc', 'finger', 'leather', 'xenia', 'whips', 'fan', 'anemone', 'weed', 'sponge', 'mushroom', 'clam']);
     const sc = { branch: rf(0.9, 1.4), stag: rf(0.9, 1.3), tube: rf(0.8, 1.1), brain: rf(0.6, 1.0), bubble: rf(0.7, 1.0), fan: rf(0.7, 1.0), anemone: rf(0.9, 1.2), weed: rf(0.8, 1.2), grass: rf(1, 1.5), sponge: rf(0.7, 1.1), mushroom: rf(0.7, 1.1), clam: rf(0.8, 1.1) }[kind] * big;
-    spawn(kind, x + Math.cos(a) * r, 0, z + Math.sin(a) * r, { ...o, scale: sc, ry: rf(0, 6) });
+    spawn(kind, x + Math.cos(a) * r, 0, z + Math.sin(a) * r, { ...o, scale: CORAL_SET.includes(kind) ? rf(0.85, 1.15) * CS : sc, ry: rf(0, 6) });
   }
+}
+// the reviewed Komodo corals, sprinkled along the reef edges of every zone (light ones more often than heavy ones)
+const CORAL_SET = ['treec', 'stag', 'table', 'cauli', 'brain', 'bubble', 'scroll', 'purplec', 'cupc', 'finger', 'leather', 'xenia', 'whips', 'btanem', 'mushroom'];
+const EDGE_CORALS = ['table', 'table', 'cauli', 'scroll', 'purplec', 'cupc', 'cupc', 'finger', 'finger', 'leather', 'leather', 'xenia', 'whips', 'whips', 'bubble', 'brain', 'brain', 'stag', 'treec', 'btanem'];
+const CS = 1.6;   // scenery corals are drawn bigger than the lane obstacles of the same kind
+function edgeCorals(z, p = 0.2, near = 4.4, far = 6.4) {
+  for (const sd of [-1, 1]) if (Math.random() < p) spawn(pick(EDGE_CORALS), sd * rf(near, far), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.2) * CS });
 }
 // the landscape is a sequence of zones, shuffled per run so every swim feels different
 const ZONES = ['canyon', 'narrows', 'open', 'garden', 'narrows', 'arches', 'cliff', 'kelp', 'reefbed'];
@@ -428,6 +457,7 @@ function decorRow(z) {
   if (zone === 'garden') {   // low coral carpet under Cubi's lane (purely decoration, never hurts)
     if (Math.random() < 0.8) spawn('patch', rf(-3.2, 3.2), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6) });
     if (Math.random() < 0.25) spawn(pick(['star', 'mushroom', 'nudi']), rf(-3.5, 3.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(0.6, 1.2) });
+    if (Math.random() < 0.12) spawn(pick(['finger', 'cupc', 'leather', 'purplec']), rf(-3.2, 3.2), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.75, 0.95) });
   }
   if (zone === 'narrows') {  // tight gorge: coral-covered rock walls right beside the lane
     for (const sd of [-1, 1]) {
@@ -435,7 +465,7 @@ function decorRow(z) {
       if (Math.random() < 0.7) spawn('wall', sd * rf(6.6, 7.6), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.25) });
       if (Math.random() < 0.45) spawn(pick(['heroanem', 'xmas', 'xmas']), sd * rf(4.2, 4.8), 0, z, { solid: false, ry: rf(0, 6), xmas: false });
     }
-    sharedLife(z); return;
+    edgeCorals(z, 0.2, 4.2, 4.8); sharedLife(z); return;
   }
   if (zone === 'canyon') {   // U-shaped valley: sand curves up into reef slopes, walls crown the rim
     for (const sd of [-1, 1]) {
@@ -444,14 +474,14 @@ function decorRow(z) {
       if (Math.random() < 0.3) spawn('heroanem', sd * rf(4.6, 5.4), 0.05, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.6) spawn('xmas', sd * rf(4.4, 5.5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.4), xmas: true });
     }
-    sharedLife(z);
+    edgeCorals(z, 0.24, 4.6, 7); sharedLife(z);
     return;
   }
   if (zone === 'arches') {   // rock arches span right over the lane
     if (here - (window.__lastArch || -99) > 16 && Math.random() < 0.5) { window.__lastArch = here; spawn('arch', 0, 0, z, { solid: false, scale: rf(2.6, 3.0), ry: 0 }); }
     for (const sd of [-1, 1]) if (Math.random() < 0.5) spawn('heroanem', sd * rf(4.5, 5.5), 0, z, { solid: false, ry: rf(0, 6) });
     for (const sd of [-1, 1]) if (Math.random() < 0.8) spawn('mound', sd * rf(5.3, 7), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
-    sharedLife(z); return;
+    edgeCorals(z); sharedLife(z); return;
   }
   if (zone === 'cliff') {    // one side: a towering coral cliff (like the photo); the other: wide open sand
     const sd = Z.side;
@@ -460,6 +490,8 @@ function decorRow(z) {
     if (Math.random() < 0.6) spawn('wall', sd * rf(13, 15), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.2, 1.5) });
     if (Math.random() < 0.4) spawn('heroanem', sd * rf(4.6, 5.4), 0, z, { solid: false, ry: rf(0, 6) });
     if (Math.random() < 0.55) spawn(pick(['mound', 'mound', 'star']), -sd * rf(5.5, 10), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
+    if (Math.random() < 0.55) spawn(pick(EDGE_CORALS), sd * rf(4.5, 6.5), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.25) * CS });
+    if (Math.random() < 0.2) spawn(pick(['table', 'cauli', 'scroll', 'finger']), -sd * rf(4.6, 7.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: CS });
     sharedLife(z); return;
   }
   if (zone === 'reefbed') {  // swimming right over a rocky reef floor
@@ -467,12 +499,14 @@ function decorRow(z) {
     if (Math.random() < 0.6) spawn('xmas', pick([-1, 1]) * rf(3.8, 5), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.0, 1.3), xmas: true });
     if (Math.random() < 0.35) spawn(pick(['xmas', 'heroanem', 'rock']), rf(-3.4, 3.4), 0, z, { solid: false, ry: rf(0, 6), scale: rf(0.6, 0.9), xmas: false });
     for (const sd of [-1, 1]) { if (Math.random() < 0.85) spawn(pick(['mound', 'moundbig']), sd * rf(5, 9), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) }); if (Math.random() < 0.3) spawn('wall', sd * rf(11, 14), 0, z, { solid: false, ry: rf(0, 6) }); }
-    sharedLife(z); return;
+    if (Math.random() < 0.15) spawn(pick(['finger', 'cupc', 'mushroom', 'purplec']), rf(-3.2, 3.2), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.7, 0.9) });
+    edgeCorals(z); sharedLife(z); return;
   }
   if (zone === 'kelp') {     // tall swaying kelp forest
     for (const sd of [-1, 1]) {
       for (let k = 0; k < 5; k++) if (Math.random() < 0.8) spawn('kelp', sd * rf(4.6, 12), 0, z + rf(-2.5, 2.5), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.6) spawn(pick(['mound', 'rock', 'heroanem']), sd * rf(5.3, 8), 0, z, { solid: false, ry: rf(0, 6) });
+      if (Math.random() < 0.15) spawn(pick(['whips', 'leather', 'xenia']), sd * rf(4.5, 6), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: CS });
     }
     if (Math.random() < 0.3) spawn('grass', rf(-3.5, 3.5), 0, z, { solid: false, ry: rf(0, 6) });
     sharedLife(z); return;
@@ -481,6 +515,7 @@ function decorRow(z) {
     if (zone === 'open') {   // wide sandy flats with scattered reef islands and big open water
       if (Math.random() < 0.45) spawn(pick(['mound', 'moundbig']), side * rf(5.5, 11), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.25) spawn(pick(['grass', 'star', 'weed', 'heroanem']), side * rf(4.4, 12), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
+      if (Math.random() < 0.18) spawn(pick(EDGE_CORALS), side * rf(4.6, 8.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) * CS });
       if (Math.random() < 0.08) spawn('wallfar', side * rf(20, 26), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5) });
       continue;
     }
@@ -491,7 +526,8 @@ function decorRow(z) {
     if (Math.random() < (zone === 'garden' ? 0.35 : 0.9)) spawn('wall', side * (zone === 'garden' ? rf(11, 13) : rf(9.5, 11)), 0, z + rf(-1, 1), { solid: false, ry: rf(-0.3, 0.3) + (side > 0 ? Math.PI : 0), scale: rf(0.9, 1.15) });
     if (Math.random() < 0.3) spawn('wallfar', side * rf(14, 18), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5) });
     // foreground plants that whoosh past the camera
-    if (Math.random() < 0.25) spawn(pick(['weed', 'weed', 'branch', 'fan']), side * rf(4.8, 6.2), 0, z + rf(-1, 1), { solid: false, scale: rf(1.2, 1.7), ry: rf(0, 6) });
+    if (Math.random() < 0.25) spawn(pick(['weed', 'weed', 'treec', 'fan', 'whips']), side * rf(4.8, 6.2), 0, z + rf(-1, 1), { solid: false, scale: rf(1.2, 1.6), ry: rf(0, 6) });
+    if (Math.random() < 0.18) spawn(pick(EDGE_CORALS), side * rf(4.4, 5.8), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.85, 1.15) * CS });
     // little creatures
     if (Math.random() < 0.1) spawn('crab', side * rf(3.9, 5.5), 0, z, { solid: false, ry: rf(-0.5, 0.5) });
     if (Math.random() < 0.12) spawn('heroanem', side * rf(4.4, 5.2), 0, z + rf(-1, 1), { solid: false, ry: rf(0, 6) });
@@ -573,8 +609,8 @@ function spawnItem(it, z) {
     case 'shark': spawn('shark', x, y, z - 6, { vz: 4, shark: true }); break;
     case 'decor': {
       const SC = { octopus: 1, featherstar: 1, bloodstar: 1, scorpion: 1, croco: 1, flounder: 1, snakeeel: 1, catshark: 1, lionfish: 1, squid: 1, stingray: 1.3, gorgonian: 1.2, rubble: 1, xmas: 1.25, star: 1.3, shrimp: 1.8, debris: 1.05, seagrass: 1.1, clam: 1, sponge: 0.9, mushroom: 0.9, crab: 1, nudi: 1.8, kelp: 1 };
-      const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp', 'octopus', 'featherstar', 'bloodstar', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'squid', 'stingray', 'gorgonian', 'rubble'].includes(it.kind) ? it.kind : 'magnifica';
-      spawn(k, x, 0, z, { solid: false, ry: rf(0, 6), scale: SC[k] ?? 1, xmas: k === 'xmas', keepKind: true });
+      const k = ['magnifica', 'gigantea', 'mertensii', 'heroanem', 'xmas', 'debris', 'seagrass', 'grazer', 'shrimp', 'star', 'clam', 'sponge', 'mushroom', 'crab', 'nudi', 'kelp', 'octopus', 'featherstar', 'bloodstar', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'squid', 'stingray', 'gorgonian', 'rubble', 'treec', 'table', 'cauli', 'scroll', 'purplec', 'cupc', 'finger', 'leather', 'xenia', 'whips', 'btanem', 'brain', 'bubble', 'stag'].includes(it.kind) ? it.kind : 'magnifica';
+      spawn(k, x, 0, z, { solid: false, ry: rf(0, 6), scale: SC[k] ?? (CORAL_SET.includes(k) ? CS : 1), xmas: k === 'xmas', keepKind: true });
       break;
     }
     case 'visitor': {
@@ -945,6 +981,7 @@ function step(dt) {
   const move = speed * dt;
   if (mode === 'play' || mode === 'caught') s += move;
   if (mode === 'menu') menuS += move;
+  if (mode === 'menu' || mode === 'splash' || mode === 'over' || mode === 'win') prewarmStep();
   if (mode === 'splash') splashT += dt;
 
   // spawn level items ahead

@@ -3,9 +3,14 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toonGradient, outline } from './materials.js';
 import { makeXmasWorm } from './reef.js';
+import { Q } from './polyps.js';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
 import { starGeo, hairGeo, tubeGeo, sprinkle, polypField, animatePolyps, animatePF } from './polyps.js';
 // Christmas tree worms living in a coral: they slowly tuck in and unfurl
-function plantWorms(g, geo, n, sc, keep, pals) { const pts = sprinkle(geo, n, rnd, keep), ws = []; pts.forEach((q, i) => { const w = makeXmasWorm(pals[i % pals.length]); w.position.copy(q.p).addScaledVector(q.n, -0.01); w.quaternion.setFromUnitVectors(UP, q.n.clone().lerp(UP, 0.4).normalize()); w.rotateY(rnd() * 6.28); w.userData.s = sc * (0.85 + rnd() * 0.35); w.userData.ph = rnd() * 6.28; g.add(w); ws.push(w); }); g.userData.worms = ws; }
+function plantWorms(g, geo, n, sc, keep, pals) {   // pick n well-spread spots on upward-facing surface
+  const smp = new MeshSurfaceSampler(new THREE.Mesh(geo)).setRandomGenerator(rnd).build(), p = new THREE.Vector3(), nr = new THREE.Vector3(), pts = [], ws = [];
+  for (let t = 0; t < 6000 && pts.length < n; t++) { smp.sample(p, nr); if (keep(p, nr) && pts.every(q => q.p.distanceTo(p) > 0.16)) pts.push({ p: p.clone(), n: nr.clone() }); }
+  pts.forEach((q, i) => { const w = makeXmasWorm(pals[i % pals.length]); w.position.copy(q.p).addScaledVector(q.n, -0.01); w.quaternion.setFromUnitVectors(UP, q.n.clone().lerp(UP, 0.4).normalize()); w.rotateY(rnd() * 6.28); w.userData.s = sc * (0.85 + rnd() * 0.35); w.userData.ph = rnd() * 6.28; g.add(w); ws.push(w); }); g.userData.worms = ws; }
 function animWorms(g, dt) { animatePF(g, dt); const t = g.userData.t; (g.userData.worms || []).forEach(w => { const k = 0.35 + 0.65 * THREE.MathUtils.smoothstep(Math.sin(t * 0.45 + w.userData.ph), -0.92, -0.6), s = w.userData.s; w.scale.set(s * (0.55 + 0.45 * k), s * k, s * (0.55 + 0.45 * k)); }); }
 const pmat = (o = {}) => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient(), emissive: new THREE.Color(o.emissive || '#000') });
 
@@ -43,9 +48,8 @@ function makeStaghorn() {
   const a0 = new THREE.Color('#6A5878'), a = new THREE.Color('#5A4AB8'), b = new THREE.Color('#9AB0F6'); paint(body, (c, x, y) => { const t = Math.min(1, y / top); c.copy(a0).lerp(a, Math.min(1, t * 3)).lerp(b, Math.max(0, (t - 0.3) / 0.7)); });
   const g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.012));
   g.add(new THREE.Mesh(mergeGeometries(tips), cmat('#E6F4FF', { emissive: '#3A5A8A' })));
-  const nub = new THREE.SphereGeometry(0.42, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2); nub.scale(1, 1.5, 1); nub.deleteAttribute('uv'); paint(nub, (c, x, y) => c.set('#6258BE').lerp(new THREE.Color('#A4B2F4'), y / 0.63));
+  const nub = new THREE.SphereGeometry(0.42, Q(6, 4), Q(4, 2), 0, Math.PI * 2, 0, Math.PI / 2); nub.scale(1, 1.5, 1); nub.deleteAttribute('uv'); paint(nub, (c, x, y) => c.set('#6258BE').lerp(new THREE.Color('#A4B2F4'), y / 0.63));
   const cups = polypField(nub.toNonIndexed(), pmat(), sprinkle(body, 1500, rnd, (p) => p.y > 0.06), { size: [0.022, 0.032], rnd, lean: 0.4, sink: 0.25, opt: { lo: 1 } });
-  const stars = polypField(starGeo({ arms: 8, cIn: '#BFD4FF', cOut: '#FFFFFF', mouth: '#7A6AE0', tilt: 1.15 }), pmat({ emissive: '#20305A' }), tipPts, { size: [0.022, 0.03], rnd, opt: { speed: 1.6 } });
   g.add(cups); g.userData.pfs = [];
   return g;
 }
@@ -59,24 +63,23 @@ function makeTable() {
   plate.computeVertexNormals(); plate.translate(0, 0.44, 0);
   paint(plate, (c, x, y) => c.set(y < 0.44 ? '#6A5A3A' : '#A8B878'));
   g.add(lined(new THREE.Mesh(plate, vmat()), 0.012));
-  const sprig = (() => { const ps = [], cap = (r, l, rx, rz, y) => { const k = new THREE.CapsuleGeometry(r, l, 2, 6); k.translate(0, l / 2 + r, 0); k.rotateX(rx); k.rotateZ(rz); k.translate(0, y, 0); k.deleteAttribute('uv'); ps.push(k.toNonIndexed()); };
+  const sprig = (() => { const ps = [], cap = (r, l, rx, rz, y) => { const k = new THREE.CapsuleGeometry(r, l, Q(2, 1), Q(6, 4)); k.translate(0, l / 2 + r, 0); k.rotateX(rx); k.rotateZ(rz); k.translate(0, y, 0); k.deleteAttribute('uv'); ps.push(k.toNonIndexed()); };
     cap(0.014, 0.06, 0, 0, 0); cap(0.011, 0.03, 0.75, 0, 0.022); cap(0.011, 0.03, -0.4, 0.7, 0.03); cap(0.011, 0.028, -0.4, -0.7, 0.016);
     return paint(mergeGeometries(ps), (cc, x, y) => cc.setScalar(0.62 + 0.38 * Math.min(1, y / 0.07)).lerp(new THREE.Color('#FFFFFF'), y > 0.075 ? 0.6 : 0)); })();
-  const N = 420, bl = new THREE.InstancedMesh(sprig, vmat(), N), m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), q2 = new THREE.Quaternion(), tops = [];
+  const N = Q(420, 220), bl = new THREE.InstancedMesh(sprig, vmat(), N), m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), q2 = new THREE.Quaternion(), tops = [];
   for (let i = 0; i < N; i++) { const a = i * 2.39996, r = Math.sqrt((i + 0.5) / N) * 0.78, out = Math.max(0, (r - 0.55) / 0.25); const d = V(Math.cos(a) * out * 1.4, 1, Math.sin(a) * out * 1.4).normalize();
     const sy = 1 + rnd() * 0.4, bp = V(Math.cos(a) * r, 0.49 + r * r * 0.12, Math.sin(a) * r); m.compose(bp, q.setFromUnitVectors(UP, d).multiply(q2.setFromAxisAngle(UP, rnd() * 6.28)), V(1, sy, 1)); bl.setMatrixAt(i, m); bl.setColorAt(i, c.set('#A8BC6E').lerp(new THREE.Color('#7FE0D2'), r / 0.8));
     tops.push({ p: bp.clone().addScaledVector(d, 0.09 * sy), n: d.clone() }); }
   bl.instanceColor.needsUpdate = true; g.add(bl);
-  const stars = polypField(starGeo({ arms: 8, cIn: '#BFF2E6', cOut: '#FFFFFF', mouth: '#4AA890', tilt: 1.2 }), pmat({ emissive: '#103A34' }), tops, { size: [0.013, 0.018], rnd, opt: { speed: 1.8, wave: 5 } });
   g.userData.pfs = [];
   return g;
 }
 
 // 3 CAULIFLOWER CORAL (Pocillopora): tight dome of stout, flattened pink branches that fork into warty, club-shaped lobes with pale tips
 function cauliLobe(len, R, flare, ph) {
-  const pts = [], n = 12; for (let k = 0; k <= n; k++) { const t = k / n; pts.push(new THREE.Vector2(R * (0.8 + flare * t * t), len * t)); }
+  const pts = [], n = Q(12, 6); for (let k = 0; k <= n; k++) { const t = k / n; pts.push(new THREE.Vector2(R * (0.8 + flare * t * t), len * t)); }
   const rt = pts[n].x; for (let k = 1; k <= 6; k++) { const a = k / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rt * Math.cos(a)), len + rt * 0.75 * Math.sin(a))); }
-  const g = new THREE.LatheGeometry(pts, 20), p = g.attributes.position, top = len + rt * 0.75, wart = new Float32Array(p.count);
+  const g = new THREE.LatheGeometry(pts, Q(20, 10)), p = g.attributes.position, top = len + rt * 0.75, wart = new Float32Array(p.count);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z), an = Math.atan2(z, x);
     const w = Math.max(0, Math.sin(y * 62 + ph) * Math.sin(an * 5 + y * 20 + ph)) * Math.min(1, y / (len * 0.25)), k = 1 + 0.2 * w * THREE.MathUtils.smoothstep(r, 0, R * 0.7); wart[i] = w;
     p.setXYZ(i, x * k, y, z * k * 0.62); }
@@ -93,7 +96,7 @@ function makeCauliflower() {
     for (let j = 0; j < nl; j++) { const dd = bend(d, 0.38 + rnd() * 0.2, 0.05), lobe = cauliLobe(0.09 + rnd() * 0.05, 0.036, 0.6, rnd() * 6); lobe.rotateY(rnd() * 3.14); parts.push(place(lobe, e, dd)); } }
   const base = new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); base.scale(1.2, 0.5, 1.2); base.deleteAttribute('uv'); parts.push(solid(base.toNonIndexed(), '#A8405E'));
   const body = mergeGeometries(parts), g = new THREE.Group(); g.add(lined(new THREE.Mesh(body, vmat()), 0.009)); g.scale.setScalar(1.3);
-  const wart = new THREE.SphereGeometry(1, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2); wart.scale(1, 0.75, 1); wart.deleteAttribute('uv'); paint(wart, (c, x, y) => c.set('#E06A90').lerp(new THREE.Color('#FFE2EA'), y / 0.75));
+  const wart = new THREE.SphereGeometry(1, Q(7, 5), Q(4, 2), 0, Math.PI * 2, 0, Math.PI / 2); wart.scale(1, 0.75, 1); wart.deleteAttribute('uv'); paint(wart, (c, x, y) => c.set('#E06A90').lerp(new THREE.Color('#FFE2EA'), y / 0.75));
   g.add(polypField(wart.toNonIndexed(), pmat(), sprinkle(body, 2400, rnd, (p) => p.y > 0.05), { size: [0.0085, 0.012], rnd, sink: 0.25, opt: { lo: 1 } }));
   g.userData.pfs = [];
   return g;
@@ -119,7 +122,7 @@ function brainMaze() {   // Gray-Scott reaction-diffusion in the labyrinth regim
 function mazeAt(u, v) { const { N, f } = brainMaze(); u = ((u % 1) + 1) % 1 * N; v = ((v % 1) + 1) % 1 * N; const x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0, g = (x, y) => f[(y % N) * N + (x % N)];
   return (g(x0, y0) * (1 - fx) + g(x0 + 1, y0) * fx) * (1 - fy) + (g(x0, y0 + 1) * (1 - fx) + g(x0 + 1, y0 + 1) * fx) * fy; }
 function makeBrain() {
-  const geo = new THREE.SphereGeometry(0.62, 240, 120, 0, Math.PI * 2, 0, Math.PI * 0.6), p = geo.attributes.position, hull = geo.clone();
+  const geo = new THREE.SphereGeometry(0.62, Q(240, 150), Q(120, 75), 0, Math.PI * 2, 0, Math.PI * 0.6), p = geo.attributes.position, hull = geo.clone();
   const ridge = new Float32Array(p.count), lo = new Float32Array(p.count);
   for (let i = 0; i < p.count; i++) { const v = V(p.getX(i), p.getY(i), p.getZ(i)).normalize(), ph = Math.acos(Math.min(1, v.y)), th = Math.atan2(v.z, v.x);
     const m = mazeAt(0.5 + ph * Math.cos(th) * 0.33, 0.5 + ph * Math.sin(th) * 0.33), r = THREE.MathUtils.smoothstep(m, 0.22, 0.7);
@@ -130,7 +133,6 @@ function makeBrain() {
   const valD = new THREE.Color('#1F5A38'), val = new THREE.Color('#3E9A55'), rid = new THREE.Color('#B8955A'), cr = new THREE.Color('#EEDCA0'), base = new THREE.Color('#5E5236'); let i = 0;
   paint(geo, c => { const r = ridge[i]; c.copy(valD).lerp(val, Math.min(1, r * 2.2)).lerp(rid, THREE.MathUtils.smoothstep(r, 0.35, 0.75)).lerp(cr, THREE.MathUtils.smoothstep(r, 0.82, 1) * 0.8).lerp(base, lo[i] * 0.55); i++; });
   const g = new THREE.Group(); g.add(new THREE.Mesh(geo, vmat()), new THREE.Mesh(hull, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide })));
-  seed = 5; const stars = polypField(starGeo({ arms: 8, cIn: '#3EDC8E', cOut: '#D6FFE6', mouth: '#F2E2A8', tilt: 1.3, w: 0.14 }), pmat({ emissive: '#0A3A22' }), sprinkle(geo, 460, rnd, (p, n, c) => c.g > c.r * 1.5 && p.y > 0.0), { size: [0.02, 0.028], rnd, sink: 0.3, opt: { speed: 1.4, wave: 5, lo: 0.25 } });
   g.userData.pfs = []; seed = 9; plantWorms(g, geo, 5, 0.3, (p, n) => p.y > 0.22 && n.y > 0.5, [0, 2, 5, 8, 11]);
   return g;
 }
@@ -152,7 +154,7 @@ function makeScroll() {
     g.add(new THREE.Mesh(geo, topMat), new THREE.Mesh(under, topMat));
     g.add(lined(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge), 110, 0.008, 6, false), rimMat), 0.005));
     for (let row = 0; row < 6; row++) { const v = 0.3 + row * 0.115, cnt = Math.max(2, Math.round(arc * (r0 + (r1 - r0) * v) / 0.085));
-      for (let j = 0; j < cnt; j++) { const u = 0.07 + (j + 0.5 + (row % 2) * 0.5) / (cnt + 0.5) * 0.86; if (Math.sin(Math.PI * u) < 0.35) continue;
+      for (let j = 0; j < cnt; j++) { const u = 0.07 + (j + 0.5 + (row % 2) * 0.5) / (cnt + 0.5) * 0.86; if (Math.sin(Math.PI * u) < 0.35 || (Q(0, 1) && (j + row) % 2)) continue;
         const q = P(u, v), nn = new THREE.Vector3().crossVectors(P(u + 0.01, v).sub(q), P(u, v + 0.01).sub(q)).normalize(); if (nn.y < 0) nn.negate(); pts.push({ p: q, n: nn }); } } }
   // raised cups + flowers
   const cup = new THREE.SphereGeometry(1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2); cup.scale(1, 0.7, 1); cup.deleteAttribute('uv'); paint(cup, (c, x, y) => c.set('#A8B434').lerp(C('#E6E46A'), y / 0.7));
@@ -169,7 +171,7 @@ function makeBubble() {
   const base = new THREE.SphereGeometry(0.4, 40, 12, 0, Math.PI * 2, 0, Math.PI / 2), bp = base.attributes.position;
   for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), z = bp.getZ(i), an = Math.atan2(z, x), k = 1 + 0.06 * Math.abs(Math.sin(an * 16)); bp.setXYZ(i, x * k * 1.08, bp.getY(i) * 0.42, z * k * 0.95); }
   base.computeVertexNormals(); paint(base, (c, x, y) => c.set('#8E8468').lerp(new THREE.Color('#C8BFA2'), Math.min(1, y / 0.12))); g.add(lined(new THREE.Mesh(base, vmat()), 0.008));
-  const sg = new THREE.SphereGeometry(1, 28, 18), sp = sg.attributes.position;
+  const sg = new THREE.SphereGeometry(1, Q(28, 14), Q(18, 10)), sp = sg.attributes.position;
   for (let i = 0; i < sp.count; i++) { const y = sp.getY(i), k = y < 0 ? 1 + 0.4 * y : 1; sp.setXYZ(i, sp.getX(i) * k, y * 1.18, sp.getZ(i) * k); }
   sg.computeVertexNormals();
   const lo = new THREE.Color('#6FB08E'), mid = new THREE.Color('#D2E6C6'), hi = new THREE.Color('#F2F6E6'), vein = new THREE.Color('#FFFFFF');
@@ -182,7 +184,6 @@ function makeBubble() {
   const teeth = []; for (let k = 0; k < 46; k++) { const a = k / 46 * Math.PI * 2, b = new THREE.SphereGeometry(1, 6, 5); b.scale(0.055, 0.03 + rnd() * 0.015, 0.008); b.rotateY(-a); b.translate(Math.cos(a) * 0.44, 0.045, Math.sin(a) * 0.395); b.deleteAttribute('uv'); teeth.push(solid(b.toNonIndexed(), '#EFE8D2')); }
   g.add(lined(new THREE.Mesh(mergeGeometries(teeth), vmat()), 0.005));
   const ring = []; for (let k = 0; k < 64; k++) { const a = k / 64 * Math.PI * 2 + rnd() * 0.08, o = V(Math.cos(a), 0, Math.sin(a)); ring.push({ p: V(o.x * 0.44, 0.035 + rnd() * 0.02, o.z * 0.39), n: o.clone().multiplyScalar(1).add(V(0, 0.45 + rnd() * 0.5, 0)).normalize() }); }
-  const tent = polypField(hairGeo({ w: 0.11, cA: '#7FB494', cB: '#FFFFFF', knob: 1.6 }), pmat(), ring, { size: [0.07, 0.11], rnd, opt: { speed: 1.2, lo: 0.75, stretch: 0.6 } });
   g.add(hm, bm, gl); g.userData = { bm, hm, gl, items, t: 0 };
   animateBubble(g, 0); return g;
 }
@@ -194,7 +195,7 @@ function animateBubble(g, dt) { const u = g.userData; u.t += dt; u.items.forEach
 
 // 7 MUSHROOM CORAL (Fungia): thick, free-living oval discs lying on the sand; fine radial septa run from a central mouth slit to the rim
 function mushroomDisc(a, b, cIn, cOut, cRidge, ph, hull) {
-  const seg = 432, N = 36, H = 0.11, S = THREE.MathUtils.smoothstep;
+  const seg = Q(432, 108), N = 36, H = 0.11, S = THREE.MathUtils.smoothstep;
   const prof = []; for (let k = 0; k <= 18; k++) { const v = k / 18; prof.push([v, H * (1 - 0.8 * Math.pow(v, 2.4)), 1]); }
   const yR = H * 0.2; prof.push([1.035, yR - 0.022, 0.5], [1.02, yR - 0.045, 0], [0.9, yR - 0.06, 0], [0.5, yR - 0.062, 0], [0, yR - 0.062, 0]);
   const rings = prof.length - 1, geo = new THREE.PlaneGeometry(1, 1, seg, rings), p = geo.attributes.position, ridge = new Float32Array(p.count), vv = new Float32Array(p.count), top = new Float32Array(p.count);
@@ -217,7 +218,6 @@ function makeMushroom() {
    [0.12, 0.0, 0.52, 0.2, 0.18, '#3E8A7A', '#A8E0C0', '#F0FFF0', 4.4, 0.9, -0.06]].forEach(([x, y, z, a, b, cI, cO, cR, ph, r, tilt]) => {
     const m = new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph), vmat({ side: THREE.DoubleSide })); m.add(new THREE.Mesh(mushroomDisc(a, b, cI, cO, cR, ph, true), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.FrontSide })));
     m.position.set(x, y + 0.05, z); m.rotation.set(tilt, r, tilt * 0.6); g.add(m);
-    const tn = polypField(hairGeo({ w: 0.13, cA: cR, cB: '#FFFFFF', knob: 1.7 }), pmat(), sprinkle(m.geometry, Math.round(420 * a * b * 4), rnd, (pp) => pp.y > 0.035 && Math.hypot(pp.x / a, pp.z / b) > 0.2, true), { size: [0.02, 0.03], rnd, lean: 0.3, opt: { speed: 1.3, wave: 7, lo: 0.7, stretch: 0.5 } });
     });
   return g;
 }
@@ -244,7 +244,7 @@ function makePurplePore() {
 // 9 ORANGE CUP CORAL (Tubastraea): squat, ribbed orange cups packed on a rock; at night-like moments they bloom into fluffy yellow polyp flowers
 function cupGeo(R, h, seedA) {   // short barrel with fine ribs, flared lip and a hollow mouth
   const pr = [[R * 0.85, 0], [R * 0.95, h * 0.3], [R, h * 0.7], [R * 1.12, h * 0.95], [R * 1.08, h * 1.02], [R * 0.86, h * 1.0], [R * 0.6, h * 0.86], [0.0001, h * 0.8]].map(([x, y]) => new THREE.Vector2(x, y));
-  const g = new THREE.LatheGeometry(new THREE.SplineCurve(pr).getPoints(22), 40), p = g.attributes.position;
+  const g = new THREE.LatheGeometry(new THREE.SplineCurve(pr).getPoints(Q(22, 12)), Q(40, 20)), p = g.attributes.position;
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), r = Math.hypot(x, z), an = Math.atan2(z, x), y = p.getY(i), outer = y < h * 0.97 && r > R * 0.8 ? 1 : 0;
     const k = 1 + outer * 0.045 * Math.max(0, Math.cos(an * 18)) + (y > h * 0.9 && r < R * 0.95 ? 0.05 * Math.cos(an * 18) : 0); p.setX(i, x * k); p.setZ(i, z * k); }
   g.computeVertexNormals();
@@ -265,7 +265,7 @@ function makeCupCoral() {
   // polyp crown: 20 tapered tentacles with pale knobby tips around a little orange mouth disc
   const tg = new THREE.LatheGeometry([[0.008, 0], [0.007, 0.03], [0.005, 0.06], [0.008, 0.07], [0.006, 0.078], [0.0001, 0.082]].map(([x, y]) => new THREE.Vector2(x, y)), 6);
   paint(tg, (c, x, y) => c.set('#FFC22E').lerp(new THREE.Color('#FFF2B0'), Math.max(0, (y - 0.055) / 0.025)));
-  const T = 20, tm = new THREE.InstancedMesh(tg, vmat({ emissive: '#5A3000' }), cups.length * T);
+  const T = Q(20, 12), tm = new THREE.InstancedMesh(tg, vmat({ emissive: '#5A3000' }), cups.length * T);
   g.add(tm); g.userData = { cups, tm, T, t: 0 }; animateCup(g, 0);
   return g;
 }
@@ -315,7 +315,7 @@ function makeFireCoral() {
 function fingerGeo(len, R, bendAmt, ph) {
   const pts = [], n = 16; for (let k = 0; k <= n; k++) { const t = k / n; pts.push(new THREE.Vector2(R * (1 - 0.22 * t) * (1 + 0.09 * Math.sin(t * 8 + ph) + 0.05 * Math.sin(t * 17 + ph * 2)), len * t)); }
   const rt = pts[n].x; for (let k = 1; k <= 6; k++) { const a = k / 6 * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rt * Math.cos(a)), len + rt * 0.9 * Math.sin(a))); }
-  const g = new THREE.LatheGeometry(pts, 14), p = g.attributes.position, top = len + rt;
+  const g = new THREE.LatheGeometry(pts, Q(14, 8)), p = g.attributes.position, top = len + rt;
   for (let i = 0; i < p.count; i++) { const t = p.getY(i) / top; p.setX(i, p.getX(i) + bendAmt * t * t * len); }
   g.computeVertexNormals();
   const c0 = new THREE.Color('#7E7434'), c1 = new THREE.Color('#C9C25A'), c2 = new THREE.Color('#F6F2BE');
@@ -331,8 +331,7 @@ function makeFinger() {
   const mound = new THREE.SphereGeometry(0.44, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2); mound.scale(1, 0.3, 1); parts.push(solid(mound.toNonIndexed(), '#7E7434'));
   const geo = mergeGeometries(parts);
   const g = new THREE.Group(); g.add(lined(new THREE.Mesh(geo, vmat()), 0.01));
-  const fuzz = polypField(starGeo({ arms: 8, cIn: '#A8B848', cOut: '#FFFFFF', mouth: '#4E5A1E', tilt: 1.2, w: 0.15, seg: 2 }), pmat(), sprinkle(geo, 700, rnd, (p) => p.y > 0.07), { size: [0.016, 0.022], rnd, sink: 0.2, opt: { speed: 1.5, wave: 6, lo: 0.3 } });
-  g.userData.pfs = []; plantWorms(g, geo, 4, 0.3, (p, n) => p.y > 0.3 && n.y > 0.75, [4, 1, 9, 13]); return g;
+  g.userData.pfs = []; plantWorms(g, geo, 4, 0.3, (p, n) => p.y > 0.28 && n.y > 0.6, [4, 1, 9, 13]); return g;
 }
 
 const still = () => {};
@@ -349,4 +348,4 @@ export const CORALS3D = [
   { en: 'Fire coral', de: 'Feuerkoralle', make: makeFireCoral, anim: animatePF },
   { en: 'Finger coral', de: 'Fingerkoralle', make: makeFinger, anim: animWorms },
 ].map(c => ({ ...c, cam: [-1.9, 1.6, -2.4], target: [0, 0.3, 0] }));
-export { makeStaghorn, makeTable, makeCauliflower, makeBrain, makeScroll, makeBubble, animateBubble, makeMushroom, makePurplePore, makeCupCoral, animateCup, makeFireCoral, makeFinger };
+export { makeStaghorn, makeTable, makeCauliflower, makeBrain, makeScroll, makeBubble, animateBubble, makeMushroom, makePurplePore, makeCupCoral, animateCup, makeFireCoral, makeFinger, animatePF, animWorms };
