@@ -7,6 +7,7 @@ import * as C3 from './critters3d.js';
 import { setLite } from './polyps.js';
 import * as K from './corals3d.js';
 import * as SK from './softcorals3d.js';
+import * as RS from './reefscape.js';
 setLite(true);   // game-weight corals (the review page keeps full detail)
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
@@ -257,11 +258,11 @@ const KINDS = {
   vent: { make: () => M.makeVent(), shape: () => [] },
   turtle: { make: () => wrapC(C3.makeSeaTurtle(Math.random() < 0.5 ? 'green' : 'hawksbill'), C3.animateSeaTurtle), shape: () => [] },
   school: { make: () => { const g = F3.makeSchool3D(); M.animateSchool(g, 0.016); return g; }, shape: () => [] },
-  wall: { make: () => RF.makeReefWall(ri(1, 999), false), shape: () => [] },
-  mound: { make: () => RF.makeReefMound(ri(1, 9999), 1), shape: () => [] },
+  wall: { make: () => RS.makeCoralWall(ri(1, 999), false), shape: () => [] },
+  mound: { make: () => RS.makeOutcrop(ri(1, 9999), 1), shape: () => [] },
   bank: { make: () => RF.makeBank(ri(1, 9999)), shape: () => [] },
   kelp: { make: () => M.makeSeaweed(pick(['#2FB070', '#3FC27F', '#5AD08A']), rf(2.2, 3.4)), shape: () => [] },
-  patch: { make: () => RF.makeReefMound(ri(1, 9999), 0.4), shape: () => [] },
+  patch: { make: () => RS.makeOutcrop(ri(1, 9999), 0.5, 'carpet'), shape: () => [] },
   whaleshark: { make: () => CR.makeWhaleShark(), shape: () => [] },
   hammer: { make: () => shark3D('Blacktip reef shark'), shape: () => [] },
   blacktip: { make: () => shark3D('Blacktip reef shark'), shape: () => [] },
@@ -290,8 +291,9 @@ const KINDS = {
   gigantea: { make: () => anemK(RF.makeGigantea(ri(0, 3), rf(1.6, 2.1))), shape: () => [] },
   mertensii: { make: () => anemK(RF.makeMertensii(ri(0, 3), rf(1.4, 1.8))), shape: () => [] },
   heroanem: { make: () => RF.makeFluffyAnemone(ri(0, 99), rf(1.8, 2.3)), shape: () => [] },
-  moundbig: { make: () => RF.makeReefMound(ri(1, 9999), 1.5), shape: () => [] },
-  wallfar: { make: () => RF.makeReefWall(ri(1, 999), true), shape: () => [] },
+  moundbig: { make: () => RS.makeOutcrop(ri(1, 9999), 1.5), shape: () => [] },
+  pinnacle: { make: () => RS.makePinnacle(ri(1, 9999)), shape: () => [] },
+  wallfar: { make: () => RS.makeCoralWall(ri(1, 999), true), shape: () => [] },
   crab: { make: () => RF.makeCrab(pick(['#FF6B4A', '#FF8A3D', '#FF5C7A'])), shape: () => [] },
   seahorse: { make: () => pick([() => RF.makeSeahorse(), () => RF.makeSeahorse('#FF7FB8', '#FFD0EA'), () => RF.makeSeahorse('#9B6BE8', '#E2D4FF')])(), shape: () => [] },
   manta: { make: () => wrap3D('Manta ray', 2.4), shape: () => [] },
@@ -492,6 +494,7 @@ function decorRow(z) {
     if (Math.random() < 0.55) spawn(pick(['mound', 'mound', 'star']), -sd * rf(5.5, 10), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
     if (Math.random() < 0.55) spawn(pick(EDGE_CORALS), sd * rf(4.5, 6.5), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.25) * CS });
     if (Math.random() < 0.2) spawn(pick(['table', 'cauli', 'scroll', 'finger']), -sd * rf(4.6, 7.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: CS });
+    if (Math.random() < 0.06) spawn('pinnacle', -sd * rf(8.5, 12), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.2, 1.5) });
     sharedLife(z); return;
   }
   if (zone === 'reefbed') {  // swimming right over a rocky reef floor
@@ -507,6 +510,7 @@ function decorRow(z) {
       for (let k = 0; k < 5; k++) if (Math.random() < 0.8) spawn('kelp', sd * rf(4.6, 12), 0, z + rf(-2.5, 2.5), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.6) spawn(pick(['mound', 'rock', 'heroanem']), sd * rf(5.3, 8), 0, z, { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.15) spawn(pick(['whips', 'leather', 'xenia']), sd * rf(4.5, 6), 0, z + rf(-1.5, 1.5), { solid: false, ry: rf(0, 6), scale: CS });
+      if (Math.random() < 0.04) spawn('pinnacle', sd * rf(9.5, 13), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.2, 1.5) });
     }
     if (Math.random() < 0.3) spawn('grass', rf(-3.5, 3.5), 0, z, { solid: false, ry: rf(0, 6) });
     sharedLife(z); return;
@@ -516,6 +520,7 @@ function decorRow(z) {
       if (Math.random() < 0.45) spawn(pick(['mound', 'moundbig']), side * rf(5.5, 11), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.25) spawn(pick(['grass', 'star', 'weed', 'heroanem']), side * rf(4.4, 12), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6) });
       if (Math.random() < 0.18) spawn(pick(EDGE_CORALS), side * rf(4.6, 8.5), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(0.9, 1.3) * CS });
+      if (Math.random() < 0.07) spawn('pinnacle', side * rf(8, 12), 0, z + rf(-2, 2), { solid: false, ry: rf(0, 6), scale: rf(1.2, 1.5) });
       if (Math.random() < 0.08) spawn('wallfar', side * rf(20, 26), 0, z, { solid: false, ry: rf(0, 6), scale: rf(1.1, 1.5) });
       continue;
     }
@@ -924,7 +929,9 @@ renderer.info.autoReset = false;
 // quality: HQ = bloom + sharper resolution, LQ = no bloom, 1x resolution (toggle with Q)
 let hq = true; try { hq = localStorage.getItem('cubi_hq') !== 'low'; } catch (e) {}
 const PR_CAP = matchMedia('(pointer: coarse)').matches ? 1.25 : 1.5;
-function renderFrame() { renderer.info.reset(); if (composer && hq) composer.render(); else renderer.render(scene, camera); }
+scene.add(RS.fieldGroup);
+const fieldRoots = [];
+function renderFrame() { fieldRoots.length = 0; for (const o of objs) if (o.mesh.userData.corals) fieldRoots.push(o.mesh); RS.syncField(fieldRoots, camera.position); renderer.info.reset(); if (composer && hq) composer.render(); else renderer.render(scene, camera); }
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hq ? PR_CAP : 1));
@@ -1451,7 +1458,7 @@ loadLevel(STARTER_LEVELS[0], 0);
 resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
-window.__game = {
+window.__game = { scene,
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },

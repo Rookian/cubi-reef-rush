@@ -5,9 +5,9 @@ import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 // game quality: fewer segments and polyps (the review page keeps full detail)
-export const LITE = { on: false };
+export const LITE = { on: false, mini: false };   // mini: far copies baked into reef outcrops
 export const setLite = (v) => { LITE.on = !!v; };
-export const Q = (full, lite) => LITE.on ? lite : full;
+export const Q = (full, lite, mini = lite) => LITE.mini ? mini : LITE.on ? lite : full;
 function paintY(g, len, A, B, y0 = 0) { const p = g.attributes.position, a = new Float32Array(p.count * 3), c = new THREE.Color(); for (let i = 0; i < p.count; i++) { c.copy(A).lerp(B, Math.max(0, Math.min(1, (p.getY(i) - y0) / len))); a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
 const fin = g => { g.deleteAttribute('uv'); return g.index ? g.toNonIndexed() : g; };
 
@@ -31,7 +31,7 @@ export function tubeGeo(o = {}) { const { w = 0.4, cA = '#fff', cB = '#fff' } = 
 
 // scatter n points over a geometry. keep(p, n, colour) filters; up flips normals to face upward (for thin double-sided sheets)
 export function sprinkle(geo, n, rnd, keep, up = false) {
-  n = Math.round(n * Q(1, 0.45));
+  n = Math.round(n * Q(1, 0.45, 0.2));
   if (!geo.attributes.normal) geo.computeVertexNormals();
   const s = new MeshSurfaceSampler(new THREE.Mesh(geo)).setRandomGenerator(rnd).build(), out = [], p = new THREE.Vector3(), nr = new THREE.Vector3(), c = new THREE.Color(), hasC = !!geo.attributes.color;
   for (let tries = 0; out.length < n && tries < n * 10; tries++) { if (hasC) s.sample(p, nr, c); else s.sample(p, nr); if (up && nr.y < 0) nr.negate(); if (!keep || keep(p, nr, c)) out.push({ p: p.clone(), n: nr.clone() }); }

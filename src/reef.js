@@ -548,7 +548,7 @@ function xmasMat() { return (_xmasMat ||= new THREE.MeshToonMaterial({ vertexCol
 export function makeXmasWorm(pal = 0) { const w = new THREE.Group(); for (const sx of [-1, 1]) { const t = new THREE.Mesh(xmasTreeGeo(pal % XMAS.length), xmasMat()); t.position.x = sx * 0.17; t.rotation.z = -sx * 0.14; w.add(t); } return w; }
 export function makeXmasRock(seed = 1) {
   const g = new THREE.Group(); const R = rng(seed * 11 + 5);
-  const rock = outline(new THREE.Mesh(xf(lumpGeo(seed, 2), 0, 0.35, 0, 0.9, 0.55, 0.8), toon('#C8BC92')), 0.03, '#5A5034'); g.add(rock);
+  const rock = outline(new THREE.Mesh(xf(lumpGeo(seed, 3), 0, 0.35, 0, 0.9, 0.55, 0.8), toon('#B39E78')), 0.03, '#4E3E28'); g.add(rock);   // a Porites boulder: the coral these worms bore into
   const worms = [];
   const n = 5 + Math.floor(R() * 3);
   for (let i = 0; i < n; i++) {

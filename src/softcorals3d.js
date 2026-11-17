@@ -33,7 +33,7 @@ function makeLeather() {
   seed = 61; const g = new THREE.Group(), S = THREE.MathUtils.smoothstep, C = (h) => new THREE.Color(h);
   const ctrl = [[0.25, 0], [0.19, 0.04], [0.155, 0.12], [0.15, 0.22], [0.17, 0.3], [0.3, 0.37], [0.5, 0.41], [0.63, 0.43], [0.665, 0.455], [0.64, 0.485], [0.5, 0.49], [0.3, 0.475], [0.12, 0.455], [0.0001, 0.45]];
   const NP = 56, prof = new THREE.SplineCurve(ctrl.map(([x, y]) => new THREE.Vector2(x, y))).getPoints(NP - 1), jTop = Math.round(NP * 0.66);
-  const geo = new THREE.LatheGeometry(prof, Q(128, 72)), p = geo.attributes.position, fold = (a) => 0.1 * Math.sin(a * 5 + 0.7) + 0.045 * Math.sin(a * 9 + 2.1) + 0.02 * Math.sin(a * 17);
+  const geo = new THREE.LatheGeometry(prof, Q(128, 72, 36)), p = geo.attributes.position, fold = (a) => 0.1 * Math.sin(a * 5 + 0.7) + 0.045 * Math.sin(a * 9 + 2.1) + 0.02 * Math.sin(a * 17);
   const bend = (x, y, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x), w = y > 0.3 ? Math.pow(S(r, 0.2, 0.66), 1.4) : 0, k = 1 + 0.09 * Math.sin(a * 5 + 1.9) * w, wr = y < 0.3 ? 1 + 0.035 * Math.sin(y * 80) * S(y, 0.03, 0.1) : 1;
     return V(x * k * wr, y + fold(a) * w, z * k * wr); };
   for (let i = 0; i < p.count; i++) { const q = bend(p.getX(i), p.getY(i), p.getZ(i)); p.setXYZ(i, q.x, q.y, q.z); }
@@ -46,7 +46,7 @@ function makeLeather() {
     else c.copy(t0).lerp(t1, S(r, 0.1, 0.55)).lerp(mar, S(r, 0.56, 0.66) * 0.8); });
   const cap = lined(new THREE.Mesh(ni(geo), vmat({ side: THREE.DoubleSide })), 0.011); g.add(cap);
   const pg = starGeo({ arms: 8, cIn: '#F2E27A', cOut: '#FFFFFF', mouth: '#6E9A22', stem: 1.9, stemW: 0.16, cStem: '#CFC47A', tilt: 1.15, w: 0.105, curl: 0.35 }); pg.scale(0.027, 0.027, 0.027);
-  const items = [], N = Q(560, 300);
+  const items = [], N = Q(560, 300, 0);
   for (let k = 0; k < N; k++) { const a = k * 2.39996, r = 0.06 + Math.sqrt((k + 0.5) / N) * 0.56, x = Math.cos(a) * r, z = Math.sin(a) * r, e = 0.01;
     const q = bend(x, topY(r), z), nx = bend(x + e, topY(Math.hypot(x + e, z)), z).sub(q), nz = bend(x, topY(Math.hypot(x, z + e)), z + e).sub(q), nn = new THREE.Vector3().crossVectors(nz, nx).normalize(); if (nn.y < 0) nn.negate();
     items.push({ p: q, d: nn.lerp(UP, 0.25).normalize(), s: 0.85 + rnd() * 0.4, ph: rnd() * 6.28, r }); }
@@ -64,7 +64,7 @@ function makeTreeCoral() {
   const trunkMat = vmat({ opacity: 0.86 });
   const branch = (parent, len, r, depth, rot) => {
     const b = new THREE.Group(); b.rotation.set(rot[0], rot[1], rot[2]); parent.add(b);
-    const geo = new THREE.CylinderGeometry(r * 0.7, r, len, 12, 10); geo.translate(0, len / 2, 0); paint(geo, (c, x, y, z, i) => { c.set('#F2B8CE').lerp(new THREE.Color('#FBE2EC'), y / len); if ((i * 7919) % 5 === 0) c.set('#FFFFFF'); if ((i * 104729) % 11 === 0) c.set('#E0709A'); });
+    const geo = new THREE.CylinderGeometry(r * 0.7, r, len, Q(12, 12, 5), Q(10, 10, 2)); geo.translate(0, len / 2, 0); paint(geo, (c, x, y, z, i) => { c.set('#F2B8CE').lerp(new THREE.Color('#FBE2EC'), y / len); if ((i * 7919) % 5 === 0) c.set('#FFFFFF'); if ((i * 104729) % 11 === 0) c.set('#E0709A'); });
     const m = Q(lined(new THREE.Mesh(geo, trunkMat), 0.008), new THREE.Mesh(geo, trunkMat)); b.add(m); swayers.push({ o: b, rest: rot.slice(), ph: rnd() * 6.28, amp: 0.05 + depth * 0.025 });
     if (depth >= 3) { const c = new THREE.Group(); c.position.y = len; b.add(c); tips.push(c); return; }
     const n = depth === 0 ? 4 : 3;
@@ -75,9 +75,9 @@ function makeTreeCoral() {
   branch(g, 0.55, 0.07, 0, [0, 0, 0]);
   // polyp bunches: instanced balls arranged as little cauliflowers
   const bunch = (() => { const ps = [], st = starGeo({ arms: 8, cIn: '#FF4E86', cOut: '#FFE6EE', mouth: '#FFE27A', tilt: 0.95, w: 0.13 }), core = new THREE.Color('#C8124E');
-    const NB = Q(11, 7); for (let i = 0; i < NB; i++) { const y = 1 - (i + 0.5) / NB * 1.5, rr = Math.sqrt(Math.max(0, 1 - y * y)), a = i * 2.4, d = V(Math.cos(a) * rr, y, Math.sin(a) * rr).normalize(), p = V(d.x * 0.05, 0.035 + d.y * 0.034, d.z * 0.05), sz = 0.022 + rnd() * 0.007;
-      const b = new THREE.SphereGeometry(sz, Q(8, 5), Q(6, 3)); b.translate(p.x, p.y, p.z); ps.push(paint(ni(b), c => c.copy(core)));
-      const k = st.clone(); k.scale(sz * 1.25, sz * 1.25, sz * 1.25); k.applyMatrix4(new THREE.Matrix4().compose(p.clone().addScaledVector(d, sz * 0.75), new THREE.Quaternion().setFromUnitVectors(UP, d), V(1, 1, 1))); ps.push(k); }
+    const NB = Q(11, 7, 4); for (let i = 0; i < NB; i++) { const y = 1 - (i + 0.5) / NB * 1.5, rr = Math.sqrt(Math.max(0, 1 - y * y)), a = i * 2.4, d = V(Math.cos(a) * rr, y, Math.sin(a) * rr).normalize(), p = V(d.x * 0.05, 0.035 + d.y * 0.034, d.z * 0.05), sz = 0.022 + rnd() * 0.007;
+      const b = new THREE.SphereGeometry(sz, Q(8, 5, 4), Q(6, 3, 2)); b.translate(p.x, p.y, p.z); ps.push(paint(ni(b), c => c.copy(core)));
+      if (Q(0, 0, 1)) continue; const k = st.clone(); k.scale(sz * 1.25, sz * 1.25, sz * 1.25); k.applyMatrix4(new THREE.Matrix4().compose(p.clone().addScaledVector(d, sz * 0.75), new THREE.Quaternion().setFromUnitVectors(UP, d), V(1, 1, 1))); ps.push(k); }
     const g2 = mergeGeometries(ps); g2.computeVertexNormals(); return g2; })();
   const bmat = vmat({ emissive: '#3A0014' }); tips.forEach(c => { const m = Q(lined(new THREE.Mesh(bunch, bmat), 0.0035), new THREE.Mesh(bunch, bmat)); m.rotation.y = rnd() * 6.28; c.add(m); });
   const foot = new THREE.SphereGeometry(0.12, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2); foot.scale(1.3, 0.4, 1.3); g.add(lined(new THREE.Mesh(foot, cmat('#F2B8CE')), 0.008));
@@ -88,9 +88,9 @@ function animateTree(g, dt) { const u = g.userData; u.t += dt; u.swayers.forEach
 // 3 PULSING XENIA: wrinkled mauve trunks crowned with long-stemmed polyps; each polyp is a hand of 8 feathery arms that opens and closes
 function makeXenia() {
   seed = 71; const g = new THREE.Group(), heads = [], C = (h) => new THREE.Color(h), parts = [];
-  const AL = 0.085, arm = (() => { const ps = []; const rach = new THREE.CylinderGeometry(0.0028, 0.0062, AL, Q(6, 4), Q(8, 3)); rach.translate(0, AL / 2, 0); rach.scale(1, 1, 0.6); ps.push(ni(rach));
-    for (let k = 0; k < 11; k += Q(1, 2)) { const t = (k + 1) / 12, y = AL * (0.1 + t * 0.86), len = 0.02 * (1 - t * 0.55) * (k < 2 ? 0.6 + k * 0.2 : 1); [-1, 1].forEach(sd => { const f = new THREE.ConeGeometry(0.0022, len, Q(4, 3)); f.translate(0, len / 2, 0); f.rotateZ(-sd * 0.95); f.translate(sd * 0.003, y, 0); ps.push(ni(f)); }); }
-    const tip = new THREE.SphereGeometry(0.0034, 6, 4); tip.translate(0, AL, 0); ps.push(ni(tip));
+  const AL = 0.085, arm = (() => { const ps = []; const rach = new THREE.CylinderGeometry(0.0028, 0.0062, AL, Q(6, 4, 3), Q(8, 3, 1)); rach.translate(0, AL / 2, 0); rach.scale(1, 1, 0.6); ps.push(ni(rach));
+    for (let k = 0; k < 11; k += Q(1, 2, 4)) { const t = (k + 1) / 12, y = AL * (0.1 + t * 0.86), len = 0.02 * (1 - t * 0.55) * (k < 2 ? 0.6 + k * 0.2 : 1); [-1, 1].forEach(sd => { const f = new THREE.ConeGeometry(0.0022, len, Q(4, 3)); f.translate(0, len / 2, 0); f.rotateZ(-sd * 0.95); f.translate(sd * 0.003, y, 0); ps.push(ni(f)); }); }
+    const tip = new THREE.SphereGeometry(0.0034, Q(6, 6, 3), Q(4, 4, 2)); tip.translate(0, AL, 0); ps.push(ni(tip));
     const a = mergeGeometries(ps), q = a.attributes.position; for (let i = 0; i < q.count; i++) { const t = q.getY(i) / AL; q.setZ(i, q.getZ(i) - 0.22 * t * t * AL + Math.abs(q.getX(i)) * 0.25); }
     a.computeVertexNormals(); const c0 = C('#C8508E'), c1 = C('#F6B8D6'), c2 = C('#FFF6FB'), pin = C('#FFE9F4');
     paint(a, (c, x, y) => { const t = Math.max(0, Math.min(1, y / AL)); c.copy(c0).lerp(c1, Math.min(1, t * 2.2)).lerp(c2, Math.max(0, (t - 0.55) / 0.45)); if (Math.abs(x) > 0.004) c.lerp(pin, 0.7); }); return a; })();
@@ -100,12 +100,12 @@ function makeXenia() {
     // wrinkled trunk
     const tp = []; for (let k = 0; k <= 20; k++) { const t = k / 20; tp.push(new THREE.Vector2(0.04 * (1.15 - 0.3 * t + 0.25 * t * t * t) * (1 + 0.07 * Math.sin(t * 34)), h * t)); }
     for (let k = 1; k <= 4; k++) { const an = k / 4 * Math.PI / 2; tp.push(new THREE.Vector2(Math.max(0.0001, 0.044 * Math.cos(an)), h + 0.02 * Math.sin(an))); }
-    const tr = new THREE.LatheGeometry(tp, 16); paint(tr, (c, x, y) => c.set('#7A4A7E').lerp(C('#D8A6CC'), Math.min(1, y / h)).lerp(C('#5A2E62'), 0.35 * Math.max(0, Math.sin(y / h * 34 + 3.6))));
+    const tr = new THREE.LatheGeometry(tp, Q(16, 16, 7)); paint(tr, (c, x, y) => c.set('#7A4A7E').lerp(C('#D8A6CC'), Math.min(1, y / h)).lerp(C('#5A2E62'), 0.35 * Math.max(0, Math.sin(y / h * 34 + 3.6))));
     parts.push(ni(tr).applyMatrix4(new THREE.Matrix4().compose(base, q0, V(1, 1, 1))));
     // polyps on slender stems fanning out of the crown
-    const n = Q(9, 6); for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, pa = k * 2.39996 + s, sp = 0.15 + Math.sqrt(f) * 1.0, pd = V(Math.cos(pa) * Math.sin(sp), Math.cos(sp), Math.sin(pa) * Math.sin(sp)).applyQuaternion(q0), sl = 0.07 + rnd() * 0.07;
+    const n = Q(9, 6, 2); for (let k = 0; k < n; k++) { const f = (k + 0.5) / n, pa = k * 2.39996 + s, sp = 0.15 + Math.sqrt(f) * 1.0, pd = V(Math.cos(pa) * Math.sin(sp), Math.cos(sp), Math.sin(pa) * Math.sin(sp)).applyQuaternion(q0), sl = 0.07 + rnd() * 0.07;
       const sb = top.clone().addScaledVector(V(Math.cos(pa), 0, Math.sin(pa)).applyQuaternion(q0), 0.022 * Math.sqrt(f)), pc = sb.clone().addScaledVector(pd, sl);
-      const st = new THREE.CylinderGeometry(0.0055, 0.008, sl, 6); st.translate(0, sl / 2, 0); paint(st, (c, x, y) => c.copy(stemC0).lerp(stemC1, y / sl)); parts.push(ni(st).applyMatrix4(new THREE.Matrix4().compose(sb, new THREE.Quaternion().setFromUnitVectors(UP, pd), V(1, 1, 1))));
+      const st = new THREE.CylinderGeometry(0.0055, 0.008, sl, Q(6, 6, 3)); st.translate(0, sl / 2, 0); paint(st, (c, x, y) => c.copy(stemC0).lerp(stemC1, y / sl)); parts.push(ni(st).applyMatrix4(new THREE.Matrix4().compose(sb, new THREE.Quaternion().setFromUnitVectors(UP, pd), V(1, 1, 1))));
       const ph = rnd() * 6.28, sc = 0.8 + rnd() * 0.3; heads.push({ c: pc, d: pd });
       for (let j = 0; j < 8; j++) items.push({ p: pc, d: pd, j, ph, s: sc, q: new THREE.Quaternion().setFromUnitVectors(UP, pd) }); } }
   const foot = new THREE.SphereGeometry(0.17, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2); foot.scale(1.2, 0.3, 1.2); parts.push(solid2(ni(foot), '#7A4A7E'));
@@ -126,10 +126,10 @@ function animateXenia(g, dt) { const u = g.userData; u.t += dt;
 function makeWhips() {
   seed = 73; const uT = { value: 0 }; const g = new THREE.Group(), whips = [], wst = starGeo({ arms: 8, cIn: '#FFD8C0', cOut: '#FFFFFF', mouth: '#B8301A', tilt: 1.05, w: 0.13, seg: 1 });
   for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2 + rnd() * 0.5, h = 0.7 + rnd() * 0.6, tilt = 0.18 + rnd() * 0.25, col = k % 3 === 2 ? ['#F2E2C8', '#FFF6E8'] : ['#D8401E', '#FF7A3A'];
-    let geo = new THREE.CylinderGeometry(0.007, 0.016, h, Q(8, 5), Q(48, 24), false); geo.translate(0, h / 2, 0);
+    let geo = new THREE.CylinderGeometry(0.007, 0.016, h, Q(8, 5, 4), Q(48, 24, 8), false); geo.translate(0, h / 2, 0);
     const A = new THREE.Color(col[0]), B = new THREE.Color(col[1]), W = new THREE.Color('#FFF8F0');
     paint(geo, (c, x, y) => { c.copy(A).lerp(B, y / h); });
-    const ps = [ni(geo)], np = Math.round(h * Q(95, 40)); for (let j = 0; j < np; j++) { const y = 0.06 + (j + rnd()) / np * (h - 0.07), an = j * 2.39996, rr = 0.016 - 0.009 * y / h, d = V(Math.cos(an), 0.35, Math.sin(an)).normalize(), k = wst.clone(), sz = 0.011 + rnd() * 0.005;
+    const ps = [ni(geo)], np = Math.round(h * Q(95, 40, 5)); for (let j = 0; j < np; j++) { const y = 0.06 + (j + rnd()) / np * (h - 0.07), an = j * 2.39996, rr = 0.016 - 0.009 * y / h, d = V(Math.cos(an), 0.35, Math.sin(an)).normalize(), k = wst.clone(), sz = 0.011 + rnd() * 0.005;
       k.scale(sz, sz, sz); k.applyMatrix4(new THREE.Matrix4().compose(V(Math.cos(an) * rr, y, Math.sin(an) * rr), new THREE.Quaternion().setFromUnitVectors(UP, d), V(1, 1, 1))); ps.push(k); }
     geo = mergeGeometries(ps); geo.computeVertexNormals(); const WU = { value: new THREE.Vector4(h, 0.7 + rnd() * 0.4, rnd() * 6.28, 0) };
     const m = new THREE.Mesh(geo, whipMat(vmat(), uT, WU, 0)); m.add(Object.assign(new THREE.Mesh(geo, whipMat(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), uT, WU, 0.003)), { raycast: () => {} })); m.position.set(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08); m.rotation.set(Math.cos(a) * tilt, 0, -Math.sin(a) * tilt); g.add(m);
@@ -155,30 +155,30 @@ function makeBubbleTip() {
   seed = 79; const g = new THREE.Group(), S = THREE.MathUtils.smoothstep, C = (h) => new THREE.Color(h);
   // column: flares from a narrow foot into a wavy collar
   const cp = []; for (let k = 0; k <= 14; k++) { const t = k / 14; cp.push(new THREE.Vector2(0.15 + 0.03 * Math.sin(t * 5) + Math.pow(t, 2.2) * 0.2, t * 0.2)); }
-  const col = new THREE.LatheGeometry(cp, 64), p = col.attributes.position;
+  const col = new THREE.LatheGeometry(cp, Q(64, 64, 20)), p = col.attributes.position;
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i), y = p.getY(i), an = Math.atan2(z, x), w = Math.pow(y / 0.2, 2), k = 1 + 0.07 * Math.sin(an * 9) * w; p.setXYZ(i, x * k, y + 0.02 * Math.sin(an * 9 + 1) * w, z * k); }
   col.computeVertexNormals(); const cA = C('#7A1626'), cB = C('#C8303E'), cS = C('#F2A0A0');
   paint(col, (c, x, y, z) => { const an = Math.atan2(z, x); c.copy(cA).lerp(cB, y / 0.2); c.lerp(cS, 0.5 * Math.pow(Math.max(0, Math.sin(an * 14) * Math.sin(y * 90)), 6)); });
   g.add(lined(new THREE.Mesh(ni(col), vmat({ side: THREE.DoubleSide })), 0.009));
   // oral disc with radial stripes and a raised mouth
-  const disc = new THREE.CircleGeometry(0.33, 64, 0, Math.PI * 2); disc.rotateX(-Math.PI / 2); const dp = disc.attributes.position;
+  const disc = new THREE.CircleGeometry(0.33, Q(64, 64, 20), 0, Math.PI * 2); disc.rotateX(-Math.PI / 2); const dp = disc.attributes.position;
   for (let i = 0; i < dp.count; i++) { const r = Math.hypot(dp.getX(i), dp.getZ(i)); dp.setY(i, 0.185 + 0.03 * Math.exp(-r * r / 0.004)); }
   disc.computeVertexNormals(); paint(disc, (c, x, y, z) => { const r = Math.hypot(x, z), an = Math.atan2(z, x); c.set('#8A4A3E').lerp(C('#E8B8A0'), 0.5 * Math.pow(Math.abs(Math.sin(an * 12)), 4)); if (r < 0.05) c.lerp(C('#FFD0C8'), 1 - r / 0.05); });
   g.add(new THREE.Mesh(ni(disc), vmat()));
   // tentacle: slim striped stalk curving outward, swollen bulb with a pale band, pointed tip
-  const TP = Q(34, 16), L = 0.3, prof = [[0.011, 0], [0.011, 0.25], [0.0095, 0.5], [0.0095, 0.6], [0.014, 0.66], [0.024, 0.73], [0.029, 0.8], [0.027, 0.86], [0.019, 0.91], [0.011, 0.95], [0.006, 0.985], [0.0001, 1]];
-  const mk = (grow) => { const t = new THREE.LatheGeometry(new THREE.SplineCurve(prof.map(([r, y]) => new THREE.Vector2(r + grow, y * L))).getPoints(TP), Q(12, 6)), q = t.attributes.position;
+  const TP = Q(34, 16, 8), L = 0.3, prof = [[0.011, 0], [0.011, 0.25], [0.0095, 0.5], [0.0095, 0.6], [0.014, 0.66], [0.024, 0.73], [0.029, 0.8], [0.027, 0.86], [0.019, 0.91], [0.011, 0.95], [0.006, 0.985], [0.0001, 1]];
+  const mk = (grow) => { const t = new THREE.LatheGeometry(new THREE.SplineCurve(prof.map(([r, y]) => new THREE.Vector2(r + grow, y * L))).getPoints(TP), Q(12, 6, 4)), q = t.attributes.position;
     for (let i = 0; i < q.count; i++) { const y = q.getY(i) / L; q.setX(i, q.getX(i) + 0.3 * y * y * L); q.setY(i, q.getY(i) - 0.1 * y * y * y * L); } t.computeVertexNormals(); return t; };
   const tg = mk(0), st0 = C('#8E3A4E'), st1 = C('#D0607A'), bulb = C('#FF86A0'), band = C('#FFE6EA'), tipc = C('#E0207A');
   { const q = tg.attributes.position; let i = 0; paint(tg, (c, x, y0, z) => { const row = i % (TP + 1), colm = Math.floor(i / (TP + 1)); i++; const y = row / TP;
       c.copy(st0).lerp(st1, y * 1.4); if (colm % 2) c.lerp(band, 0.22 * (1 - S(y, 0.5, 0.66))); c.lerp(bulb, S(y, 0.6, 0.72)); c.lerp(band, 0.85 * S(y, 0.76, 0.79) * (1 - S(y, 0.82, 0.85))); c.lerp(tipc, S(y, 0.9, 0.97)); }); }
-  const items = [], N = Q(150, 100);
+  const items = [], N = Q(150, 100, 60);
   for (let i = 0; i < N; i++) { const f = (i + 0.5) / N, r = 0.05 + Math.sqrt(f) * 0.27, a = i * 2.39996, out = V(Math.cos(a), 0, Math.sin(a)), tilt = 0.1 + f * 0.8;
     items.push({ p: V(out.x * r, 0.185, out.z * r), out, tilt, s: (0.6 + f * 0.55) * (0.85 + rnd() * 0.3), w: 0.9 + rnd() * 0.35, ph: rnd() * 6.28, r, a }); }
   const im = new THREE.InstancedMesh(tg, vmat({ emissive: '#30000C' }), N), hm = new THREE.InstancedMesh(mk(0.0035), new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), N); g.add(hm, im);
   // clownfish pair
   const fish = []; const d = design('Clownfish');
-  if (d) [[0.3, 0.1], [0.2, 2.4]].forEach(([size, ph]) => { const f = makeFish3D(d, size); g.add(f); fish.push({ f, ph, size }); });
+  if (d) [[0.3, 0.1], [0.2, 2.4]].forEach(([size, ph]) => { const f = makeFish3D(d, size); f.userData.noBake = true; g.add(f); fish.push({ f, ph, size }); });
   g.userData = { t: 0, im, hm, items, fish }; animateBubbleTip(g, 0); return g;
 }
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _b = new THREE.Matrix4();
