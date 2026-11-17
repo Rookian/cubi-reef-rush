@@ -156,7 +156,7 @@ function rockGeo(R, w, h, d, pal) {
     col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
 }
-const ROCKS = [['#4E4A58', '#8E8898', '#B8708E'], ['#46505A', '#7E8C94', '#A87090'], ['#5A5048', '#9A8C7A', '#B87C7C'], ['#48485E', '#80809E', '#9E78A8']];
+const ROCKS = [['#2E2A44', '#5E5A7E', '#8E5A86'], ['#263646', '#506A80', '#82608A'], ['#3A3046', '#6A5A78', '#9A6080'], ['#2A3040', '#56607A', '#7A6A96']];
 
 // spots on the rock's upper surface, well spread, with their surface normal
 function spots(geo, n, R, minY, gap) {
@@ -190,7 +190,7 @@ const SIZE = { stag: 1.7, table: 1.9, cauli: 1.4, brain: 1.3, scroll: 1.5, bubbl
 export function makeOutcrop(seed = 1, big = 1, theme = null) {
   const R = rng(seed * 29 + 11); theme ||= pickR(R, THEME_NAMES); const T = THEMES[theme];
   const flat = theme === 'carpet', w = (0.85 + R() * 0.4) * big, h = (flat ? 0.18 : (0.45 + R() * 0.35) * (theme === 'boulder' ? 1.5 : 1)) * big, d = (0.8 + R() * 0.35) * big;
-  const pal = theme === 'boulder' ? ['#7A6A50', '#C8B48E', '#B89A70'] : pickR(R, ROCKS);
+  const pal = theme === 'boulder' ? ['#6A5A42', '#B09A72', '#9A7E5A'] : pickR(R, ROCKS);
   const rock = rockGeo(R, w, h, d, pal), corals = [];
   const add = (kind, q, s) => { const v = Math.floor(R() * variants(kind)), g = baked(kind, v), k = s * SIZE[kind] / Math.max(0.6, g.userData.w);
     corals.push({ key: kind + ':' + v, m: local(q.p.x, q.p.y - 0.04 * k, q.p.z, k, R() * 6.28, q.n.clone().lerp(UP, 0.65).normalize()) }); };

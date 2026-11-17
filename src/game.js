@@ -18,13 +18,14 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { makeRenderer, setupScene, makeFloor, rayTexture, causticClock } from './env.js';
 import { STARTER_LEVELS, normalizeLevel, countPearls, loadCustom, LANE, HAZARDS } from './levels.js';
 
 // ------------------------------------------------------------------ setup
 const canvas = document.getElementById('c');
 const renderer = makeRenderer(canvas, matchMedia("(pointer: coarse)").matches ? 1.25 : 1.5);
-const { scene, sun } = setupScene(renderer, { fogNear: 9, fogFar: 46 });
+const { scene, sun } = setupScene(renderer, { fogNear: 13, fogFar: 46 });   // less haze close up so near corals keep their colour
 const { floor, sand, caus } = makeFloor();
 // ---- living terrain: the path curves left/right and rolls up/down; ground is sand or rocky reef ----
 const TER = { W: 84, L: 72, NX: 56, NZ: 72, z0: 4 };
@@ -914,6 +915,19 @@ addEventListener('keydown', (e) => { if (mode === 'splash' && (e.key === 'Enter'
 if (/[?&]play=custom/.test(location.search)) { const c = loadCustom(); if (c) setTimeout(() => start(c, -1), 50); }
 
 // ------------------------------------------------------------------ resize
+// colour grade: vibrance (lifts the dull colours most, so corals pop without over-cooking what is already vivid),
+// a gentle S-curve for contrast, and a touch of warmth in the highlights against the blue water
+const GRADE = { vib: { value: 0.5 }, sat: { value: 1.08 }, con: { value: 1.3 }, warm: { value: 0.6 } };
+const gradePass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, ...GRADE }, vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float vib, sat, con, warm; varying vec2 vUv;
+    void main() { vec4 t = texture2D(tDiffuse, vUv); vec3 c = max(t.rgb, 0.0);
+      vec3 s = pow(c, vec3(1.0 / 2.2));                                  // grade in display space
+      float l = dot(s, vec3(0.2126, 0.7152, 0.0722)), mx = max(s.r, max(s.g, s.b)), mn = min(s.r, min(s.g, s.b));
+      s = mix(vec3(l), s, sat + vib * (1.0 - (mx - mn)));               // vibrance + saturation
+      s = clamp(s, 0.0, 1.0); s = mix(s, s * s * (3.0 - 2.0 * s), con - 1.0);   // S-curve contrast
+      s += warm * vec3(0.04, 0.015, -0.03) * smoothstep(0.45, 1.0, l);
+      gl_FragColor = vec4(pow(max(s, 0.0), vec3(2.2)), t.a); }` });
+for (const k in GRADE) GRADE[k] = gradePass.uniforms[k];   // ShaderPass clones its uniforms: talk to the live ones
 // soft bloom: only the brightest, glowing colours (coral tips, anemones, fish) get a halo of their own colour
 const BLOOM = !/[?&]nobloom/.test(location.search);
 let composer = null, bloomPass = null;
@@ -923,6 +937,7 @@ if (BLOOM) {
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.35, 0.93);
   composer.addPass(bloomPass);
+  composer.addPass(gradePass);
   composer.addPass(new OutputPass());
 }
 renderer.info.autoReset = false;
@@ -1457,6 +1472,7 @@ function updateStream(o) {
 loadLevel(STARTER_LEVELS[0], 0);
 resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
+window.__grade = (o) => { for (const k in o) if (GRADE[k]) GRADE[k].value = o[k]; else if (k === 'fogNear') scene.fog.near = o[k]; else if (k === 'glow') glowU.uGlowK.value = o[k]; };
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
 window.__game = { scene,
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },

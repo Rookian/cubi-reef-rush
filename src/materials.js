@@ -113,7 +113,7 @@ export function finMesh(len, spread, lobes, color, rayColor, edge = OUTLINE, edg
 // Living glow: vivid colours give off a soft light of their own (scaled by saturation, so
 // rocks, sand, eyes and white stripes stay as they are), with a slow shimmer.
 // ------------------------------------------------------------------
-export const glowU = { uGlowT: { value: 0 }, uGlowK: { value: 0.4 } };
+export const glowU = { uGlowT: { value: 0 }, uGlowK: { value: 0.5 } };
 export function glowify(mat) {
   if (!mat || !mat.isMeshToonMaterial || mat.userData.glow || mat.userData.noGlow) return;
   mat.userData.glow = true;
