@@ -306,6 +306,8 @@ const KINDS = {
   shelfR: { make: () => RS.makeSlabSeg(ri(1, 9999), 1.9, 3.1, -0.2, 3.6), shape: () => [] },
   tunnel: { make: () => RS.makeTunnelSeg(ri(1, 9999)), shape: () => [] },
   tunnelMouth: { make: () => RS.makeTunnelSeg(ri(1, 9999), true), shape: () => [] },
+  hump: { make: () => RS.makeSlabSeg(ri(1, 9999), -0.3, 1.65, -1.4, 1.4), shape: () => [] },
+  roof: { make: () => RS.makeSlabSeg(ri(1, 9999), 2.9, 5.6, -3.6, 3.6), shape: () => [] },
   wallfar: { make: () => RS.makeCoralWall(ri(1, 999), true), shape: () => [] },
   crab: { make: () => RF.makeCrab(pick(['#FF6B4A', '#FF8A3D', '#FF5C7A'])), shape: () => [] },
   seahorse: { make: () => pick([() => RF.makeSeahorse(), () => RF.makeSeahorse('#FF7FB8', '#FFD0EA'), () => RF.makeSeahorse('#9B6BE8', '#E2D4FF')])(), shape: () => [] },
@@ -366,7 +368,7 @@ function spawn(kind, x, y, z, opt = {}) {
   if (RESIDENT_HOMES.includes(kind) && !opt.noRes) residents(o);
   return o;
 }
-let hungry = null, hungryCD = 25, hungryTipShown = false;   // the one hungry shark (see SHARKS WITH MOODS)
+let hungry = null, hungryCD = 45, hungryTipShown = false;   // the one hungry shark (see SHARKS WITH MOODS)
 // ---- who lives where: each reef structure gets the fish that really hang around that kind of coral
 const RESIDENT_HOMES = ['mound', 'moundbig', 'wall', 'pinnacle'];
 const BIG_ROCKS = new Set(['mound', 'moundbig', 'wall', 'pinnacle', 'rock', 'patch', 'xmas']);
@@ -396,7 +398,7 @@ let prewarmI = 0;
 function prewarmStep() { if (prewarmI >= PREWARM.length * 2) return; const k = PREWARM[prewarmI % PREWARM.length]; prewarmI++;
   const m = KINDS[k].make(); if (!NOGLOW.includes(k)) glowAll(m); m.traverse(q => { q.castShadow = false; }); (pools[k] ||= []).push(m); }
 function despawn(o) {
-  if (o === hungry) { hungry = null; hungryCD = rf(35, 60); const w = $('sharkwarn'); if (w) w.classList.remove('show'); }
+  if (o === hungry) { hungry = null; hungryCD = rf(60, 100); const w = $('sharkwarn'); if (w) w.classList.remove('show'); }
   scene.remove(o.mesh);
   if (o.extra) o.extra.forEach(e => scene.remove(e));
   if (o.clown && !o.clownTaken) scene.remove(o.clown);
@@ -446,7 +448,7 @@ let whaleTimes = [];
 function resetWorld() {
   whaleTimes = [rf(0.15, 0.3), rf(0.55, 0.75)];
   buildZones();
-  [...objs].forEach(despawn); objs.length = 0; finishObj = null; hungry = null; hungryCD = 25;
+  [...objs].forEach(despawn); objs.length = 0; finishObj = null; hungry = null; hungryCD = 45;
   if (buddy) { scene.remove(buddy); buddy = null; }
   endParty(); ink.level = 0;
   s = 0; pearls = 0; lives = 3; invuln = 0; nextDecor = 0; shake = 0; caught = null; toxin.cd = 0;
@@ -494,12 +496,12 @@ function zoneAt(d) { if (window.__forceZone) return { type: window.__forceZone, 
 function decorRow(z) { decorMap = true; try { if (!setPiece(z)) decorRow0(z); else sideOnly(z); } finally { decorMap = false; } }
 let pieceUntil = -999, pieceFrom = -999;
 function sideOnly(z) { const Z = zoneAt(s - z); if (Z.type !== 'garden') decorRow0(z); else sharedLife(z, true); }
-const PIECES = ['ridge', 'slab', 'tunnel', 'shelf', 'ridge', 'tunnel'];
+const PIECES = ['ridge', 'slab', 'tunnel', 'shelf', 'hump', 'roof', 'hump', 'roof', 'ridge', 'hump'];
 function setPiece(z) {
   const here = s - z;
   if (here >= pieceFrom && here <= pieceUntil) return true;                                   // inside a piece: keep the lane clear
-  if (mode !== 'play' || here < 45 || here < pieceUntil + (window.__piece ? 12 : 45) || Math.random() > (window.__piece ? 1 : 0.09)) return false;
-  const kind = window.__piece || pick(PIECES), n = kind === 'tunnel' ? 9 : kind === 'ridge' ? 9 : 6, len = n * RS.SEG;
+  if (mode !== 'play' || here < 35 || here < pieceUntil + (window.__piece ? 12 : 22) || Math.random() > (window.__piece ? 1 : 0.16)) return false;
+  const kind = window.__piece || pick(PIECES), n = kind === 'tunnel' ? 9 : kind === 'ridge' ? 9 : kind === 'hump' ? 3 : kind === 'roof' ? 5 : 6, len = n * RS.SEG;
   // the piece brings its own pearls and dangers: ordinary level items in its stretch step aside; special moments block it
   const span = items.filter(it => it.z > here - 6 && it.z < here + len + 6);
   if (span.some(it => !['pearl', 'pearls', 'jelly', 'puffer', 'urchin', 'coral'].includes(it.t)) || (level.length && here + len > level.length - 20)) return false;
@@ -517,6 +519,10 @@ function setPiece(z) {
       if (i === 2 || i === 4) spawn('jelly', rf(-1.2, 1.2), good > 0 ? 1.4 : 3.8, zz - 1, { bob: 0.15, drift: 0 }); }
     if (kind === 'shelf') { const sd = good; spawn(sd > 0 ? 'shelfR' : 'shelfL', 0, 0, zz, { shapes: [{ t: 'b', x0: sd > 0 ? -0.2 : -3, x1: sd > 0 ? 3 : 0.2, y0: 1.9, y1: 3.1, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG });
       if (mid) pearl(sd * 1.5, 1.25, zz - 1); }
+    if (kind === 'hump') { spawn('hump', 0, 0, zz, { shapes: [{ t: 'b', x0: -1.35, x1: 1.35, y0: -3, y1: 1.65, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG });   // a reef head in the lane: over or around
+      pearl(0, 2.35 + (i === 1 ? 0.35 : 0), zz - 1); }
+    if (kind === 'roof') { spawn('roof', 0, 0, zz, { shapes: [{ t: 'b', x0: -3, x1: 3, y0: 2.85, y1: 7, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG });   // rock hanging from above: dive
+      if (mid) pearl(Math.sin(i * 1.3) * 1.4, 1.35, zz - 1); }
     if (kind === 'tunnel') { spawn(i === 0 || i === n - 1 ? 'tunnelMouth' : 'tunnel', 0, 0, zz, { shapes: [{ t: 'b', x0: -3, x1: 3, y0: 4.1, y1: 8, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG, cover: true });
       if (mid) pearl(Math.sin(i * 0.9) * 1.6, 2.2 + Math.cos(i * 0.7) * 0.9, zz - 1); }
   }
@@ -739,10 +745,10 @@ function hurt(msg = 'Ouch!') {
     invuln = 1.2; sound.hurt(); toast('Buddy saved you!'); updateHud(); return true;
   }
   lives--; invuln = 1.6; updateHud(); sound.hurt();
-  if (lives <= 0) gameOver(); else toast(msg);
+  if (lives <= 0) gameOver(); else toast(msg, 3);
   return true;
 }
-let pathD = 0; const BEND = 1.0, BEND_Y = 0.85;
+let pathD = 0; const BEND = 0, BEND_Y = 0;   // no corridor pull (it made steering feel draggy); direction comes from the set pieces
 function wallScrape(sx, sy) { if (t - (wallScrape.last || -9) < 0.45) return; wallScrape.last = t; sound.bump(); P.vx += sx * 5; P.vy += sy * 4; shake = Math.max(shake, 0.08); cubi.userData.boing = 0.25; }
 function bumpY(o) { // shelves and roofs: nudge up or down, whichever is closer
   if (t - (bump.last || -9) > 0.5) { bump.last = t; sound.bump(); }
@@ -830,7 +836,21 @@ function updateHud() {
   $('pearls').textContent = `${pearls}/${pearlTotal}`;
   $('buddy').classList.toggle('on', !!buddy);
 }
-function toast(txt) { const el = $('toast'); el.textContent = txt; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+// messages: one at a time. A more important one replaces a less important one; the same text is not repeated within 6 s;
+// at most one message waits in line (the most important), everything else is dropped.
+// prio: 3 = you got hurt, 2 = danger ahead, 1 = info
+const MSG = { cur: null, until: 0, prio: 0, next: null, seen: new Map() };
+function toast(txt, prio = 1) {
+  const now = performance.now() / 1000;
+  if (MSG.seen.has(txt) && now - MSG.seen.get(txt) < 6) return;
+  if (MSG.cur && now < MSG.until && prio <= MSG.prio) { if (!MSG.next || prio > MSG.next.prio) MSG.next = { txt, prio }; return; }
+  showMsg(txt, prio, now);
+}
+function showMsg(txt, prio, now) {
+  const el = $('toast'); MSG.cur = txt; MSG.prio = prio; MSG.until = now + 1.5; MSG.seen.set(txt, now);
+  el.textContent = txt; el.classList.toggle('long', txt.length > 22); el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(MSG.tm); MSG.tm = setTimeout(() => { MSG.cur = null; const n = MSG.next; MSG.next = null; if (n) showMsg(n.txt, n.prio, performance.now() / 1000); }, 1500);
+}
 function showOnly(id) {
   ['ranks', 'community'].forEach(k => $(k) && $(k).classList.add('hidden'));
   if (id === 'menu') sound.setMode('menu'); ['menu', 'over', 'win'].forEach(k => $(k).classList.toggle('hidden', k !== id)); $('hud').classList.toggle('hidden', !!id); $('toxinBtn').classList.toggle('hidden', !!id); }
@@ -1270,7 +1290,7 @@ function step(dt) {
       else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
       else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
       else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
-      else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, o.mood === 'rest' ? dt * 0.3 : o.mood === 'hungry' && o.phase === 'lunge' ? dt * 2.2 : dt);
+      else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, dt * (o.tail || 1));
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
     }
     if (o.kind === 'pearl') { o.mesh.children[0].rotation.y += dt * 2; o.mesh.position.y = o.y + Math.sin(t * 2 + o.ph) * 0.08; }
@@ -1446,7 +1466,7 @@ const _mv = new THREE.Vector3(), _mv2 = new THREE.Vector3(), _mv3 = new THREE.Ve
 function updateMoray(o, dt) {
   o.mt += dt; const m = o.mesh; m.userData.t += dt;
   let out = 0.15 + Math.sin(o.mt * 2) * 0.03, open = 0.1;
-  if (o.phase === 'peek' && o.z > -14 && !o.warned && mode === 'play') { o.warned = true; toast('Moray eel ahead!'); }
+  if (o.phase === 'peek' && o.z > -14 && !o.warned && mode === 'play') { o.warned = true; toast('Moray eel ahead!', 2); }
   if (o.phase === 'peek' && o.z > -2.6 && mode === 'play') { o.phase = 'lunge'; o.mt = 0; }
   if (o.phase === 'lunge') { const k = o.mt; out = k < 0.22 ? 0.15 + (k / 0.22) * 0.85 : k < 0.6 ? 1 : Math.max(0.15, 1 - (k - 0.6) / 0.6 * 0.85); open = k < 0.6 ? 1 : 0.2; if (k > 1.3) o.phase = 'done'; }
   if (o.phase === 'done' || o.sick) { out = Math.max(0, (m.userData.out || 0.15) - dt * 0.8); open = 0; }
@@ -1466,7 +1486,7 @@ function updateCrosser(o, dt) {
   if (o.sick) { o.mesh.rotation.y = o.flee > 0 ? -Math.PI / 2 : Math.PI / 2; return; }
   if (!o.go) {
     o.x = -o.crosser * 12;
-    if (o.z > -24) { o.go = true; o.vx = o.crosser * 12 / (24 / Math.max(speed, 2)); if (mode === 'play') { toast(o.warn); sound.warn(); } }
+    if (o.z > -24) { o.go = true; o.vx = o.crosser * 12 / (24 / Math.max(speed, 2)); if (mode === 'play') { toast(o.warn, 2); sound.warn(); } }
   } else o.x += o.vx * dt;
   if (mode === 'play' && invuln <= 0 && Math.abs(o.z) < 1.6) {
     const s = o.s, cx = o.x + o.crosser * o.cOff * s, along = THREE.MathUtils.clamp(P.x - cx, -o.halfL * s, o.halfL * s);
@@ -1508,7 +1528,7 @@ function updateKraken(o, dt) {
   const k = o.mesh; RF.animateKraken(k, dt); o.mt += dt;
   k.userData.squirt = Math.max(0, k.userData.squirt - dt * 2);
   if (o.phase === 'wait') {
-    if (o.z > -30 && !o.warned && mode === 'play') { o.warned = true; toast('Kraken!'); }
+    if (o.z > -30 && !o.warned && mode === 'play') { o.warned = true; toast('Kraken!', 2); }
     if (o.z > -13) { o.z = -13; o.hold = (o.hold || 0) + dt; }        // hovers ahead of Cubi, glaring…
     if (o.hold > 1.3 && mode === 'play') { o.phase = 'squirt'; o.mt = 0; k.userData.squirt = 1; squirtInk(); }
   } else if (o.phase === 'squirt') {
@@ -1564,15 +1584,15 @@ function sharkLife(z, side) {
   if (Math.random() < 0.04) { const n = Math.random() < 0.5 ? 1 : 2;                     // whitetips resting on the sand
     for (let k = 0; k < n; k++) spawn('whitetip', side * rf(3.1, 4.6), 0.18, z + k * rf(1.2, 2), { solid: false, scale: rf(0.9, 1.1), mood: 'rest', ry: rf(0, 6), noRes: true }); }
   if (Math.random() < 0.02) spawn(sp, side * rf(7, 10), rf(2.2, 4), z, { solid: false, scale: rf(1, 1.2), mood: 'curious', phase: 'in', side, noRes: true });
-  if (mode === 'play' && !hungry && hungryCD <= 0 && s > 60 && Math.random() < 0.012) hungryShark(z + 10, side * 4);
+  if (mode === 'play' && !hungry && hungryCD <= 0 && s > 120 && Math.random() < 0.01) hungryShark(z + 10, side * 6);
 }
 function hungryShark(z, x) {
   if (hungry || mode !== 'play') return;
   const was = decorMap; decorMap = false;
-  hungry = spawn('blacktip', THREE.MathUtils.clamp(x, -6, 6), 3.2, Math.min(z, -24), { solid: false, scale: 1.65, mood: 'hungry', phase: 'approach', pt: 0, shark: true, noRes: true });
+  hungry = spawn('blacktip', THREE.MathUtils.clamp(x, -6, 6), 3.2, Math.min(z, -24), { solid: false, scale: 1.65, mood: 'hungry', phase: 'approach', pt: 0, shark: true, noRes: true, ry: Math.PI - Math.sign(x || 1) * 0.35 });
+  hungry.hd = hungry.mesh.rotation.y; hungry.spd = 3;
   decorMap = was;
-  if (!hungryTipShown) { hungryTipShown = true; toast('Hungry shark! Hide: tunnel, under a ledge, tight at the reef edge – or use your toxin'); }
-  else toast('Hungry shark!');
+  const w = $('sharkwarn'); if (w) w.querySelector('span').textContent = hungryTipShown ? 'Hungry shark!' : 'Hungry shark – hide in a tunnel, under a ledge or low in the coral, or use toxin'; hungryTipShown = true;
 }
 function inCover() {
   if (Math.abs(P.x) > 2.0 && P.y < 2.0) return true;                                     // tucked low into the coral at the reef edge
@@ -1584,41 +1604,54 @@ function inCover() {
   }
   return false;
 }
-const _hv2 = new THREE.Vector3();
-function faceTo(o, vx, vy, vz, k, dt) { const ry = Math.atan2(-vx, -vz); let d = ry - o.mesh.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.mesh.rotation.y += d * Math.min(1, dt * k); o.mesh.rotation.x = THREE.MathUtils.lerp(o.mesh.rotation.x, THREE.MathUtils.clamp(vy * 0.08, -0.4, 0.4), Math.min(1, dt * 3)); }
-function steerTo(o, tx, ty, tz, spd, dt, move) {   // swim toward a point in lane space; move cancels the scroll so it keeps pace
-  _hv2.set(tx - o.x, ty - o.y, tz - o.z); const d = _hv2.length(); if (d > 0.01) _hv2.multiplyScalar(Math.min(spd, d * 2.5) / d);
-  o.vx = THREE.MathUtils.lerp(o.vx || 0, _hv2.x, Math.min(1, dt * 2.2)); o.vy = THREE.MathUtils.lerp(o.vy || 0, _hv2.y, Math.min(1, dt * 2.2)); o.vz = THREE.MathUtils.lerp(o.vzz || 0, _hv2.z, Math.min(1, dt * 2.2)); o.vzz = o.vz;
-  o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt - move;
-  faceTo(o, o.vx, o.vy, o.vz - 0.001, 4, dt); return d;
+// shark locomotion: a glider. It always swims forward along its heading, turns in wide arcs (limited turn rate),
+// leans into the turn, changes depth gently, and speeds up or slows down smoothly. Tail beat follows its speed.
+function glide(o, tx, ty, tz, cruise, turn, dt, move) {
+  if (o.hd === undefined) { o.hd = o.mesh.rotation.y; o.spd = o.spd ?? cruise; o.roll = 0; o.mesh.rotation.order = 'YXZ'; }
+  const want = Math.atan2(-(tx - o.x), -(tz - o.z)); let dh = Math.atan2(Math.sin(want - o.hd), Math.cos(want - o.hd));
+  const step = THREE.MathUtils.clamp(dh, -turn * dt, turn * dt); o.hd += step;
+  o.spd += (cruise - o.spd) * Math.min(1, dt * (cruise > o.spd ? 1.6 : 0.7));
+  const dy = THREE.MathUtils.clamp(ty - o.y, -1, 1) * 0.6; o.y += dy * dt;
+  o.x += -Math.sin(o.hd) * o.spd * dt; o.z += -Math.cos(o.hd) * o.spd * dt - move;
+  o.roll += ((-step / Math.max(dt, 1e-4)) * 0.35 - o.roll) * Math.min(1, dt * 3);
+  o.mesh.rotation.y = o.hd; o.mesh.rotation.x = THREE.MathUtils.lerp(o.mesh.rotation.x, -dy * 0.25, Math.min(1, dt * 2)); o.mesh.rotation.z = THREE.MathUtils.clamp(o.roll, -0.35, 0.35);
+  o.tail = 0.55 + o.spd / 5;   // tail beat rate for the animation
+  return Math.hypot(tx - o.x, tz - o.z);
 }
+const facing = (o) => { const want = Math.atan2(-(P.x - o.x), -(0 - o.z)); return Math.abs(Math.atan2(Math.sin(want - o.hd), Math.cos(want - o.hd))); };
 function updateMood(o, dt) {
   const move = (mode === 'play' || mode === 'caught') ? speed * dt : 0;
-  if (o.mood === 'patrol') { faceTo(o, o.swim[0], 0, o.swim[1], 2, dt); return; }
-  if (o.mood === 'rest') { o.mesh.rotation.z = Math.sin(t * 0.8 + o.ph) * 0.03; return; }
-  if (o.mood === 'curious') {                                                           // glide in, pass close, peel away
-    if (o.phase === 'in') { if (steerTo(o, o.side * 2.9, Math.max(1.4, P.y), 1.5, 3.2, dt, 0) < 1.5 || o.z > 0.5) o.phase = 'out'; }
-    else { steerTo(o, o.side * 14, 4.5, o.z - 6, 3.5, dt, 0); if (Math.abs(o.x) > 13) o.gone = true; }
+  if (o.mood === 'patrol') { o.mesh.rotation.y = Math.atan2(-o.swim[0], -o.swim[1]) + Math.sin(t * 0.6 + o.ph) * 0.06; o.tail = 0.9; return; }
+  if (o.mood === 'rest') { o.mesh.rotation.z = Math.sin(t * 0.8 + o.ph) * 0.03; o.tail = 0.25; return; }
+  if (o.mood === 'curious') {                                                           // glides in, passes alongside, peels away
+    if (o.phase === 'in') { if (glide(o, o.side * 3.2, Math.max(1.6, P.y + 0.4), 2, 3.4, 0.7, dt, 0) < 2 || o.z > 0.5) o.phase = 'out'; }
+    else { glide(o, o.side * 16, 4.5, o.z - 12, 3.8, 0.6, dt, 0); if (Math.abs(o.x) > 13 || o.z > 9) o.gone = true; }
     return;
   }
   if (o.mood !== 'hungry') return;
-  // ---- the hungry one
+  // ---- the hungry one: lazy passes across the lane ahead of Cubi, getting closer — then one burst at him
   const warn = $('sharkwarn');
-  if (o.sick && o.phase !== 'leave') { o.phase = 'leave'; toast('The shark swims off!'); }
+  if (o.sick && o.phase !== 'leave') { o.phase = 'leave'; o.pt = 0; }
   o.pt += dt;
-  if (o.phase === 'approach') { if (steerTo(o, P.x + (o.x > P.x ? 3 : -3), P.y + 0.6, -9, 9, dt, move) < 2 || o.pt > 6) { o.phase = 'stalk'; o.pt = 0; } }
-  else if (o.phase === 'stalk') {                                                       // circles ahead of Cubi, matching his pace
-    const a = o.pt * 1.3 + o.ph; steerTo(o, P.x + Math.sin(a) * 3.2, P.y + 0.5 + Math.sin(a * 1.7) * 0.6, -8 + Math.cos(a) * 2, 7, dt, move);
-    if (o.pt > 3.6) { o.phase = 'lunge'; o.pt = 0; o.tx = P.x; o.ty = P.y; sound.bump(); shake = Math.max(shake, 0.15); }
-  } else if (o.phase === 'lunge') {                                                    // a straight, fast rush at where Cubi was
-    steerTo(o, o.tx, o.ty, 2.5, 15, dt, move);
+  if (o.phase === 'approach') { glide(o, o.x > 0 ? -4 : 4, P.y + 0.8, -12, 3, 0.8, dt, move * 0.7); if (o.z > -15 || o.pt > 6) { o.phase = 'pass'; o.pt = 0; o.passes = 0; o.goal = o.x > 0 ? -4.5 : 4.5; } }
+  else if (o.phase === 'pass') {                                                        // sweeps from one side to the other, keeping pace
+    const zt = -11 + Math.min(o.passes, 2) * 1.5;
+    if (o.passes < 2) glide(o, o.goal, P.y + 0.6, zt, 3.6, 0.9, dt, move);
+    else glide(o, P.x, P.y, -3, 3.2, 1.1, dt, move);                                   // turns to line up with Cubi
+    if (Math.abs(o.x - o.goal) < 1.2) { o.passes++; o.goal = -o.goal; }
+    if (o.z > -6) o.z -= (o.z + 6) * Math.min(1, dt * 2);   // stays well ahead while sweeping
+    if (o.passes >= 2 && facing(o) < 0.45 && o.z < -4.5) { o.phase = 'lunge'; o.pt = 0; o.tx = P.x; o.ty = P.y; sound.bump(); }
+    if (o.pt > 15) { o.phase = 'leave'; o.pt = 0; }
+  } else if (o.phase === 'lunge') {                                                    // a short burst; aim locks after half a second
+    if (o.pt < 0.5) { o.tx = P.x; o.ty = P.y; }
+    glide(o, o.tx, o.ty, 2, 9.5, 1.5, dt, move);
     if (o.z > -1.2 && o.z < 1.2 && Math.hypot(P.x - o.x, P.y - o.y) < 1.25) {
-      if (inCover()) { toast('Hidden! The shark gives up'); o.phase = 'leave'; o.pt = 0; window.__sharkResult = 'hidden'; }
+      if (inCover()) { toast('Hidden!', 2); o.phase = 'leave'; o.pt = 0; window.__sharkResult = 'hidden'; }
       else if (invuln <= 0) { hurt('Shark bite!'); o.phase = 'leave'; o.pt = 0; window.__sharkResult = 'bite'; }
     }
-    if (o.z > 1.8 || o.pt > 2.2) { if (o.phase === 'lunge') { const h = inCover(); if (h) toast('Hidden! The shark gives up'); window.__sharkResult = h ? 'hidden' : 'missed'; } o.phase = 'leave'; o.pt = 0; }
-  } else if (o.phase === 'leave') { steerTo(o, (o.x >= 0 ? 1 : -1) * 16, 6, o.z - 10, 6, dt, 0); if (Math.abs(o.x) > 14 || o.pt > 6) o.gone = true; }
-  if (warn) warn.classList.toggle('show', mode === 'play' && (o.phase === 'stalk' || o.phase === 'lunge' || o.phase === 'approach') && !o.gone);
+    if (o.z > 1.8 || o.pt > 2.6) { if (o.phase === 'lunge') { const h = inCover(); if (h) toast('Hidden!', 2); window.__sharkResult = h ? 'hidden' : 'missed'; } o.phase = 'leave'; o.pt = 0; }
+  } else if (o.phase === 'leave') { glide(o, (o.x >= 0 ? 1 : -1) * 18, 6, o.z - 8, 4, 0.7, dt, 0); if (Math.abs(o.x) > 15 || o.z > 9 || o.pt > 8) o.gone = true; }
+  if (warn) warn.classList.toggle('show', mode === 'play' && (o.phase === 'pass' || o.phase === 'lunge' || o.phase === 'approach') && !o.gone);
 }
 function updateStream(o) {
   const pos = o.mesh.geometry.attributes.position.array;

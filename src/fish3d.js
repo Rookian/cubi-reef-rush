@@ -116,13 +116,13 @@ export function makeFish3D(d, size = 1) {
     } }
   if (d.flat) { const tilt = new THREE.Group(); tilt.rotation.z = Math.PI / 2; root.remove(rig); tilt.add(rig); root.add(tilt); }
   root.scale.setScalar(size);
-  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 4.5 : 6.5 };
+  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 3.2 : 6.5, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
   return root;
 }
 export function animateFish3D(f, dt) {
   const u = f.userData; u.t += dt; u.U.value += dt * u.speed;
   if (!u.flat) { u.rig.rotation.y = -Math.sin(u.U.value) * 0.05; u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03; } u.rig.position.y = Math.sin(u.t * 1.3) * 0.02;
-  u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
+  u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (u.stiff ? 0.62 + Math.sin(u.t * 0.7 + p.sx) * 0.04 : 0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });
 }
