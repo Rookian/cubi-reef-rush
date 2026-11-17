@@ -49,7 +49,7 @@ function shapeAt(d) {
   return out;
 }
 function bankH(xl, d, S) {
-  const ax = Math.abs(xl);
+  const ax = Math.abs(xl) + 0.9;   // walls hug the narrower lane
   let h = 0.5 * Math.pow(Math.max(0, ax - 9) / 6, 2) * 3;                                    // gentle rise at the far sides everywhere
   if (S.canyon) h += S.canyon * 4.4 * Math.pow(THREE.MathUtils.clamp((ax - 4.3) / 7.5, 0, 1), 2.0) + S.canyon * 0.6 * Math.max(0, ax - 11.8);
   if (S.narrow) h += S.narrow * 7.5 * Math.pow(THREE.MathUtils.clamp((ax - 3.9) / 3.2, 0, 1), 1.4) + S.narrow * 1.2 * Math.max(0, ax - 7.1);   // tight gorge
@@ -215,7 +215,11 @@ const bokeh = RF.makeBokeh(); scene.add(bokeh);
 const cubi = M.makeCubi(); scene.add(cubi);
 const bodyMat = cubi.userData.bodyMat;
 const P = { x: 0, y: 2.4, vx: 0, vy: 0, tx: 0, ty: 2.4 };
-const B = { minX: LANE.minX, maxX: LANE.maxX, minY: 0.8, maxY: 4.4, r: 0.46 };
+const LANE_K = 2.5 / 3.4;   // the swim lane is 5 m wide; level designs (±3.4) are scaled into it
+const B = { minX: -2.5, maxX: 2.5, minY: 0.8, maxY: 4.4, r: 0.46 };
+// scenery placed for the old wide lane: lane-floor bits squeeze with the lane, everything beyond the edge moves in by the same 0.9 m
+const mapX = (x) => Math.abs(x) < 3.4 ? x * LANE_K : Math.sign(x) * (Math.abs(x) - 0.9);
+let decorMap = false;
 let buddy = null;
 const stars = new THREE.Group(); scene.add(stars); stars.visible = false;
 for (let i = 0; i < 3; i++) stars.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), new THREE.MeshToonMaterial({ color: '#FFE14D', emissive: new THREE.Color('#996600') })));
@@ -294,6 +298,14 @@ const KINDS = {
   heroanem: { make: () => RF.makeFluffyAnemone(ri(0, 99), rf(1.8, 2.3)), shape: () => [] },
   moundbig: { make: () => RS.makeOutcrop(ri(1, 9999), 1.5), shape: () => [] },
   pinnacle: { make: () => RS.makePinnacle(ri(1, 9999)), shape: () => [] },
+  // set pieces (segments; shapes come with the spawn options)
+  ridge: { make: () => RS.makeRidgeSeg(ri(1, 9999)), shape: () => [] },
+  ridgeEnd: { make: () => RS.makeRidgeSeg(ri(1, 9999), true), shape: () => [] },
+  slab: { make: () => RS.makeSlabSeg(ri(1, 9999), 2.0, 3.0), shape: () => [] },
+  shelfL: { make: () => RS.makeSlabSeg(ri(1, 9999), 1.9, 3.1, -3.6, 0.2), shape: () => [] },
+  shelfR: { make: () => RS.makeSlabSeg(ri(1, 9999), 1.9, 3.1, -0.2, 3.6), shape: () => [] },
+  tunnel: { make: () => RS.makeTunnelSeg(ri(1, 9999)), shape: () => [] },
+  tunnelMouth: { make: () => RS.makeTunnelSeg(ri(1, 9999), true), shape: () => [] },
   wallfar: { make: () => RS.makeCoralWall(ri(1, 999), true), shape: () => [] },
   crab: { make: () => RF.makeCrab(pick(['#FF6B4A', '#FF8A3D', '#FF5C7A'])), shape: () => [] },
   seahorse: { make: () => pick([() => RF.makeSeahorse(), () => RF.makeSeahorse('#FF7FB8', '#FFD0EA'), () => RF.makeSeahorse('#9B6BE8', '#E2D4FF')])(), shape: () => [] },
@@ -337,6 +349,7 @@ function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.desig
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
 const NOGLOW = ['turtle', 'shrimp', 'octopus', 'featherstar', 'bloodstar', 'urchin', 'stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 function spawn(kind, x, y, z, opt = {}) {
+  if (decorMap) x = mapX(x);
   if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
   let mesh = pool.pop();
@@ -420,7 +433,7 @@ function resetWorld() {
 let wreckDone = false;
 function loadLevel(lv, idx) {
   level = normalizeLevel(lv); levelIdx = idx;
-  items = level.items.slice(); itemIdx = 0; pearlTotal = countPearls(level);
+  items = level.items.map(it => ({ ...it })); itemIdx = 0; pearlTotal = countPearls(level);
 }
 
 // scenery stays at the sides so the lane is easy to read
@@ -451,7 +464,38 @@ function buildZones() {
   while (d < 4000) { let z; do { z = pick(ZONES); } while (z === prev); zoneList.push({ from: d, type: z, side: Math.random() < 0.5 ? -1 : 1 }); prev = z; d += rf(55, 95); }
 }
 function zoneAt(d) { if (window.__forceZone) return { type: window.__forceZone, side: 1 }; let zz = zoneList[0]; for (const q of zoneList) { if (q.from <= d) zz = q; else break; } return zz || { type: 'garden', side: 1 }; }
-function decorRow(z) {
+function decorRow(z) { decorMap = true; try { if (!setPiece(z)) decorRow0(z); else sideOnly(z); } finally { decorMap = false; } }
+let pieceUntil = -999, pieceFrom = -999;
+function sideOnly(z) { const Z = zoneAt(s - z); if (Z.type !== 'garden') decorRow0(z); else sharedLife(z, true); }
+const PIECES = ['ridge', 'slab', 'tunnel', 'shelf', 'ridge', 'tunnel'];
+function setPiece(z) {
+  const here = s - z;
+  if (here >= pieceFrom && here <= pieceUntil) return true;                                   // inside a piece: keep the lane clear
+  if (mode !== 'play' || here < 45 || here < pieceUntil + (window.__piece ? 12 : 45) || Math.random() > (window.__piece ? 1 : 0.09)) return false;
+  const kind = window.__piece || pick(PIECES), n = kind === 'tunnel' ? 9 : kind === 'ridge' ? 9 : 6, len = n * RS.SEG;
+  // the piece brings its own pearls and dangers: ordinary level items in its stretch step aside; special moments block it
+  const span = items.filter(it => it.z > here - 6 && it.z < here + len + 6);
+  if (span.some(it => !['pearl', 'pearls', 'jelly', 'puffer', 'urchin', 'coral'].includes(it.t)) || (level.length && here + len > level.length - 20)) return false;
+  for (const it of span) if (!it.skip) { it.skip = true; if (it.t === 'pearl') pearlTotal--; if (it.t === 'pearls') pearlTotal -= it.n || 5; }
+  pieceFrom = here; pieceUntil = here + len;
+  const was = decorMap; decorMap = false;
+  const good = Math.random() < 0.5 ? -1 : 1;   // which route carries the pearls
+  const pearl = (x, y, zz) => { spawn('pearl', x, y, zz, { solid: false, pearl: true }); pearlTotal++; };
+  for (let i = 0; i < n; i++) { const zz = z - i * RS.SEG, mid = i > 0 && i < n - 1;
+    if (kind === 'ridge') { spawn(i === 0 || i === n - 1 ? 'ridgeEnd' : 'ridge', 0, 0, zz, { shapes: [pillar(0.75, 9)], bump: true, len: RS.SEG });
+      if (mid && i % 2) pearl(good * 1.7, 2.2 + Math.sin(i) * 0.6, zz - 1);
+      if (i === 3 || i === 6) spawn('jelly', -good * 1.7, 2.4, zz - 1, { bob: 0.3, drift: 0 }); }
+    if (kind === 'slab') { spawn('slab', 0, 0, zz, { shapes: [{ t: 'b', x0: -3, x1: 3, y0: 2.0, y1: 3.0, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG });
+      if (mid) pearl(rf(-1, 1), good > 0 ? 3.75 : 1.3, zz - 1);
+      if (i === 2 || i === 4) spawn('jelly', rf(-1.2, 1.2), good > 0 ? 1.4 : 3.8, zz - 1, { bob: 0.15, drift: 0 }); }
+    if (kind === 'shelf') { const sd = good; spawn(sd > 0 ? 'shelfR' : 'shelfL', 0, 0, zz, { shapes: [{ t: 'b', x0: sd > 0 ? -0.2 : -3, x1: sd > 0 ? 3 : 0.2, y0: 1.9, y1: 3.1, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG });
+      if (mid) pearl(sd * 1.5, 1.25, zz - 1); }
+    if (kind === 'tunnel') { spawn(i === 0 || i === n - 1 ? 'tunnelMouth' : 'tunnel', 0, 0, zz, { shapes: [{ t: 'b', x0: -3, x1: 3, y0: 4.1, y1: 8, dz: RS.SEG / 2 }], bumpY: true, len: RS.SEG, cover: true });
+      if (mid) pearl(Math.sin(i * 0.9) * 1.6, 2.2 + Math.cos(i * 0.7) * 0.9, zz - 1); }
+  }
+  decorMap = was; return true;
+}
+function decorRow0(z) {
   if (!zoneList.length) buildZones();
   const here = (mode === 'play' || mode === 'caught' ? s : menuS) - z;
   const Z = (mode === 'menu' || mode === 'splash') ? { type: 'garden', side: 1 } : zoneAt(here);
@@ -593,7 +637,7 @@ function sharedLife(z, bg) {
 }
 
 function spawnItem(it, z) {
-  const x = THREE.MathUtils.clamp(+it.x || 0, -3.6, 3.6), y = +it.y || LANE.mid;
+  const x = THREE.MathUtils.clamp(+it.x || 0, -3.6, 3.6) * LANE_K, y = +it.y || LANE.mid;
   switch (it.t) {
     case 'pearl': spawn('pearl', x, y, z, { solid: false, pearl: true }); break;
     case 'pearls': { const n = it.n || 5, gap = it.gap || 3; for (let i = 0; i < n; i++) spawn('pearl', x + (it.dx || 0) * i, y + (it.dy || 0) * i, z - i * gap, { solid: false, pearl: true }); break; }
@@ -602,9 +646,9 @@ function spawnItem(it, z) {
     case 'urchin': spawn('urchin', x, 0, z, { scale: 1.15, ry: rf(0, 6) }); break;
     case 'coral': spawn(KINDS[it.kind] ? it.kind : 'branch', x, 0, z, { scale: it.kind === 'brain' ? 1.4 : 1.5, ry: rf(0, 6), bump: true }); break;
     case 'stream': spawnStream(z, it.dir, it.len || 14); break;
-    case 'wreckgate': { const hx = THREE.MathUtils.clamp(+it.x || 0, -2.2, 2.2); const gm = RF.makeWreckGate(hx); scene.add(gm); objs.push({ kind: 'gate', mesh: gm, x: 0, y: 0, z, hx, shapes: [], noPool: true, gate: true }); break; }
-    case 'moray': { const sd = (+it.x || 1) >= 0 ? 1 : -1; const tube = it.home ? it.home === 'tube' : Math.random() < 0.5; spawn(tube ? 'moraytube' : 'moray', sd * (tube ? 4.6 : 5.0), 0, z, { scale: 1.3, solid: false, ry: sd > 0 ? -Math.PI / 2 : Math.PI / 2, side: sd, moray: true, tube, phase: 'peek', mt: 0 }); break; }
-    case 'kraken': spawn('kraken', THREE.MathUtils.clamp(+it.x || 0, -2.5, 2.5), 5.0, z, { solid: false, kraken: true, phase: 'wait', mt: 0, scale: 1.15 }); break;
+    case 'wreckgate': { const hx = THREE.MathUtils.clamp(+it.x || 0, -2.2, 2.2) * LANE_K; const gm = RF.makeWreckGate(hx); scene.add(gm); objs.push({ kind: 'gate', mesh: gm, x: 0, y: 0, z, hx, shapes: [], noPool: true, gate: true }); break; }
+    case 'moray': { const sd = (+it.x || 1) >= 0 ? 1 : -1; const tube = it.home ? it.home === 'tube' : Math.random() < 0.5; spawn(tube ? 'moraytube' : 'moray', sd * (tube ? 3.7 : 4.1), 0, z, { scale: 1.3, solid: false, ry: sd > 0 ? -Math.PI / 2 : Math.PI / 2, side: sd, moray: true, tube, phase: 'peek', mt: 0 }); break; }
+    case 'kraken': spawn('kraken', THREE.MathUtils.clamp(+it.x || 0, -2.5, 2.5) * LANE_K, 5.0, z, { solid: false, kraken: true, phase: 'wait', mt: 0, scale: 1.15 }); break;
     case 'hammer': case 'seasnake': {
       const dir = it.from === 'right' ? -1 : it.from === 'left' ? 1 : (x > 0 ? -1 : 1);
       const hammer = it.t === 'hammer';
@@ -645,6 +689,8 @@ function hitShape(o) {
     } else if (sh.t === 's') {
       const dy = P.y - (o.y + sh.y);
       if (dx * dx + dy * dy + dz * dz < (sh.r + B.r) ** 2) return true;
+    } else if (sh.t === 'b') {   // box: a shelf or roof across the lane
+      if (P.x > sh.x0 - B.r && P.x < sh.x1 + B.r && P.y > sh.y0 - B.r && P.y < sh.y1 + B.r && Math.abs(dz) < sh.dz + B.r) return true;
     } else if (sh.t === 'c') {
       const cy = Math.min(Math.max(P.y, o.y + sh.y2), o.y + sh.y1), dy = P.y - cy;
       if (dx * dx + dy * dy + dz * dz < (sh.r + B.r) ** 2) return true;
@@ -664,6 +710,14 @@ function hurt(msg = 'Ouch!') {
   lives--; invuln = 1.6; updateHud(); sound.hurt();
   if (lives <= 0) gameOver(); else toast(msg);
   return true;
+}
+let pathD = 0; const BEND = 1.0, BEND_Y = 0.85;
+function wallScrape(sx, sy) { if (t - (wallScrape.last || -9) < 0.45) return; wallScrape.last = t; sound.bump(); P.vx += sx * 5; P.vy += sy * 4; shake = Math.max(shake, 0.08); cubi.userData.boing = 0.25; }
+function bumpY(o) { // shelves and roofs: nudge up or down, whichever is closer
+  if (t - (bump.last || -9) > 0.5) { bump.last = t; sound.bump(); }
+  const sh = o.shapes[0], up = P.y > (sh.y0 + sh.y1) / 2;
+  P.vy += up ? 7 : -7; P.ty = THREE.MathUtils.clamp(up ? sh.y1 + B.r + 0.15 : sh.y0 - B.r - 0.15, B.minY, B.maxY); o.hit = false; o.rehit = t + 0.4;
+  shake = Math.max(shake, 0.12); cubi.userData.boing = 0.35;
 }
 function bump(o) { // corals & rocks: soft nudge, no damage
   if (t - (bump.last || -9) > 0.5) { bump.last = t; sound.bump(); }
@@ -1008,12 +1062,20 @@ function step(dt) {
 
   // spawn level items ahead
   if (mode === 'play' || mode === 'caught') {
-    while (itemIdx < items.length && items[itemIdx].z - s <= SPAWN_AHEAD) { const it = items[itemIdx++]; spawnItem(it, -(it.z - s)); }
+    while (itemIdx < items.length && items[itemIdx].z - s <= SPAWN_AHEAD) { const it = items[itemIdx++]; if (!it.skip) spawnItem(it, -(it.z - s)); }
     if (!finishObj && level.length - s <= SPAWN_AHEAD) spawnFinish(-(level.length - s));
     if (!wreckDone && s > level.length * 0.35) { wreckDone = true; const sd = Math.random() < 0.5 ? -1 : 1; spawn('wreck', sd * 12.5, 0, -SPAWN_AHEAD, { solid: false, ry: sd > 0 ? 2.4 : 0.7, scale: 1.1 }); }
     if (s >= level.length && mode === 'play') win();
   }
 
+  // the landscape steers: when the path bends, the corridor slides under Cubi (he keeps his heading) — follow it or bump into the reef
+  if (mode === 'play') {
+    const ddx = (relXRaw(s) - relXRaw(pathD)) * BEND, ddy = (relYRaw(s) - relYRaw(pathD)) * BEND_Y; pathD = s;
+    if (Math.abs(ddx) < 1 && Math.abs(ddy) < 1) { P.x -= ddx; P.tx -= ddx; P.y -= ddy; P.ty -= ddy; if (drag) { drag.tx -= ddx; drag.ty = (drag.ty ?? P.ty) - ddy; } }
+    const over = P.tx < B.minX ? B.minX - P.tx : P.tx > B.maxX ? B.maxX - P.tx : 0, overY = P.ty < B.minY ? B.minY - P.ty : P.ty > B.maxY ? B.maxY - P.ty : 0;
+    if (over || overY) { P.tx += over; P.ty += overY;                                         // the reef edge pushes back …
+      if (Math.abs(over) > 0.02 || Math.abs(overY) > 0.02) wallScrape(Math.sign(over), Math.sign(overY)); }   // … with a little bump
+  } else pathD = s;
   // steering
   if (mode === 'play') {
     const kx = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
@@ -1204,9 +1266,9 @@ function step(dt) {
       if (o.pearl && !o.hit) {
         const dx = P.x - o.x, dy = P.y - o.y, dz = o.z;
         if (dx * dx + dy * dy + dz * dz < 0.9) { o.hit = true; pearls++; sound.pearl(); cubi.userData.chomp = 0.3; updateHud(); o.z = 99; }
-      } else if (!o.hit && o.shapes.length && hitShape(o)) {
+      } else if ((!o.hit || (o.rehit && t > o.rehit)) && o.shapes.length && hitShape(o)) { o.rehit = 0;
         o.hit = true;
-        if (o.hazard) hurt(); else if (o.bump) bump(o);
+        if (o.hazard) hurt(); else if (o.bumpY) bumpY(o); else if (o.bump) bump(o);
       }
     }
     if (o.z > 9 || (o.swim && Math.abs(o.x) > (o.maxX || 18)) || (o.sick && Math.abs(o.x) > 16) || (o.kind === 'flee' && Math.abs(o.x) > 14)) { if (o === finishObj) finishObj = null; despawn(o); objs.splice(i, 1); }

@@ -243,3 +243,62 @@ export function makePinnacle(seed = 1) {
     corals.push({ key: kind + ':' + v, m: local(Math.cos(a) * 1.9, 0.02, Math.sin(a) * 1.7, (0.8 + R() * 0.3) * SIZE[kind] / Math.max(0.6, g.userData.w), R() * 6.28) }); }
   const g = new THREE.Group(); g.add(rockMesh(mergeGeometries(parts), 0.05)); g.userData.corals = corals; g.userData.h = y; return g;
 }
+
+// ================= SET PIECES: segments (≈3 m long, overlapping) so long features follow the bending path =================
+function lumpC(R, sx, sy, sz, pal, detail = 3) {   // a lumpy rock without the flat base of rockGeo
+  let g = new THREE.IcosahedronGeometry(1, detail); g.deleteAttribute('uv'); g.deleteAttribute('normal'); g = mergeVertices(g);
+  const p = g.attributes.position, a = R() * 6, b = R() * 6;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.13 * Math.sin(x * 2.3 + a) * Math.cos(z * 2.1 + b) + 0.06 * Math.sin(y * 4 + a) + 0.04 * Math.sin(x * 7 + z * 6 + b); p.setXYZ(i, x * k * sx, y * k * sy, z * k * sz); }
+  g.computeVertexNormals(); g = g.toNonIndexed();
+  const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3), lo = new THREE.Color(pal[0]), hi = new THREE.Color(pal[1]), cr = new THREE.Color(pal[2]);
+  for (let i = 0; i < P.count; i++) { const up = N.getY(i); _c.copy(lo).lerp(hi, 0.5 + up * 0.5); if (Math.sin(P.getX(i) * 4.1 + a) * Math.sin(P.getZ(i) * 3.7 + P.getY(i) * 2 + b) > 0.4) _c.lerp(cr, 0.7); if (up < -0.3) _c.multiplyScalar(0.6);
+    col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+}
+// spots on any face; dir: 'up' (n.y > .3), 'side' (|n.y| < .5), 'down' (n.y < -.4)
+function spotsAny(geo, n, R, dir, gap) {
+  const s = new MeshSurfaceSampler(new THREE.Mesh(geo)).setRandomGenerator(R).build(), p = V(0, 0, 0), nr = V(0, 0, 0), out = [];
+  for (let t = 0; t < n * 80 && out.length < n; t++) { s.sample(p, nr); const ok = dir === 'up' ? nr.y > 0.3 : dir === 'down' ? nr.y < -0.4 : Math.abs(nr.y) < 0.5; if (!ok || out.some(q => q.p.distanceTo(p) < gap)) continue; out.push({ p: p.clone(), n: nr.clone() }); }
+  return out;
+}
+function dress(R, geo, corals, list, n, dir, scale, lean = 0.5) {
+  spotsAny(geo, n, R, dir, 0.55).forEach(q => { const kind = pickR(R, list), v = Math.floor(R() * variants(kind)), g = baked(kind, v), k = scale * (0.8 + R() * 0.4) * SIZE[kind] / Math.max(0.6, g.userData.w);
+    const nd = dir === 'down' ? q.n.clone() : q.n.clone().lerp(UP, lean).normalize();
+    corals.push({ key: kind + ':' + v, m: local(q.p.x, q.p.y, q.p.z, k, R() * 6.28, nd) }); });
+}
+export const SEG = 2.2;   // segment spacing along the path; each piece is a bit longer so neighbours overlap
+// a tall reef fin down the middle of the lane: the path forks left / right around it
+export function makeRidgeSeg(seed = 1, first = false, last = false) {
+  const R = rng(seed * 53 + 7), pal = pickR(R, ROCKS), taper = first || last ? 0.75 : 1;
+  const geo = lumpC(R, 0.85, 3.0 * taper, 1.75, pal, 3); geo.translate(0, 2.4 * taper, -SEG / 2);
+  const corals = []; dress(R, geo, corals, ['tree', 'whips', 'purple', 'scroll', 'xenia', 'cup', 'tree'], 6, 'side', 0.75, 0.2); dress(R, geo, corals, ['table', 'stag', 'tree', 'leather', 'whips'], 3, 'up', 1.0);
+  const g = new THREE.Group(); g.add(rockMesh(geo, 0.035)); g.userData.corals = corals; return g;
+}
+// a rock shelf across the lane at height y0..y1: dive under or rise over; x0..x1 limits it for side overhangs
+export function makeSlabSeg(seed = 1, y0 = 2.0, y1 = 3.0, x0 = -3.6, x1 = 3.6) {
+  const R = rng(seed * 61 + 3), pal = pickR(R, ROCKS), cx = (x0 + x1) / 2, hw = (x1 - x0) / 2 + 0.3, ht = (y1 - y0) / 2;
+  const slab = lumpC(R, hw, ht * 1.1, 1.6, pal, 3); slab.translate(cx, (y0 + y1) / 2, -SEG / 2);
+  // the shelf grows out of the reef wall: rock buttresses carry it on the side(s) where it meets the wall
+  const legs = [slab]; for (const ex of [x0, x1]) if (Math.abs(ex) > 3) { const lg = lumpC(R, 0.9, (y0 + 0.3) / 2 + 0.4, 1.4, pal, 2); lg.translate(Math.sign(ex) * 3.25, (y0 + 0.3) / 2, -SEG / 2); legs.push(lg); }
+  const geo = mergeGeometries(legs);
+  const corals = []; dress(R, slab, corals, ['table', 'cauli', 'brain', 'leather', 'finger', 'scroll', 'stag', 'xenia'], 5, 'up', 0.85);
+  dress(R, slab, corals, ['tree', 'tree', 'whips', 'purple'], 4, 'down', 0.6);   // tree corals hang from ceilings, as they do in real reef caves
+  const g = new THREE.Group(); g.add(rockMesh(geo, 0.035)); g.userData.corals = corals; return g;
+}
+// a rock tunnel over the lane: open space inside up to ~4 m, corals outside and hanging from the roof
+export function makeTunnelSeg(seed = 1, mouth = false) {
+  const R = rng(seed * 71 + 9), pal = pickR(R, ROCKS);
+  let shell = new THREE.CylinderGeometry(3.6, 3.6, SEG + 0.6, 18, 2, true, -Math.PI / 2, Math.PI); shell.rotateX(-Math.PI / 2); shell.deleteAttribute('uv');
+  shell = mergeVertices(shell); const p = shell.attributes.position, a = R() * 6;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.1 * Math.sin(x * 1.9 + a + z * 1.3) + 0.06 * Math.sin(y * 2.7 + z * 2 + a); p.setXYZ(i, x * k * 1.05, y * k + 0.5, z); }
+  shell.computeVertexNormals(); shell = shell.toNonIndexed(); shell.translate(0, 0, -SEG / 2);
+  const P = shell.attributes.position, col = new Float32Array(P.count * 3), lo = new THREE.Color(pal[0]), hi = new THREE.Color(pal[1]), cr = new THREE.Color(pal[2]);
+  for (let i = 0; i < P.count; i++) { _c.copy(lo).lerp(hi, THREE.MathUtils.clamp(P.getY(i) / 4.2, 0, 1)); if (Math.sin(P.getX(i) * 2.1 + a) * Math.sin(P.getZ(i) * 3 + P.getY(i)) > 0.5) _c.lerp(cr, 0.6); col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
+  shell.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  // thickness: an outer skin a little larger so the roof reads as solid rock from outside
+  const outer = shell.clone(); outer.scale(1.12, 1.1, 1); outer.translate(0, 0.05, 0);
+  const corals = []; dress(R, outer, corals, ['table', 'stag', 'tree', 'cauli', 'brain', 'whips', 'leather', 'xenia'], mouth ? 6 : 4, 'up', 0.9);
+  dress(R, shell, corals, ['tree', 'purple', 'tree'], 2, 'down', 0.5);
+  const m = new THREE.Mesh(mergeGeometries([shell, outer]), toon('#ffffff', { vertexColors: true, side: THREE.DoubleSide })); outline(m, 0.04, '#2E2238'); m.castShadow = false;
+  const g = new THREE.Group(); g.add(m); g.userData.corals = corals; return g;
+}
