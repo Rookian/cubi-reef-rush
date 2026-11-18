@@ -1299,6 +1299,8 @@ function step(dt) {
     if (o.kind === 'finish') o.mesh.children.forEach((m, k) => { m.position.z = Math.sin(t * 3 + k) * 0.1; });
 
     const dd = curD - o.z, ox = relX(dd), oy = o.grounded ? groundAt(o.x, dd) : relY(dd);
+    if (o.kind === 'school' && o.mesh.userData.small) {   // small fish fade into the blue with distance (far away they only sparkle)
+      const k = THREE.MathUtils.clamp((o.z + 28) / 8, 0, 1); o.mesh.visible = k > 0; o.mesh.scale.setScalar((o.s || 1) * (0.35 + 0.65 * k)); }
     if (o.z > 1.0 && !o.pearl && !o.hazard && !o.mood && !o.crosser && !o.shapes.length && o.kind !== 'school' && o.kind !== 'finish') {   // never let the camera sit inside scenery
       const r = BIG_ROCKS.has(o.kind) ? (o.kind === 'wall' || o.kind === 'moundbig' ? 5.5 : 3.8) : 1.3 * (o.s || 1) + 0.4;
       o.mesh.visible = Math.hypot(o.x + ox - camera.position.x, o.z - camera.position.z) > r || o.z < 1.0; }

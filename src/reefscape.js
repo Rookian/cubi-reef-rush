@@ -80,14 +80,15 @@ let _mat = null, _hull = null;
 function surge(m, push) {
   m.onBeforeCompile = (sh) => { sh.uniforms.uT = reefClock;
     sh.vertexShader = 'uniform float uT; attribute float sway;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-      ${push ? 'transformed += normalize(normal) * ' + push.toFixed(3) + ';' : ''}
       vec4 wp = vec4(position, 1.0);
       #ifdef USE_INSTANCING
         wp = instanceMatrix * wp;
       #endif
+      ${push ? 'transformed += normalize(normal) * ' + push.toFixed(3) + ' * clamp(-(viewMatrix * modelMatrix * wp).z / 12.0, 1.0, 3.0);' : ''}
       wp = modelMatrix * wp;
-      transformed.x += sin(uT * 0.9 + wp.x * 0.8 + wp.z * 0.6) * sway * 0.09;
-      transformed.z += cos(uT * 0.7 + wp.z * 0.9) * sway * 0.06;`); };
+      float swayK = sway * clamp(1.0 - (-(viewMatrix * wp).z - 14.0) / 14.0, 0.0, 1.0);   // far corals hold still: thin swaying tips would only sparkle
+      transformed.x += sin(uT * 0.9 + wp.x * 0.8 + wp.z * 0.6) * swayK * 0.09;
+      transformed.z += cos(uT * 0.7 + wp.z * 0.9) * swayK * 0.06;`); };
   m.customProgramCacheKey = () => 'surge' + push; return m;
 }
 function mats() {
@@ -151,7 +152,7 @@ function rockGeo(R, w, h, d, pal) {
   const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3), lo = new THREE.Color(pal[0]), hi = new THREE.Color(pal[1]), cr = new THREE.Color(pal[2]);
   for (let i = 0; i < P.count; i++) { const y = P.getY(i), x = P.getX(i), z = P.getZ(i), up = N.getY(i);
     _c.copy(lo).lerp(hi, THREE.MathUtils.clamp(y / (h * 1.1), 0, 1) * 0.8 + up * 0.2);
-    const n = Math.sin(x * 4.1 + a) * Math.sin(z * 3.7 + y * 2 + b); if (n > 0.35) _c.lerp(cr, 0.75);
+    const n = Math.sin(x * 1.9 + a) * Math.sin(z * 1.7 + y * 1.2 + b); _c.lerp(cr, THREE.MathUtils.smoothstep(n, 0.2, 0.6) * 0.7);
     if (up < -0.2) _c.multiplyScalar(0.55);
     col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
@@ -251,7 +252,7 @@ function lumpC(R, sx, sy, sz, pal, detail = 3) {   // a lumpy rock without the f
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + 0.13 * Math.sin(x * 2.3 + a) * Math.cos(z * 2.1 + b) + 0.06 * Math.sin(y * 4 + a) + 0.04 * Math.sin(x * 7 + z * 6 + b); p.setXYZ(i, x * k * sx, y * k * sy, z * k * sz); }
   g.computeVertexNormals(); g = g.toNonIndexed();
   const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3), lo = new THREE.Color(pal[0]), hi = new THREE.Color(pal[1]), cr = new THREE.Color(pal[2]);
-  for (let i = 0; i < P.count; i++) { const up = N.getY(i); _c.copy(lo).lerp(hi, 0.5 + up * 0.5); if (Math.sin(P.getX(i) * 4.1 + a) * Math.sin(P.getZ(i) * 3.7 + P.getY(i) * 2 + b) > 0.4) _c.lerp(cr, 0.7); if (up < -0.3) _c.multiplyScalar(0.6);
+  for (let i = 0; i < P.count; i++) { const up = N.getY(i); _c.copy(lo).lerp(hi, 0.5 + up * 0.5); _c.lerp(cr, THREE.MathUtils.smoothstep(Math.sin(P.getX(i) * 1.9 + a) * Math.sin(P.getZ(i) * 1.7 + P.getY(i) * 1.2 + b), 0.25, 0.65) * 0.65); if (up < -0.3) _c.multiplyScalar(0.6);
     col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
 }

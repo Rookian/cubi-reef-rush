@@ -175,6 +175,6 @@ export function makeSchool3D(name, n, size) {
     o: new THREE.Vector3((Rn() - 0.5) * spread * 1.4, (Rn() - 0.5) * spread * 0.7, (Rn() - 0.5) * spread * 1.4),
     f: [0.25 + Rn() * 0.9, 0.3 + Rn() * 1.1, 0.2 + Rn() * 0.8, 0.5 + Rn() * 1.5], ph: [Rn() * 6, Rn() * 6, Rn() * 6, Rn() * 6],
     a: (0.25 + Rn() * 0.5) * Math.max(0.6, size), s: size * (0.85 + Rn() * 0.3), dart: new THREE.Vector3(), nextDart: Rn() * 4, prev: new THREE.Vector3(), yaw: 0, pitch: 0 });
-  g.userData = { meshes, fish, mats, t: Rn() * 10, n, size, species: name };
+  g.userData = { meshes, fish, mats, t: Rn() * 10, n, size, species: name, small: size < 0.6 };
   return g;
 }

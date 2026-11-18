@@ -49,7 +49,7 @@ export function outlineMat(thickness = 0.022, color = OUTLINE) {
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uThick = { value: thickness };
-    sh.vertexShader = 'uniform float uThick;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += normalize(normal) * uThick;');
+    sh.vertexShader = 'uniform float uThick;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vec4 oP = vec4(position, 1.0);\n #ifdef USE_INSTANCING\n oP = instanceMatrix * oP;\n #endif\n float oDist = -(modelViewMatrix * oP).z; transformed += normalize(normal) * uThick * clamp(oDist / 12.0, 1.0, 3.0);   // ~constant width on screen: far outlines stay solid instead of shimmering');
   };
   m.customProgramCacheKey = () => 'hull' + key;
   return (hullMats[key] = m);
