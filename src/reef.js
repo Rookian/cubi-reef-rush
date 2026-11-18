@@ -116,18 +116,27 @@ function dotTexture(ring) {
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-export function makeGlitter(n = 260) {
+// particles that never shrink below ~1.5 px on screen: tiny far points would blink on and off (grainy shimmer);
+// instead they keep a minimum size and fade out as they get smaller
+export function steadyPoints(mat, minPx = 1.6, fadePx = 3.2) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = 'varying float vPA;\n' + sh.vertexShader.replace('#include <logdepthbuf_vertex>', `float ps0 = gl_PointSize; gl_PointSize = max(ps0, ${minPx.toFixed(2)}); vPA = clamp(ps0 / ${fadePx.toFixed(2)}, 0.0, 1.0);\n#include <logdepthbuf_vertex>`);
+    sh.fragmentShader = 'varying float vPA;\n' + sh.fragmentShader.replace('#include <fog_fragment>', '#include <fog_fragment>\n gl_FragColor.a *= vPA;');
+  };
+  mat.customProgramCacheKey = () => 'steady' + minPx + fadePx; return mat;
+}
+export { dotTexture };
+export function makeGlitter(n = 150) {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 26; pos[i * 3 + 1] = 0.5 + Math.random() * 9; pos[i * 3 + 2] = -55 + Math.random() * 61; }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ map: dotTexture(false), color: '#FFF6C8', size: 0.16, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.9 });
+  const mat = steadyPoints(new THREE.PointsMaterial({ map: dotTexture(false), color: '#FFF6C8', size: 0.16, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 }));
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false;
   pts.userData.update = (move, t) => {
     const a = geo.attributes.position.array;
     for (let i = 0; i < n; i++) { a[i * 3 + 2] += move * 0.98; a[i * 3] += Math.sin(t * 0.7 + i) * 0.002; if (a[i * 3 + 2] > 6) { a[i * 3 + 2] -= 61; a[i * 3] = (Math.random() - 0.5) * 26; a[i * 3 + 1] = 0.5 + Math.random() * 9; } }
     geo.attributes.position.needsUpdate = true;
-    mat.opacity = 0.75 + Math.sin(t * 3.1) * 0.15; mat.size = 0.15 + Math.sin(t * 2.3) * 0.03;
   };
   return pts;
 }

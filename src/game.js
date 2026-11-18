@@ -199,12 +199,12 @@ function endParty() { blubs.forEach(b => { if (b.party) { b.party = false; b.lif
 const angLerp = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
 // marine snow
-const SNOW = 400;
+const SNOW = 260;
 const snowGeo = new THREE.BufferGeometry();
 const snowPos = new Float32Array(SNOW * 3);
 for (let i = 0; i < SNOW; i++) { snowPos[i * 3] = (Math.random() - 0.5) * 30; snowPos[i * 3 + 1] = Math.random() * 10; snowPos[i * 3 + 2] = -60 + Math.random() * 66; }
 snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
-scene.add(new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: '#E6FBFF', size: 0.06, transparent: true, opacity: 0.75, depthWrite: false })));
+scene.add(new THREE.Points(snowGeo, RF.steadyPoints(new THREE.PointsMaterial({ map: RF.dotTexture(false), color: '#E6FBFF', size: 0.09, transparent: true, opacity: 0.55, depthWrite: false }))));
 
 // sand details, sparkly plankton, soft bubbles in front of the camera
 const ground = RF.makeGroundScatter(); scene.add(ground);
