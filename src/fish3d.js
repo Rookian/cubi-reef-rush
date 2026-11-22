@@ -30,7 +30,7 @@ function silhouette(d) {
 // shared swimming wave: head stays calm, amplitude grows toward the tail
 const GLOW = { 'Palette surgeonfish': [0.6, '#1670FF'], 'Emperor angelfish': [0.6, '#1E4FD8'], 'Clown surgeonfish': [0.65, '#2E9BFF'], 'Orange-lined triggerfish': [0.6, '#FF9A2A'], 'Anthias': [0.5, '#FF8A3A'], 'Parrotfish': [0.7, '#FF7AB8'], 'Coral grouper': [0.9, '#5FD0FF'], 'Lunar fusilier': [0.3, '#3FA8F0'] };
 const METAL = { 'Lunar fusilier': 0.6, 'Silversides': 1.2 };
-function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, flap: 0 }) {
+function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, flap: 0, scull: 0 }) {
   mat.onBeforeCompile = (sh) => {
     if (inst) { sh.uniforms.uT = { value: 0 }; mat.userData.sh = sh; } else sh.uniforms.uT = U;
     sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -38,7 +38,8 @@ function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, fl
       float zn = position.z / ${len.toFixed(4)};
       float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2 * mv.wave).toFixed(4)};
       ${mv.flap ? `transformed.x += sin(${inst ? 'uT * 6.5' : 'uT'} * 0.55 - abs(position.y) * 5.0) * abs(position.y) * ${mv.flap.toFixed(2)} * 0.45;` : ''}
-      transformed.x += sin(${inst ? 'uT * 6.5 + float(gl_InstanceID) * 1.37' : 'uT'} - zn * 3.0) * env;`);
+      transformed.x += sin(${inst ? 'uT * 6.5 + float(gl_InstanceID) * 1.37' : 'uT'} - zn * 3.0) * env;
+      ${mv.scull ? `transformed.x += sin(uT) * max(0.0, abs(position.y) - ${(len * 0.27).toFixed(4)}) * ${(mv.scull * 0.75).toFixed(2)};   // ocean sunfish: dorsal + anal fin stroke together to the same side, like a pair of vertical wings` : ''}`);
     if (mat.isMeshToonMaterial) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
       { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
         float fr = pow(1.0 - clamp(abs(dot(nn, vv)), 0.0, 1.0), 2.4);
@@ -51,7 +52,7 @@ function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, fl
           outgoingLight = mix(outgoingLight, outgoingLight * 1.15 + vec3(0.75, 0.9, 1.0) * (sp2 * 0.6 + band * 0.16 + fr * 0.3), ${Math.min(1, fx.metal * 0.75).toFixed(2)}); }` : ''} }
       #include <opaque_fragment>`).replace('void main() {', 'uniform float uT;\nvoid main() {');
   };
-  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst + mv.wave + '_' + mv.flap;
+  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst + mv.wave + '_' + mv.flap + '_' + (mv.scull || 0);
   return mat;
 }
 let _grad = null;
@@ -86,7 +87,7 @@ function parts(d) {
     (d.mouth ? `<path d="M${d.mouth[0]},${d.mouth[1]} q${5 * (d.mouthS || 1)},${6 * (d.mouthS || 1)} ${11 * (d.mouthS || 1)},${d.mouthS || 1}" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>` : ''), d.fill);
   const finTex = svgTexture((d.fins || []).join('') + (d.pec || ''));
   // median fins: one cut-out sheet in the centre plane
-  const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, d.flap ? 40 : 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
+  const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, d.flap || d.scull ? 40 : 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
   let pec = null;
   if (d.pec) { const [a, b, c, e] = bbox(d.pec), base = firstPt(d.pec);
     const g = new THREE.PlaneGeometry((c - a) * S, (e - b) * S); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, (a + u.getX(i) * (c - a)) / 300, 1 - (b + (1 - u.getY(i)) * (e - b)) / 200);
@@ -99,7 +100,7 @@ export function makeFish3D(d, size = 1) {
   const P = parts(d), U = { value: Math.random() * 6 };
   const root = new THREE.Group(), rig = new THREE.Group(); root.add(rig);
   const gl = GLOW[d.en], fx = (gl || METAL[d.en]) ? { glow: gl ? gl[0] : 0, gc: new THREE.Color(gl ? gl[1] : '#fff'), metal: METAL[d.en] || 0, key: d.en } : null;
-  const mv = { wave: d.wave || 1, flap: d.flap || 0 };
+  const mv = { wave: d.wave || 1, flap: d.flap || 0, scull: d.scull || 0 };
   const bodyM = swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), U, P.len, 0, fx, false, mv);
   rig.add(new THREE.Mesh(P.body, bodyM));
   rig.add(new THREE.Mesh(P.body, swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), U, P.len, 0.014, null, false, mv)));
@@ -116,12 +117,12 @@ export function makeFish3D(d, size = 1) {
     } }
   if (d.flat) { const tilt = new THREE.Group(); tilt.rotation.z = Math.PI / 2; root.remove(rig); tilt.add(rig); root.add(tilt); }
   root.scale.setScalar(size);
-  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.en.includes('shark') ? 3.2 : 6.5, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
+  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.scull ? 3.0 : d.en.includes('shark') ? 3.2 : 6.5, scull: !!d.scull, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
   return root;
 }
 export function animateFish3D(f, dt) {
   const u = f.userData; u.t += dt; u.U.value += dt * u.speed;
-  if (!u.flat) { u.rig.rotation.y = -Math.sin(u.U.value) * 0.05; u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03; } u.rig.position.y = Math.sin(u.t * 1.3) * 0.02;
+  if (!u.flat) { u.rig.rotation.y = -Math.sin(u.U.value) * (u.scull ? 0.03 : 0.05); u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03; } u.rig.position.y = Math.sin(u.t * 1.3) * 0.02;
   u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (u.stiff ? 0.62 + Math.sin(u.t * 0.7 + p.sx) * 0.04 : 0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });

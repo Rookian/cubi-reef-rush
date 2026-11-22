@@ -254,6 +254,16 @@ const F = [
           fin('M244,100 C256,86 272,80 284,82 C280,94 280,106 284,118 C272,120 256,114 244,100Z', '#B49A70')],
    pattern: [[104, 80], [140, 70], [180, 78], [214, 96], [120, 108], [160, 104], [196, 122], [140, 134], [100, 128], [80, 104]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="#3FA0FF" stroke-width="3.5"/><circle cx="${x}" cy="${y}" r="3" fill="#3FA0FF"/>`).join('') + [...Array(30)].map((_, i) => `<circle cx="${60 + (i * 47) % 180}" cy="${60 + (i * 31) % 84}" r="1.8" fill="#7A6440"/>`).join(''),
    over: `<path d="M46,96 C50,102 50,108 46,112" stroke="${O}" stroke-width="3" fill="none" stroke-linecap="round"/>`, eyes: [[68, 90, 7.5], [72, 110, 7.5]] })],
+ ['Mola mola (ocean sunfish)', 'Mondfisch (Mola mola)', fish({ thick: 0.2, wave: 0.1, scull: 1,
+   body: 'M38,100 C38,62 76,34 130,32 C176,32 208,46 224,64 C236,66 240,76 234,82 C244,86 244,96 236,100 C244,104 244,114 236,118 C240,124 236,134 224,136 C208,154 176,168 130,168 C76,166 38,138 38,100Z', fill: '#A9BCCB',
+   fins: [fin('M164,40 C170,20 182,4 200,0 C198,14 200,30 208,50Z', '#7F96AA', `<path d="M172,38 C178,22 186,10 196,5" stroke="#9FB3C4" stroke-width="3" fill="none" stroke-linecap="round"/>`),
+          fin('M164,160 C170,180 182,196 200,200 C198,186 200,170 208,150Z', '#7F96AA', `<path d="M172,162 C178,178 186,190 196,195" stroke="#9FB3C4" stroke-width="3" fill="none" stroke-linecap="round"/>`)],
+   pattern: `<path d="M20,116 C70,140 170,140 250,112 L250,180 L20,180Z" fill="#DDE7EE"/><path d="M20,70 C70,40 170,34 250,64 L250,0 L20,0Z" fill="#8EA3B6"/>`
+     + [[110, 74, 11, 7], [150, 66, 9, 6], [186, 82, 10, 7], [132, 104, 8, 5], [170, 112, 12, 7], [96, 122, 7, 5], [204, 108, 7, 5], [146, 140, 9, 5]].map(([x, y, rx, ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#C9D6E1" opacity=".9"/>`).join('')
+     + `<path d="M226,64 C236,80 236,120 226,136" stroke="#D3DEE7" stroke-width="10" fill="none"/>` + [72, 88, 104, 120].map(y => `<path d="M214,${y} l18,${(y - 100) * 0.08}" stroke="#8EA3B6" stroke-width="2.5" fill="none"/>`).join(''),
+   shine: [104, 46, 26, -10], eye: [74, 88, 12], blush: [78, 110], blushR: 6,
+   over: `<ellipse cx="41" cy="104" rx="5" ry="6.5" fill="#4A3A40" stroke="${O}" stroke-width="3"/><path d="M106,92 C100,100 100,112 106,120" stroke="#6F8498" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+   pec: finT('M108,104 C116,90 138,84 146,92 C144,102 132,112 108,104Z', '#8EA3B6', null) + [0, 1, 2].map(k => `<path d="M${114 + k * 2},${102 - k * 1} L${136 + k * 3},${90 + k * 4}" stroke="#A9BCCB" stroke-width="2.2" stroke-linecap="round"/>`).join('') })],
 ];
 
 

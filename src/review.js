@@ -6,7 +6,9 @@ import { FISH3D, makeFish3D, animateFish3D } from './fish3d.js';
 import { CRITTERS3D } from './critters3d.js';
 import { CORALS3D } from './corals3d.js';
 import { SOFT3D } from './softcorals3d.js';
-const ITEMS = FISH3D.map(d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D })).concat(CRITTERS3D, CORALS3D, SOFT3D);
+const fishItem = d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D });
+const LATE = ['Mola mola (ocean sunfish)'];   // added after the review numbers were set: appended so earlier numbers stay the same
+const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem));
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
