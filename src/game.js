@@ -470,6 +470,7 @@ function stepTurtle(o, dt) {
   else if (k < 1) target = j.up ? 0.55 + 0.45 * (Math.sin(j.t * 0.55 + j.ph) > -0.2 ? 1 : 0) : 0.2 + 0.5 * (Math.sin(j.t * 0.4 + j.ph) > 0.6 ? 1 : 0);
   else target = j.up ? 0.4 : 0.06;                              // at the surface paddling slowly / settled on the sand
   j.stroke += (target - j.stroke) * Math.min(1, dt * 0.8);
+  const tm = o.mesh.userData.c3.m.userData; tm.stroke = j.stroke; tm.headUp = (j.up && k >= 1 && j.done < 4) ? 0.25 : 0;   // lift the head to breathe at the surface
   const kk = ease(k), prev = bez(j.p0, j.c, j.p1, Math.max(0, ease(Math.max(0, (j.t - dt) / j.T))), _tv).clone();
   const cur = bez(j.p0, j.c, j.p1, kk, _tb);
   if (k >= 1 && j.up) { j.done += dt; cur.x -= Math.sign(j.p0.x) * j.done * 0.5; cur.z -= j.done * 0.6; cur.y += Math.sin(j.done * 0.8) * 0.06; }   // breathe at the top, then drift off
@@ -1383,7 +1384,7 @@ function step(dt) {
     if (o.mood) updateMood(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
     if (o.kind === 'anemone' && o.z > -40 && o.z < 10) M.animateAnemone(o.mesh, dt);
-    { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt * (o.tj ? o.tj.stroke : 1)); }
+    { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt); }
     if (o.mesh.userData.f3 && o.z > -45 && o.z < 12) F3.animateFish3D(o.mesh.userData.f3, dt);
     if (o.mesh.userData.anem && o.z > -40 && o.z < 10) RF.animateAnemone(o.mesh, dt, Math.abs(o.z) < 3.2 && Math.abs(o.x - P.x) < 2.8 && P.y < 3.2);
     if (o.xmas && o.z > -30) RF.animateXmas(o.mesh, dt, Math.abs(o.z) < 4.5 && Math.abs(o.x - P.x) < 3.6 && P.y < 3.4);

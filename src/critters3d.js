@@ -115,10 +115,24 @@ export function makeSeaTurtle(kind = 'green') {
   return root;
 }
 export function animateSeaTurtle(o, dt) {
+  // Unhurried 'underwater flight': the big front flippers sweep down and back, then feather and lift on the recovery;
+  // the hind feet paddle gently and steer like rudders. u.stroke (0 resting .. 1 swimming) sets tempo and reach,
+  // so a gliding turtle still sculls its flippers softly instead of freezing.
   const u = o.userData; u.t += dt; const t = u.t;
-  u.flips.forEach(({ fp, rp, sx }) => { fp.rotation.z = sx * Math.sin(t * 1.6) * 0.45; fp.rotation.y = sx * Math.cos(t * 1.6) * 0.3; rp.rotation.y = sx * Math.sin(t * 1.6 + 1) * 0.25; });
-  u.rig.position.y = Math.sin(t * 1.6 - 0.6) * 0.04; u.rig.rotation.x = Math.sin(t * 1.6 - 0.9) * 0.03;
-  u.head.rotation.y = Math.sin(t * 0.5) * 0.25; u.head.rotation.x = Math.sin(t * 0.7) * 0.08;
+  const st = u.stroke ?? 0.7; u.sv = (u.sv ?? st) + (st - (u.sv ?? st)) * Math.min(1, dt * 1.5); const k = u.sv;
+  u.ph = (u.ph || 0) + dt * (0.9 + 1.3 * k);                         // stroke phase: ~0.15 Hz resting .. ~0.35 Hz swimming
+  const ph = u.ph, a = 0.12 + 0.6 * k, down = Math.sin(ph), back = Math.cos(ph);
+  const ease = (x) => Math.sign(x) * Math.pow(Math.abs(x), 0.8);     // a little hang at the top and bottom of each stroke
+  u.flips.forEach(({ fp, rp, sx }) => {
+    fp.rotation.z = sx * ease(down) * a * 0.85;                       // flap up / down
+    fp.rotation.y = sx * (back * a * 0.55 + 0.08);                    // sweep back on the downstroke, forward on recovery
+    fp.rotation.x = -Math.sin(ph + 1.2) * a * 0.45;                   // feathering twist
+    rp.rotation.y = sx * (Math.sin(ph * 0.5 + sx) * (0.12 + 0.22 * k) - 0.05);   // hind feet: slow alternate paddling
+    rp.rotation.z = sx * Math.sin(ph * 0.5 + 0.8 + sx) * (0.08 + 0.1 * k);
+    rp.rotation.x = Math.sin(ph * 0.5 + 1.6 + sx) * 0.1;
+  });
+  u.rig.position.y = Math.sin(ph - 0.6) * 0.035 * (0.3 + k); u.rig.rotation.x = Math.sin(ph - 0.9) * 0.03 * (0.3 + k);
+  u.head.rotation.y = Math.sin(t * 0.45) * 0.22; u.head.rotation.x = Math.sin(t * 0.6) * 0.08 + (u.headUp || 0);
   blink(u, dt);
 }
 
