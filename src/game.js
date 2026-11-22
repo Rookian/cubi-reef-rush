@@ -8,6 +8,7 @@ import { setLite } from './polyps.js';
 import * as K from './corals3d.js';
 import * as SK from './softcorals3d.js';
 import * as RS from './reefscape.js';
+import * as CL from './cleaning.js';
 setLite(true);   // game-weight corals (the review page keeps full detail)
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
@@ -269,6 +270,8 @@ const KINDS = {
   kelp: { make: () => M.makeSeaweed(pick(['#2FB070', '#3FC27F', '#5AD08A']), rf(2.2, 3.4)), shape: () => [] },
   patch: { make: () => RS.makeOutcrop(ri(1, 9999), 0.5, 'carpet'), shape: () => [] },
   whaleshark: { make: () => CR.makeWhaleShark(), shape: () => [] },
+  cleaningL: { make: () => CL.makeCleaningStation(-1), shape: () => [] },
+  cleaningR: { make: () => CL.makeCleaningStation(1), shape: () => [] },
   hammer: { make: () => shark3D('Blacktip reef shark'), shape: () => [] },
   blacktip: { make: () => shark3D('Blacktip reef shark'), shape: () => [] },
   whitetip: { make: () => shark3D('Whitetip reef shark'), shape: () => [] },
@@ -368,6 +371,7 @@ function spawn(kind, x, y, z, opt = {}) {
   if (RESIDENT_HOMES.includes(kind) && !opt.noRes) residents(o);
   return o;
 }
+const _clv = new THREE.Vector3();
 let hungry = null, hungryCD = 45, hungryTipShown = false;   // the one hungry shark (see SHARKS WITH MOODS)
 // ---- who lives where: each reef structure gets the fish that really hang around that kind of coral
 const RESIDENT_HOMES = ['mound', 'moundbig', 'wall', 'pinnacle'];
@@ -669,10 +673,19 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
   if (Math.random() < 0.07) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (!bg) sharkLife(z, side);
+  if (!bg && Math.random() < 0.012) cleaningStation(z, side);
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
 
+// mola cleaning station beside the reef: at most one at a time, fresh (unscared) each time
+let cleaningLast = -1e9;
+function cleaningStation(z, side) {
+  if (objs.some(o => o.cleaning) || curD - cleaningLast < 220) return null;
+  cleaningLast = curD;
+  const o = spawn(side > 0 ? 'cleaningR' : 'cleaningL', side * rf(4.3, 5.0), 0, z, { solid: false, cleaning: true, ry: 0, noRes: true, noPool: true });
+  return o;
+}
 function spawnItem(it, z) {
   const x = THREE.MathUtils.clamp(+it.x || 0, -3.6, 3.6) * LANE_K, y = +it.y || LANE.mid;
   switch (it.t) {
@@ -705,6 +718,7 @@ function spawnItem(it, z) {
       if (it.kind === 'turtle') spawn('turtle', -dir * 13, rf(6.5, 7.5), z, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] });
       else if (it.kind === 'babyturtles') { const y0 = rf(4.4, 5.4); for (let k = 0; k < 3; k++) spawn('babyturtle', -dir * (10 + k * 1.2), y0 + rf(-0.4, 0.4), z + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
       else if (it.kind === 'dolphin') { for (let k = 0; k < 3; k++) spawn('dolphin', -dir * (16 + k * 2.2), rf(7, 8.4), z + rf(-2, 2), { solid: false, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 5.5, 0], maxX: 22 }); }
+      else if (it.kind === 'mola') { cleaningLast = -1e9; cleaningStation(z, sd); }
       else if (it.kind === 'manta') spawn('manta', -dir * 14, rf(7, 8), z, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 2.2, 0], maxX: 20 });
       else { spawn('whaleshark', sd * 6, 6.2, z, { solid: false, scale: 2.4, ry: -sd * 0.12, swim: [-sd * 0.12, -speed * 0.7] }); if (mode === 'play') { toast('A whale shark is passing by!'); sound.whale(); } }
       break;
@@ -1283,6 +1297,11 @@ function step(dt) {
       else if (o.kind === 'eel') RF.animateEel(o.mesh, dt);
       else if (o.kind === 'whale') RF.animateWhale(o.mesh, dt);
       else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
+      else if (o.cleaning) {
+        const mp = CL.moloPos(o.mesh, _clv), near = o.seen && mp.distanceTo(cubi.position) < 2.8 || (hungry && hungry.mesh.position.distanceTo(mp) < 9);
+        if (!o.told && o.z > -26 && mode === 'play') { o.told = true; toast('A sunfish at the cleaning station!', 1); }
+        CL.animateCleaningStation(o.mesh, dt, near); o.seen = true;
+      }
       else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
       else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
       else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, dt * (o.tail || 1));

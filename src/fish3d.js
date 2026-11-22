@@ -115,9 +115,19 @@ export function makeFish3D(d, size = 1) {
       rig.add(e); eyes.push(e);
       if (d.grumpy) { const br = new THREE.Mesh(new THREE.CapsuleGeometry(r3 * 0.15, r3 * 1.3, 4, 8), new THREE.MeshBasicMaterial({ color: OUT })); br.position.set(0, r3 * 1.0, r3 * 0.55); br.rotation.z = Math.PI / 2 + sx * 0.45; e.add(br); }
     } }
+  // breathing mouth (+ gill holes): a round lip that opens and closes; dark inside
+  let mouth = null;
+  if (d.mouthO) { const [mx, my, mr] = d.mouthO, r = mr * S;
+    mouth = new THREE.Group(); mouth.position.set(0, (100 - my) * S, (mx - P.xm) * S - r * 0.35);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.42, 10, 20), new THREE.MeshToonMaterial({ color: d.lipC || d.fill, gradientMap: softGrad() }));
+    const lipO = new THREE.Mesh(lip.geometry, new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide })); lipO.scale.setScalar(1.12);
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(r * 0.9, 18), new THREE.MeshBasicMaterial({ color: '#2A1E24' })); hole.rotation.y = Math.PI; hole.position.z = 0.0005;
+    mouth.add(lip, lipO, hole); rig.add(mouth);
+    mouth.userData.gills = [];
+    if (P.pec) for (const sx of [-1, 1]) { const gh = new THREE.Mesh(new THREE.CircleGeometry(r * 0.75, 14), new THREE.MeshBasicMaterial({ color: '#3A2A2C' })); gh.position.set(sx * (P.pec.x + 0.002), P.pec.y + r * 0.2, P.pec.z - r * 2.2); gh.rotation.y = sx * Math.PI / 2; gh.scale.set(0.55, 1, 1); rig.add(gh); mouth.userData.gills.push(gh); } }
   if (d.flat) { const tilt = new THREE.Group(); tilt.rotation.z = Math.PI / 2; root.remove(rig); tilt.add(rig); root.add(tilt); }
   root.scale.setScalar(size);
-  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.scull ? 3.0 : d.en.includes('shark') ? 3.2 : 6.5, scull: !!d.scull, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
+  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.scull ? 3.0 : d.en.includes('shark') ? 3.2 : 6.5, scull: !!d.scull, mouth, bodyM, breath: Math.random() * 6, mood: 0, moodV: 0, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
   return root;
 }
 export function animateFish3D(f, dt) {
@@ -126,6 +136,13 @@ export function animateFish3D(f, dt) {
   u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (u.stiff ? 0.62 + Math.sin(u.t * 0.7 + p.sx) * 0.04 : 0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });
+  if (u.mouth) {   // calm: slow deep breaths, pale skin; startled (mood -> 1): fast breathing, dark bold skin
+    u.moodV += (u.mood - u.moodV) * Math.min(1, dt * 2.5);
+    u.breath += dt * (3.4 + u.moodV * 5.5); const o = 0.5 + 0.5 * Math.sin(u.breath), m = u.mouth.children;
+    m[2].scale.setScalar(0.15 + 0.85 * o); m[0].scale.set(1, 0.72 + 0.28 * o, 1 + 0.25 * (1 - o)); m[1].scale.set(1.12, 1.12 * (0.72 + 0.28 * o), 1.12 * (1 + 0.25 * (1 - o)));
+    u.mouth.userData.gills.forEach(g => { g.scale.y = 0.35 + 0.65 * (1 - o); });
+    const c = u.bodyM.color, v = u.moodV; c.setRGB(1.12 - 0.6 * v, 1.1 - 0.62 * v, 1.08 - 0.62 * v);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -135,7 +152,7 @@ const SCHOOLS = { 'Palette surgeonfish': [2, 1, 4, 0.7, 0.95], 'Moorish idol': [
   'Needlefish': [1.2, 4, 9, 0.8, 1], 'Trumpetfish': [0.9, 1, 1, 1, 1.3], 'Blue-green chromis': [3, 10, 22, 0.3, 0.4], 'Yellowtail damselfish': [2, 6, 14, 0.3, 0.4], 'Pink skunk clownfish': [1, 2, 3, 0.4, 0.5],
   'Clownfish': [0.8, 2, 2, 0.4, 0.5], 'Giant puffer': [0.5, 1, 1, 1.2, 1.5], 'Clown triggerfish': [1, 1, 1, 0.9, 1.1], 'Titan triggerfish': [0.7, 1, 1, 1.1, 1.3], 'Clown surgeonfish': [1.5, 1, 4, 0.7, 0.9],
   'Brown sailfin tang': [1.2, 1, 3, 0.7, 0.9], 'Threadfin butterflyfish': [2, 2, 2, 0.6, 0.8], 'Orange-lined triggerfish': [1, 1, 1, 0.8, 1], 'Lunar fusilier': [2.5, 8, 18, 0.5, 0.65], 'Silversides': [2, 20, 36, 0.22, 0.3],
-  'Anthias': [3, 10, 20, 0.3, 0.4], 'Parrotfish': [1.5, 1, 3, 1.0, 1.4], 'Coral grouper': [1, 1, 1, 1.3, 1.7] };
+  'Anthias': [3, 10, 20, 0.3, 0.4], 'Parrotfish': [1.5, 1, 3, 1.0, 1.4], 'Coral grouper': [1, 1, 1, 1.3, 1.7], 'Schooling bannerfish': [1.2, 5, 12, 0.5, 0.65] };
 const byName = Object.fromEntries(DESIGNS.map(d => [d.en, d]));
 export const design = (name) => byName[name];
 function eyeGeo(d, P, lo = false) {   // lo: tiny school fish, where eye detail can't be seen anyway

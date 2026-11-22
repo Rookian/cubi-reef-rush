@@ -33,7 +33,7 @@ const DE = {
   // level names
   'Sunny Shallows': 'Sonnige Lagune', 'Jelly Garden': 'Quallengarten', 'Current Canyon': 'Strömungsschlucht',
   // toasts & warnings
-  'A whale shark is passing by!': 'Ein Walhai schwimmt vorbei!', 'Buddy saved you!': 'Dein Freund hat dich gerettet!', 'Bleh! Spat out!': 'Bäh! Ausgespuckt!', 'Saved on this device': 'Auf diesem Gerät gespeichert',
+  'A whale shark is passing by!': 'Ein Walhai schwimmt vorbei!', 'A sunfish at the cleaning station!': 'Ein Mondfisch an der Putzerstation!', 'Buddy saved you!': 'Dein Freund hat dich gerettet!', 'Bleh! Spat out!': 'Bäh! Ausgespuckt!', 'Saved on this device': 'Auf diesem Gerät gespeichert',
   'Could not save': 'Speichern fehlgeschlagen', 'Could not load level': 'Level konnte nicht geladen werden', 'High quality': 'Hohe Qualität', 'Fast mode': 'Schneller Modus',
   'Chomp! Too slow…': 'Happs! Zu langsam…', 'Clownfish buddy!': 'Clownfisch-Freund!', '+1 heart': '+1 Herz', 'Through the wreck!': 'Durchs Wrack!', 'Moray eel ahead!': 'Achtung, Muräne!',
   'Hammerhead!': 'Hammerhai!', 'Sea snake!': 'Seeschlange!', 'Inked!': 'Tinte!', 'Kraken!': 'Krake!', 'Shark! Press Space / tap Toxin': 'Hai! Leertaste / Gift drücken',
@@ -66,7 +66,7 @@ const DE = {
   'Copy your level': 'Dein Level kopieren', 'Paste a level': 'Level einfügen', 'Please enter your name': 'Bitte gib deinen Namen ein',
   'Reef shark (crosses)': 'Riffhai (kreuzt)', 'Reef shark': 'Riffhai', 'Reef shark!': 'Riffhai!', 'Bonk! Reef shark!': 'Bonk! Riffhai!', 'Type': 'Typ', 'Blacktip': 'Schwarzspitze', 'Whitetip': 'Weißspitze',
   'Blue-spotted stingray': 'Blaupunktrochen', 'Sea fan': 'Fächerkoralle', 'Dead coral': 'Tote Korallen',
-  'Scorpionfish': 'Skorpionsfisch', 'Crocodilefish': 'Krokodilfisch', 'Peacock flounder': 'Pfauenbutt', 'Banded snake eel': 'Ringel-Schlangenaal', 'Coral catshark': 'Korallen-Katzenhai', 'Lionfish': 'Rotfeuerfisch', 'Bigfin reef squid': 'Großflossen-Riffkalmar', 'Dolphins': 'Delfine',
+  'Scorpionfish': 'Skorpionsfisch', 'Crocodilefish': 'Krokodilfisch', 'Peacock flounder': 'Pfauenbutt', 'Banded snake eel': 'Ringel-Schlangenaal', 'Coral catshark': 'Korallen-Katzenhai', 'Lionfish': 'Rotfeuerfisch', 'Bigfin reef squid': 'Großflossen-Riffkalmar', 'Dolphins': 'Delfine', 'Sunfish cleaning station': 'Mondfisch-Putzerstation',
   'Octopus': 'Krake (Oktopus)', 'Feather star': 'Haarstern', 'Blood star': 'Blutstern',
   'English': 'Englisch', 'Deutsch': 'Deutsch', 'Language': 'Sprache',
 };

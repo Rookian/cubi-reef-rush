@@ -7,7 +7,7 @@ import { CRITTERS3D } from './critters3d.js';
 import { CORALS3D } from './corals3d.js';
 import { SOFT3D } from './softcorals3d.js';
 const fishItem = d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D });
-const LATE = ['Mola mola (ocean sunfish)'];   // added after the review numbers were set: appended so earlier numbers stay the same
+const LATE = ['Mola mola (ocean sunfish)', 'Schooling bannerfish', 'Cleaner wrasse'];   // added after the review numbers were set: appended so earlier numbers stay the same
 const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem));
 import { makeComposer } from './post.js';
 

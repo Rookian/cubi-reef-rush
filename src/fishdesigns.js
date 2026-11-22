@@ -269,8 +269,23 @@ const F = [
      + `<path d="M224,64 C240,74 242,126 224,136" stroke="#7D6E63" stroke-width="12" fill="none"/>` + [76, 92, 108, 124].map(y => `<path d="M214,${y} l18,${(y - 100) * 0.08}" stroke="#62544A" stroke-width="2.5" fill="none"/>`).join('')
      + `<ellipse cx="120" cy="56" rx="60" ry="10" fill="#E8D8B0" opacity=".22"/>`,
    shine: [104, 46, 26, -10], eye: [76, 88, 12], blush: [80, 110], blushR: 6,
-   over: `<ellipse cx="42" cy="105" rx="5" ry="6.5" fill="#4A3A40" stroke="${O}" stroke-width="3"/><path d="M108,92 C102,100 102,112 108,120" stroke="#5E5047" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+   mouthO: [42, 105, 6], lipC: '#A99A8C', over: `<ellipse cx="42" cy="105" rx="5" ry="6.5" fill="#4A3A40" stroke="${O}" stroke-width="3"/><path d="M108,92 C102,100 102,112 108,120" stroke="#5E5047" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
    pec: finT('M108,104 C116,90 138,84 146,92 C144,102 132,112 108,104Z', '#6E5F55', null) + [0, 1, 2].map(k => `<path d="M${114 + k * 2},${102 - k * 1} L${136 + k * 3},${90 + k * 4}" stroke="#958579" stroke-width="2.2" stroke-linecap="round"/>`).join('') })],
+ ['Schooling bannerfish', 'Schwarm-Wimpelfisch', fish({ body: 'M52,110 C56,98 68,90 80,84 C96,56 128,38 160,38 C200,42 234,74 242,100 C234,128 200,158 160,162 C126,160 96,144 80,128 C66,122 56,118 52,110Z', fill: '#FFFFFF',
+   fins: [fin('M132,46 C138,14 170,-2 226,0 C258,2 282,8 298,16 C268,16 226,18 194,26 C174,32 160,42 154,52Z', '#FFFFFF', `<path d="M150,40 C176,14 230,8 290,14" stroke="#E6ECF2" stroke-width="3" fill="none" stroke-linecap="round"/>`),
+          fin('M184,48 C214,46 236,66 244,88 L232,92 C222,72 204,62 186,60Z', '#FFD21F'),
+          fin('M138,156 C158,186 202,182 230,124 L220,118 C206,146 178,156 150,152Z', '#16161C', `<path d="M196,160 C210,150 220,136 226,122" stroke="#FFD21F" stroke-width="5" fill="none"/>`),
+          fin('M238,100 L278,74 C271,92 271,108 278,126Z', '#FFD21F')],
+   pattern: `<path d="M112,20 L148,20 L170,180 L128,180Z" fill="#16161C"/><path d="M188,20 L216,20 L240,180 L208,180Z" fill="#16161C"/><path d="M216,20 L260,20 L260,180 L240,180Z" fill="#FFF2B0"/><path d="M84,62 C80,70 78,78 80,84" stroke="#3A3A44" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+   eye: [96, 92, 10], blush: [84, 116], blushR: 5, mouth: [52, 112], mouthS: 0.6,
+   pec: fin('M120,108 C132,100 148,102 152,114 C140,122 126,120 120,108Z', '#F4F6F8') })],
+ ['Cleaner wrasse', 'Gemeiner Putzerlippfisch', fish({ body: 'M30,104 C40,90 72,80 122,78 C182,76 228,86 250,96 C254,100 254,104 250,108 C228,120 182,126 122,124 C72,122 40,116 30,104Z', fill: '#F6F2E2',
+   fins: [fin('M112,82 C150,70 206,72 236,90 L228,92 C200,82 156,80 116,84Z', '#2F72E8'),
+          fin('M160,124 C190,132 216,126 236,112 L228,110 C208,120 188,124 164,122Z', '#2F72E8'),
+          fin('M244,102 C256,90 274,80 290,76 C284,93 284,111 290,128 C274,124 256,114 244,102Z', '#2F72E8', `<path d="M246,102 L288,102" stroke="#16161C" stroke-width="9"/>`)],
+   pattern: `<path d="M20,60 L260,60 L260,98 C200,92 140,90 20,96Z" fill="#CFE2F4"/>` + [[100, '#B4D2F4'], [120, '#8FBDF6'], [140, '#68A6F8'], [160, '#4A95FA']].map(([x, c]) => `<path d="M${x},60 L260,60 L260,99 C220,95 ${x + 40},93 ${x},93 C${x - 8},82 ${x - 4},70 ${x},60Z" fill="${c}"/>`).join('') + `<path d="M26,101 C80,98 160,92 252,94 L252,112 C160,112 80,108 26,106Z" fill="#16161C"/>`,
+   shine: [120, 84, 22], eye: [62, 98, 9], blush: [66, 112], blushR: 4, mouth: [30, 106], mouthS: 0.4,
+   pec: fin('M96,104 C104,98 116,100 118,108 C110,114 100,112 96,104Z', '#DDEBFA') })]
 ];
 
 
