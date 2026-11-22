@@ -364,6 +364,7 @@ function spawn(kind, x, y, z, opt = {}) {
   mesh.rotation.set(0, opt.ry ?? 0, 0);
   mesh.visible = true;
   scene.add(mesh);
+  if (kind === 'school' && !opt.noEnv) { mesh.userData.env = fishEnv; const dd = curD - z, lift = groundAt(x, dd) - relY(dd) + 0.5 + (mesh.userData.size || 0.6); if (y < lift) y = lift; }
   const o = { kind, mesh, x, y, z, s, shapes: opt.solid === false ? [] : KINDS[kind].shape(s), hit: false, ph: Math.random() * 6, hazard: HAZARDS.includes(kind) && opt.solid !== false, grounded: y <= 0.05 && !opt.swim, ...opt };
   if (kind === 'puffer') { o.puff = 0; setPuff3D(mesh, 0); }
   if (kind === 'shark') { M.setSharkMouth(mesh, 0); mesh.userData.sick = 0; }
@@ -386,6 +387,52 @@ const RESIDENTS = {
   wall: [['Anthias', 0.3], ['Lunar fusilier', 0.2], ['Clown triggerfish', 0.12], ['Emperor angelfish', 0.15]],
   pinnacle: [['Anthias', 0.95], ['Lunar fusilier', 0.6], ['Blue-green chromis', 0.5], ['Titan triggerfish', 0.15]],
 };
+// ---- fish stay out of rock, coral heads and sand (and big fish and sharks too); small fish are shy of Cubi
+const solids = [], _pw = new THREE.Vector3(), _po = new THREE.Vector3(), _pb = new THREE.Box3(), _pv = new THREE.Vector3();
+function updateSolids() {
+  solids.length = 0;
+  for (const o of objs) {
+    if (o.z < -60 || o.z > 12) continue;
+    if (BIG_ROCKS.has(o.kind) && o.kind !== 'xmas' || o.cleaning) {
+      if (!o.ell) { o.mesh.updateMatrixWorld(true); _pb.setFromObject(o.mesh); const c = _pb.getCenter(_pv), sz = _pb.getSize(new THREE.Vector3());
+        o.ell = { ox: c.x - o.mesh.position.x, oz: c.z - o.mesh.position.z, base: _pb.min.y - o.mesh.position.y, rx: sz.x * 0.4, ry: sz.y * 0.88, rz: sz.z * 0.4 }; }
+      solids.push(o);
+    } else if (o.shapes.length && o.shapes.some(sh => sh.t === 'b')) solids.push(o);
+  }
+}
+function pushOut(w, rad, out) {
+  out.set(0, 0, 0);
+  const d = curD - w.z, gy = groundAt(w.x - relX(d), d) + rad;
+  if (w.y < gy) out.y = gy - w.y;
+  for (const o of solids) {
+    const m = o.mesh.position;
+    if (Math.abs(m.z - w.z) > 10 || Math.abs(m.x - w.x) > 10) continue;
+    if (o.ell) {
+      const e = o.ell, cx = m.x + e.ox, cz = m.z + e.oz, cy = m.y + e.base;
+      const dx = w.x - cx, dy = Math.max(0, w.y + out.y - cy), dz = w.z - cz, rx = e.rx + rad, ry = e.ry + rad, rz = e.rz + rad;
+      const q = (dx / rx) ** 2 + (dy / ry) ** 2 + (dz / rz) ** 2;
+      if (q < 1) { const k = 1 / Math.sqrt(Math.max(q, 1e-3)) - 1; out.x += dx * k; out.y += dy * k; out.z += dz * k; }
+    } else for (const sh of o.shapes) if (sh.t === 'b') {
+      const dd = curD - o.z, rx = relX(dd), ry = relY(dd);
+      if (w.x > sh.x0 + rx - rad && w.x < sh.x1 + rx + rad && w.y > sh.y0 + ry - rad && w.y < sh.y1 + ry + rad && Math.abs(w.z - o.z) < sh.dz + rad) {
+        const up = sh.y1 + ry + rad - w.y, dn = w.y - (sh.y0 + ry - rad); out.y += up < dn ? up : -dn; }
+    }
+  }
+  return out;
+}
+const fishEnv = { threat: new THREE.Vector3(0, -99, 0), r: 2.8, push: pushOut };
+// big swimmers: body radius for keeping them out of the reef
+const BIG_SWIM = { blacktip: 0.75, whitetip: 0.75, hammer: 0.8, whaleshark: 1.8, manta: 1.0, turtle: 0.8, babyturtle: 0.3, dolphin: 0.7, whale: 2.5, squid: 0.3, lionfish: 0.35 };
+function keepOut(o, dt) {
+  const rad = BIG_SWIM[o.kind] * (o.s || 1) / (o.kind === 'whaleshark' ? 2.4 : 1), dd = curD - o.z;
+  _pw.set(o.x + relX(dd), o.y + relY(dd), o.z); pushOut(_pw, rad, _po);
+  if (_po.lengthSq() > 1e-6) { const k = Math.min(1, dt * 6); o.x += _po.x * k; o.y += _po.y * k; if (o.swim || o.mood) o.z += _po.z * k * 0.5; }
+  if (o.kind === 'squid') {   // squid are shy too: they ease away from Cubi and come back
+    o.fl ||= new THREE.Vector3(); _pv.set(o.x + relX(dd), o.y + relY(dd), o.z).sub(fishEnv.threat); const dist = Math.hypot(_pv.x, _pv.y, _pv.z * 0.5);
+    if (dist < 3) { _pv.z *= 0.25; _pv.setLength((3 - dist) * 1.2 + 0.3); } else _pv.set(0, 0, 0);
+    o.fl.lerp(_pv, 1 - Math.pow(dist < 3 ? 0.3 : 0.75, dt));
+  }
+}
 function residents(home) {
   if (mode === 'menu' && Math.random() < 0.5) return;
   const th = home.mesh.userData.theme || (home.kind === 'pinnacle' ? 'pinnacle' : home.kind.startsWith('wall') ? 'wall' : 'mixed');
@@ -1258,6 +1305,7 @@ function step(dt) {
   if (mode !== 'over' && mode !== 'win') { nextDecor -= move; if (nextDecor <= 0) { decorRow(-SPAWN_AHEAD - 4); nextDecor = 3.5; } }
 
   // update objects
+  updateSolids(); fishEnv.threat.copy(cubi.position); if (mode !== 'play') fishEnv.threat.set(0, -99, 0);
   for (let i = objs.length - 1; i >= 0; i--) {
     const o = objs[i];
     o.z += move;
@@ -1314,6 +1362,7 @@ function step(dt) {
     if (o.kind === 'stream') updateStream(o);
     if (o.kind === 'finish') o.mesh.children.forEach((m, k) => { m.position.z = Math.sin(t * 3 + k) * 0.1; });
 
+    if (BIG_SWIM[o.kind] && !o.grounded) keepOut(o, dt);
     const dd = curD - o.z, ox = relX(dd), oy = o.grounded ? groundAt(o.x, dd) : relY(dd);
     if (o.kind === 'school' && o.mesh.userData.small) {   // small fish fade into the blue with distance (far away they only sparkle)
       const k = THREE.MathUtils.clamp((o.z + 28) / 8, 0, 1); o.mesh.visible = k > 0; o.mesh.scale.setScalar((o.s || 1) * (0.35 + 0.65 * k)); }
@@ -1324,6 +1373,7 @@ function step(dt) {
     if (o.kind === 'stream') { o.mesh.position.y = oy; o.chev.position.set(ox, oy, 0); }
     else if (o.kind === 'pearl') o.mesh.position.y += oy;
     else o.mesh.position.y = o.y + oy;
+    if (o.fl) { o.mesh.position.x += o.fl.x; o.mesh.position.y += o.fl.y; o.mesh.position.z += o.fl.z; }
     if (o.clown && !o.clownTaken) { o.clownOff = [ox, oy]; }
     if (o.clown && !o.clownTaken) {
       const co = o.clownOff || [0, 0]; o.clown.position.set(o.x + co[0] + Math.sin(t * 1.2) * 0.25, 1.15 + co[1] + Math.sin(t * 2) * 0.12, o.z + Math.cos(t * 1.2) * 0.25);

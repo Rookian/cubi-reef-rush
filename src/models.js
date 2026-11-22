@@ -854,10 +854,13 @@ let _fishGrad = null;
 function fishGradient() { if (_fishGrad) return _fishGrad; const d = new Uint8Array([150, 150, 150, 255, 214, 214, 214, 255, 255, 255, 255, 255]); _fishGrad = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); _fishGrad.minFilter = _fishGrad.magFilter = THREE.NearestFilter; _fishGrad.generateMipmaps = false; _fishGrad.needsUpdate = true; return _fishGrad; }
 let _toonRef = null; function toonGradientRef() { if (!_toonRef) _toonRef = toon('#fff').gradientMap; return _toonRef; }
 const _sm = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _sv = new THREE.Vector3(), _ss = new THREE.Vector3(), _se = new THREE.Euler();
+const _sw = new THREE.Vector3(), _sd = new THREE.Vector3(), _st = new THREE.Vector3(), _sp = new THREE.Vector3();
 export function animateSchool(g, dt) {
   const u = g.userData; u.t += dt;
   u.mats.forEach(m => { if (m.userData.sh) m.userData.sh.uniforms.uT.value = u.t; });
-  const t = u.t;
+  const t = u.t, env = u.env;
+  // in the game: env.threat (Cubi), env.r (shy radius) and env.push(worldPos, radius, out) keep fish out of rock and sand
+  if (env) { g.updateWorldMatrix(true, false); (u.inv ||= new THREE.Matrix4()).copy(g.matrixWorld).invert(); }
   u.fish.forEach((f, i) => {
     // each fish wanders on its own little path, and now and then darts off
     f.nextDart -= dt;
@@ -870,6 +873,18 @@ export function animateSchool(g, dt) {
       f.o.y + Math.sin(t * f.f[1] + f.ph[1]) * f.a * 0.5,
       f.o.z + Math.cos(t * f.f[2] + f.ph[2]) * f.a + Math.sin(t * f.f[3] + f.ph[1]) * f.a * 0.3,
     ).addScaledVector(f.dart, -0.6);
+    if (env && dt > 0) {
+      f.fl ||= new THREE.Vector3();
+      _sw.copy(_sv).applyMatrix4(g.matrixWorld);
+      // shy: when Cubi comes close the fish ease aside (mostly sideways and up), then drift back once it has passed
+      _sd.subVectors(_sw, env.threat); const ahead = _sd.z < 0 ? 0.4 : 0.8;
+      const dist = Math.hypot(_sd.x, _sd.y, _sd.z * ahead), R = env.r * (0.75 + Math.min(1, u.size) * 0.5);
+      if (dist < R) { _sd.z *= 0.1; if (Math.hypot(_sd.x, _sd.y) < 0.4) _sd.x = (i % 2 ? 0.4 : -0.4); _st.copy(_sd).setLength((R - dist) * 1.6 + 0.4); } else _st.set(0, 0, 0);
+      f.fl.lerp(_st, 1 - Math.pow(dist < R ? 0.12 : 0.75, dt));
+      _sw.add(f.fl);
+      _sw.add(env.push(_sw, 0.1 + 0.22 * u.size, _sp));   // never inside rock, coral heads or sand
+      _sv.copy(_sw).applyMatrix4(u.inv);
+    }
     if (dt > 0) {
       f.vel.lerp(_ss.set((_sv.x - f.prev.x) / dt, (_sv.y - f.prev.y) / dt, 0), 1 - Math.pow(0.002, dt));
       f.yaw += (THREE.MathUtils.clamp(-f.vel.x * 0.35, -0.9, 0.9) - f.yaw) * (1 - Math.pow(0.03, dt));
