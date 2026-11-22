@@ -444,6 +444,48 @@ function keepOut(o, dt) {
     o.fl.lerp(_pv, 1 - Math.pow(dist < 3 ? 0.3 : 0.75, dt));
   }
 }
+// ---- sea turtles that come up from the reef to breathe, or sink down from the surface to rest on the bottom.
+// Calm: a slow eased path (lift-off, climb, level out), long glides between lazy flipper strokes, head-first with pitch.
+const SURF_Y = 11.1;   // just under the water surface (world y 12)
+function turtleJourney(z, side, up) {
+  const x0 = side * rf(3.4, 4.6), x1 = up ? x0 - side * rf(0.6, 1.8) : side * rf(3.6, 4.8);
+  const dd = curD - z, gy = (x) => groundAt(x, dd) - relY(dd) + 0.42, sy = SURF_Y - relY(dd);
+  const p0 = up ? new THREE.Vector3(x0, gy(x0), 0) : new THREE.Vector3(x0, sy, 0);
+  const p1 = up ? new THREE.Vector3(x1, sy, -rf(5, 7)) : new THREE.Vector3(x1, gy(x1), -rf(4, 6));
+  // control point: leave the bottom flat-ish and reach the surface flat-ish (or the reverse going down)
+  const c = up ? new THREE.Vector3(x0 - side * 0.3, p0.y + 2.2, p1.z * 0.5) : new THREE.Vector3((x0 + x1) / 2, sy - 1.0, p1.z * 0.45);
+  const len = p0.distanceTo(c) + c.distanceTo(p1);
+  const o = spawn('turtle', p0.x, p0.y, z, { solid: false, scale: 1.3, ry: 0 });
+  o.tj = { up, p0, p1, c, T: len / (up ? 1.6 : 1.5), t: up ? -rf(0.3, 0.8) : 0, stroke: up ? 0.1 : 0.35, zo: 0, ph: rf(0, 6), pitch: 0, yaw: up ? (side > 0 ? 0.6 : -0.6) : side * -0.4, done: 0 };
+  o.mesh.rotation.order = 'YXZ';
+  return o;
+}
+const _tb = new THREE.Vector3(), _tv = new THREE.Vector3();
+function bez(a, c, b, k, out) { const m = 1 - k; return out.set(m * m * a.x + 2 * m * k * c.x + k * k * b.x, m * m * a.y + 2 * m * k * c.y + k * k * b.y, m * m * a.z + 2 * m * k * c.z + k * k * b.z); }
+function stepTurtle(o, dt) {
+  const j = o.tj; j.t += dt;
+  const ease = (x) => x * x * (3 - 2 * x);
+  let k = Math.max(0, Math.min(1, j.t / j.T)), target = 0.35;
+  if (j.t < 0) target = 0.08;                                   // still resting on the bottom, just breathing slowly
+  else if (k < 1) target = j.up ? 0.55 + 0.45 * (Math.sin(j.t * 0.55 + j.ph) > -0.2 ? 1 : 0) : 0.2 + 0.5 * (Math.sin(j.t * 0.4 + j.ph) > 0.6 ? 1 : 0);
+  else target = j.up ? 0.4 : 0.06;                              // at the surface paddling slowly / settled on the sand
+  j.stroke += (target - j.stroke) * Math.min(1, dt * 0.8);
+  const kk = ease(k), prev = bez(j.p0, j.c, j.p1, Math.max(0, ease(Math.max(0, (j.t - dt) / j.T))), _tv).clone();
+  const cur = bez(j.p0, j.c, j.p1, kk, _tb);
+  if (k >= 1 && j.up) { j.done += dt; cur.x -= Math.sign(j.p0.x) * j.done * 0.5; cur.z -= j.done * 0.6; cur.y += Math.sin(j.done * 0.8) * 0.06; }   // breathe at the top, then drift off
+  // never through rock or coral heads: a lift that grows while the path would cut into something (so it lands on top of a bommie)
+  { const dd = curD - o.z; _pw.set(cur.x + relX(dd), cur.y + (j.lift || 0) + relY(dd), o.z); pushOut(_pw, 0.5, _po);
+    const need = Math.max(0, _po.y) + Math.hypot(_po.x, _po.z) * 0.6; j.lift = Math.max((j.lift || 0) * (k < 0.85 ? 1 - dt * 0.15 : 1), (j.lift || 0) + need * Math.min(1, dt * 5)); }
+  o.x = cur.x; o.y = cur.y + j.lift; o.z += cur.z - (j.zo || 0); j.zo = cur.z;
+  // face the way it moves: yaw from the horizontal motion, pitch from the climb (nose up going up), all eased
+  const vx = cur.x - prev.x, vy = cur.y - prev.y, vz = cur.z - prev.z, h = Math.hypot(vx, vz);
+  if (h + Math.abs(vy) > 1e-4) {
+    const yaw = Math.atan2(-vx, -vz), dy = Math.atan2(Math.sin(yaw - j.yaw), Math.cos(yaw - j.yaw)); j.yaw += dy * Math.min(1, dt * 1.2);
+    j.pitch += (THREE.MathUtils.clamp(Math.atan2(vy, Math.max(h, 1e-4)) * 0.85, -0.7, 0.75) - j.pitch) * Math.min(1, dt * 1.2);
+  } else j.pitch *= Math.max(0, 1 - dt * 1.5);
+  o.mesh.rotation.set(j.pitch, j.yaw, Math.sin(j.t * 0.3 + j.ph) * 0.05);
+  if (j.up && j.done > 18) o.gone = true;
+}
 function residents(home) {
   if (mode === 'menu' && Math.random() < 0.5) return;
   const th = home.mesh.userData.theme || (home.kind === 'pinnacle' ? 'pinnacle' : home.kind.startsWith('wall') ? 'wall' : 'mixed');
@@ -733,7 +775,9 @@ function sharedLife(z, bg) {
   if (!bg) sharkLife(z, side);
   if (!bg && Math.random() < 0.005) cleaningStation(z, side);
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
-  if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
+  if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, r = Math.random();
+    if (r < 0.8 && !objs.some(o => o.tj && o.z < -20)) turtleJourney(z - 6, dir, r < 0.4);
+    else spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
 
 // mola cleaning station beside the reef: at most one at a time, fresh (unscared) each time
@@ -773,7 +817,7 @@ function spawnItem(it, z) {
     }
     case 'visitor': {
       const sd = x >= 0 ? 1 : -1, dir = -sd;
-      if (it.kind === 'turtle') spawn('turtle', -dir * 13, rf(6.5, 7.5), z, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] });
+      if (it.kind === 'turtle') turtleJourney(z, dir, Math.random() < 0.5);
       else if (it.kind === 'babyturtles') { const y0 = rf(4.4, 5.4); for (let k = 0; k < 3; k++) spawn('babyturtle', -dir * (10 + k * 1.2), y0 + rf(-0.4, 0.4), z + rf(-1.2, 1.2), { solid: false, scale: rf(0.4, 0.5), ry: dir * Math.PI / 2 + Math.PI, swim: [dir * rf(1.1, 1.5), 0], maxX: 16 }); }
       else if (it.kind === 'dolphin') { for (let k = 0; k < 3; k++) spawn('dolphin', -dir * (16 + k * 2.2), rf(7, 8.4), z + rf(-2, 2), { solid: false, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 5.5, 0], maxX: 22 }); }
       else if (it.kind === 'mola') { cleaningLast = -1e9; cleaningStation(z, sd); }
@@ -1339,7 +1383,7 @@ function step(dt) {
     if (o.mood) updateMood(o, dt);
     if (o.sick && !o.moray && !o.kraken) { o.x += o.flee * 5 * dt; o.y += 0.6 * dt; if (o.kind !== 'shark') o.mesh.rotation.z = o.flee * -0.4; }
     if (o.kind === 'anemone' && o.z > -40 && o.z < 10) M.animateAnemone(o.mesh, dt);
-    { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt); }
+    { const c3 = o.mesh.userData.c3; if (c3 && o.z > -c3.far && o.z < 12) c3.anim(c3.m, dt * (o.tj ? o.tj.stroke : 1)); }
     if (o.mesh.userData.f3 && o.z > -45 && o.z < 12) F3.animateFish3D(o.mesh.userData.f3, dt);
     if (o.mesh.userData.anem && o.z > -40 && o.z < 10) RF.animateAnemone(o.mesh, dt, Math.abs(o.z) < 3.2 && Math.abs(o.x - P.x) < 2.8 && P.y < 3.2);
     if (o.xmas && o.z > -30) RF.animateXmas(o.mesh, dt, Math.abs(o.z) < 4.5 && Math.abs(o.x - P.x) < 3.6 && P.y < 3.4);
@@ -1378,7 +1422,8 @@ function step(dt) {
     if (o.kind === 'stream') updateStream(o);
     if (o.kind === 'finish') o.mesh.children.forEach((m, k) => { m.position.z = Math.sin(t * 3 + k) * 0.1; });
 
-    if (BIG_SWIM[o.kind] && !o.grounded) keepOut(o, dt);
+    if (o.tj) stepTurtle(o, dt);
+    else if (BIG_SWIM[o.kind] && !o.grounded) keepOut(o, dt);
     const dd = curD - o.z, ox = relX(dd), oy = o.grounded ? groundAt(o.x, dd) : relY(dd);
     if (o.kind === 'school' && o.mesh.userData.small) {   // small fish fade into the blue with distance (far away they only sparkle)
       const k = THREE.MathUtils.clamp((o.z + 28) / 8, 0, 1); o.mesh.visible = k > 0; o.mesh.scale.setScalar((o.s || 1) * (0.35 + 0.65 * k)); }
@@ -1765,7 +1810,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
 window.__grade = (o) => { for (const k in o) if (GRADE[k]) GRADE[k].value = o[k]; else if (k === 'fogNear') scene.fog.near = o[k]; else if (k === 'glow') glowU.uGlowK.value = o[k]; };
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
-window.__game = { scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
+window.__game = { turtle: (z, side, up) => turtleJourney(z, side, up), scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },
