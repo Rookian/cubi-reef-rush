@@ -9,10 +9,7 @@ import { SOFT3D } from './softcorals3d.js';
 const fishItem = d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D });
 const LATE = ['Mola mola (ocean sunfish)'];   // added after the review numbers were set: appended so earlier numbers stay the same
 const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem));
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { makeComposer } from './post.js';
 
 const $ = (id) => document.getElementById(id);
 const renderer = makeRenderer($('c'), 2);
@@ -24,8 +21,8 @@ renderer.domElement.addEventListener('pointerdown', () => { ctl.autoRotate = fal
 const bub = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([...Array(240)].map(() => (Math.random() - 0.5) * 10), 3)), new THREE.PointsMaterial({ color: '#DFF8FF', size: 0.05, transparent: true, opacity: 0.6 }));
 scene.add(bub);
 
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: 4 }));
-composer.addPass(new RenderPass(scene, cam)); composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.5, 0.95)); composer.addPass(new OutputPass());
+const { composer } = makeComposer(renderer, scene, cam, { strength: 0.45, radius: 0.5, threshold: 0.95 });
+window.__post = { composer, renderer };
 const KEY = 'cubi_review_v1';
 let notes = {}; try { notes = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(notes)); } catch (e) {} };

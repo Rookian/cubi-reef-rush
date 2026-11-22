@@ -14,7 +14,7 @@ import { sound } from './audio.js';
 import * as LB from './leaderboard.js';
 import * as CM from './community.js';
 import { langSwitch, LANG_CSS, onLangChange } from './i18n.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { makeComposer } from './post.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
@@ -1037,13 +1037,8 @@ for (const k in GRADE) GRADE[k] = gradePass.uniforms[k];   // ShaderPass clones 
 const BLOOM = !/[?&]nobloom/.test(location.search);
 let composer = null, bloomPass = null;
 if (BLOOM) {
-  const rt = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, samples: 4 });
-  composer = new EffectComposer(renderer, rt);
-  composer.addPass(new RenderPass(scene, camera));
-  bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.35, 0.93);
-  composer.addPass(bloomPass);
-  composer.addPass(gradePass);
-  composer.addPass(new OutputPass());
+  ({ composer, bloom: bloomPass } = makeComposer(renderer, scene, camera, { strength: 0.3, radius: 0.35, threshold: 0.93, extra: [gradePass] }));
+  window.__post = { composer, renderer };
 }
 renderer.info.autoReset = false;
 // quality: HQ = bloom + sharper resolution, LQ = no bloom, 1x resolution (toggle with Q)
