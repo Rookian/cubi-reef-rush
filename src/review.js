@@ -9,6 +9,16 @@ import { SOFT3D } from './softcorals3d.js';
 const fishItem = d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D });
 const LATE = ['Mola mola (ocean sunfish)', 'Schooling bannerfish', 'Cleaner wrasse'];   // added after the review numbers were set: appended so earlier numbers stay the same
 const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem));
+// groups for the list and the gallery (review numbers stay as they were, so earlier feedback still matches)
+const GROUPS = [
+  ['reef', 'Reef fish', 'Rifffische'], ['open', 'Open water & schools', 'Freiwasser & Schwärme'], ['sharks', 'Sharks & rays', 'Haie & Rochen'],
+  ['bottom', 'Bottom dwellers & eels', 'Bodenbewohner & Aale'], ['critters', 'Turtles & invertebrates', 'Schildkröten & Wirbellose'],
+  ['hard', 'Hard corals', 'Steinkorallen'], ['soft', 'Soft corals & anemones', 'Weichkorallen & Anemonen']];
+const FISH_GROUP = { open: ['Needlefish', 'Trumpetfish', 'Lunar fusilier', 'Silversides', 'Bigfin reef squid', 'Dolphin', 'Mola mola (ocean sunfish)'],
+  sharks: ['Blacktip reef shark', 'Whitetip reef shark', 'Coral catshark', 'Blue-spotted stingray', 'Bluespotted stingray', 'Manta ray'],
+  bottom: ['Moray eel', 'Banded snake eel', 'Scorpionfish', 'Lionfish', 'Crocodilefish', 'Peacock flounder'] };
+ITEMS.forEach((d, i) => { d.no = i + 1;
+  d.group = CRITTERS3D.includes(d) ? 'critters' : CORALS3D.includes(d) ? 'hard' : SOFT3D.includes(d) ? 'soft' : Object.keys(FISH_GROUP).find(k => FISH_GROUP[k].includes(d.en)) || 'reef'; });
 import { makeComposer } from './post.js';
 
 const $ = (id) => document.getElementById(id);
@@ -38,10 +48,49 @@ function show(i) {
   $('note').value = n.note || ''; $('ok').setAttribute('aria-pressed', String(n.ok === true)); $('no').setAttribute('aria-pressed', String(n.ok === false));
   renderList();
 }
+const badge = (d) => { const n = notes[d.en] || {}; return n.ok === true ? '✅' : n.ok === false ? '✏️' : '▫️'; };
+const tally = (g) => { const its = ITEMS.filter(d => d.group === g); return `${its.filter(d => (notes[d.en] || {}).ok === true).length}/${its.length}`; };
 function renderList() {
-  $('list').innerHTML = ITEMS.map((d, i) => { const n = notes[d.en] || {}; return `<button data-i="${i}" class="${i === idx ? 'on' : ''}">${n.ok === true ? '✅' : n.ok === false ? '✏️' : '▫️'} ${i + 1}. ${d.en}</button>`; }).join('');
+  $('list').innerHTML = `<button class="gal" id="galBtn">▦ Gallery · Galerie</button>` + GROUPS.map(([g, en, de]) => `<h2>${en}<small>${de} · ${tally(g)}</small></h2>` +
+    ITEMS.filter(d => d.group === g).map(d => `<button data-i="${d.no - 1}" class="${d.no - 1 === idx ? 'on' : ''}">${badge(d)} ${d.no}. ${d.en}</button>`).join('')).join('');
+  const on = $('list').querySelector('button.on'); if (on && !galOpen) on.scrollIntoView({ block: 'nearest' });
 }
-$('list').onclick = (e) => { const b = e.target.closest('button'); if (b) show(+b.dataset.i); };
+// ---- gallery: every design as a still picture, grouped; click one to open it in 3D
+let galOpen = false;
+const thumbs = {};
+function renderGallery() {
+  $('gallery').innerHTML = `<div class="ghead"><h1>Cubi's Reef Rush · Designs</h1><button class="b" id="galClose">✕ Close</button></div>` +
+    `<nav class="chips">${GROUPS.map(([g, en]) => `<a href="#g-${g}">${en} <b>${tally(g)}</b></a>`).join('')}</nav>` +
+    GROUPS.map(([g, en, de]) => `<section id="g-${g}"><h2>${en} <small>${de}</small></h2><div class="grid">` +
+      ITEMS.filter(d => d.group === g).map(d => `<button class="card" data-i="${d.no - 1}"><span class="pic">${thumbs[d.no] ? `<img src="${thumbs[d.no]}" alt="">` : '<i class="wait"></i>'}</span><span class="st">${badge(d) === '▫️' ? '' : badge(d)}</span><span class="no">${d.no}</span><b>${d.en}</b><small>${d.de}</small></button>`).join('') + '</div></section>').join('');
+}
+function openGallery(on) {
+  galOpen = on; document.body.classList.toggle('galOn', on);
+  if (on) { renderGallery(); makeThumbs(); }
+  try { history.replaceState(null, '', on ? '?gallery' : '?i=' + (idx + 1)); } catch (e) {}
+}
+$('gallery').onclick = (e) => { if (e.target.closest('#galClose')) return openGallery(false); const c = e.target.closest('.card'); if (c) { openGallery(false); show(+c.dataset.i); } };
+// thumbnails: a small second renderer draws each design once (textures need a moment to load)
+let thumbR = null, thumbBusy = false;
+async function makeThumbs() {
+  if (thumbBusy) return; thumbBusy = true;
+  if (!thumbR) { const cv = document.createElement('canvas'); thumbR = { r: makeRenderer(cv, 1), cam: new THREE.PerspectiveCamera(32, 4 / 3, 0.1, 100) }; thumbR.r.setSize(320, 240, false); thumbR.scene = setupScene(thumbR.r, { fogNear: 30, fogFar: 120 }).scene; }
+  const { r, cam: tc, scene: ts } = thumbR, wait = (ms) => new Promise(res => setTimeout(res, ms));
+  for (const d of ITEMS) {
+    if (thumbs[d.no]) continue;
+    const m = d.make(); ts.add(m);
+    if (d.anim) d.anim(m, 0.4);
+    await wait(160);
+    if (d.cam) tc.position.set(...d.cam); else if (d.flat) tc.position.set(-1.7, 2.4, -1.7); else tc.position.set(-1.6, 0.35, -2.6);
+    const tg = new THREE.Vector3(...(d.target || [0, 0, 0])); tc.position.sub(tg).multiplyScalar(d.make.length === 0 && FISH3D.some(f => f.en === d.en) ? 0.68 : 0.95).add(tg); tc.lookAt(tg);
+    r.render(ts, tc); thumbs[d.no] = r.domElement.toDataURL('image/jpeg', 0.82); ts.remove(m);
+    const img = $('gallery').querySelector(`.card[data-i="${d.no - 1}"] .pic`); if (img) img.innerHTML = `<img src="${thumbs[d.no]}" alt="">`;
+    await wait(0);
+  }
+  thumbBusy = false;
+}
+$('list').onclick = (e) => { if (e.target.closest('#galBtn')) return openGallery(true); const b = e.target.closest('button[data-i]'); if (b) show(+b.dataset.i); };
+$('galTop').onclick = () => openGallery(true);
 $('prev').onclick = () => show(idx - 1); $('next').onclick = () => show(idx + 1);
 const mark = (ok) => { const d = ITEMS[idx]; notes[d.en] = { ...(notes[d.en] || {}), ok, note: $('note').value.trim() }; save(); if (ok) show(idx + 1); else { show(idx); $('note').focus(); } };
 $('ok').onclick = () => mark(true); $('no').onclick = () => mark(false);
@@ -51,11 +100,12 @@ $('copy').onclick = async () => {
   try { await navigator.clipboard.writeText(txt); $('copy').textContent = 'Copied! Paste it into the chat'; } catch (e) { prompt('Copy this into the chat:', txt); }
   setTimeout(() => { $('copy').textContent = 'Copy my feedback'; }, 2500);
 };
-addEventListener('keydown', (e) => { if (e.target.tagName === 'TEXTAREA') return; if (e.key === 'ArrowRight') show(idx + 1); if (e.key === 'ArrowLeft') show(idx - 1); });
+addEventListener('keydown', (e) => { if (e.target.tagName === 'TEXTAREA') return; if (e.key === 'Escape') openGallery(!galOpen); if (galOpen) return; if (e.key === 'ArrowRight') show(idx + 1); if (e.key === 'ArrowLeft') show(idx - 1); });
 function resize() { const w = $('c').clientWidth, h = $('c').clientHeight; renderer.setSize(w, h, false); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 show(idx);
+if (!new URLSearchParams(location.search).has('i') && !/[?&]still/.test(location.search)) openGallery(true);
 let last = performance.now();
-function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (cur) ITEMS[idx].anim(cur, dt); bub.rotation.y += dt * 0.02; ctl.update(); composer.render(); requestAnimationFrame(frame); }
+function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (galOpen) { requestAnimationFrame(frame); return; } if (cur) ITEMS[idx].anim(cur, dt); bub.rotation.y += dt * 0.02; ctl.update(); composer.render(); requestAnimationFrame(frame); }
 window.__review = { show, tick: (n = 1) => { for (let i = 0; i < n; i++) if (cur) ITEMS[idx].anim(cur, 1 / 30); ctl.update(); composer.render(); }, cam, ctl, count: ITEMS.length };
 if (!/[?&]still/.test(location.search)) requestAnimationFrame(frame);
