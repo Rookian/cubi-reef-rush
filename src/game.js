@@ -364,6 +364,8 @@ function spawn(kind, x, y, z, opt = {}) {
   mesh.rotation.set(0, opt.ry ?? 0, 0);
   mesh.visible = true;
   scene.add(mesh);
+  if (kind === 'school') { const ry = opt.ry ?? 0, sc = opt.scale ?? 1;   // a travelling school: its own swim direction in the school's frame, so the fish face where they go
+    mesh.userData.flow = opt.swim ? new THREE.Vector3(opt.swim[0], 0, opt.swim[1]).applyAxisAngle(new THREE.Vector3(0, 1, 0), -ry).divideScalar(sc) : null; }
   if (kind === 'school' && !opt.noEnv) { mesh.userData.env = fishEnv; const dd = curD - z, lift = groundAt(x, dd) - relY(dd) + 0.5 + (mesh.userData.size || 0.6); if (y < lift) y = lift; }
   const o = { kind, mesh, x, y, z, s, shapes: opt.solid === false ? [] : KINDS[kind].shape(s), hit: false, ph: Math.random() * 6, hazard: HAZARDS.includes(kind) && opt.solid !== false, grounded: y <= 0.05 && !opt.swim, ...opt };
   if (kind === 'puffer') { o.puff = 0; setPuff3D(mesh, 0); }
@@ -426,7 +428,9 @@ const BIG_SWIM = { blacktip: 0.75, whitetip: 0.75, hammer: 0.8, whaleshark: 1.8,
 function keepOut(o, dt) {
   const rad = BIG_SWIM[o.kind] * (o.s || 1) / (o.kind === 'whaleshark' ? 2.4 : 1), dd = curD - o.z;
   _pw.set(o.x + relX(dd), o.y + relY(dd), o.z); pushOut(_pw, rad, _po);
-  if (_po.lengthSq() > 1e-6) { const k = Math.min(1, dt * 6); o.x += _po.x * k; o.y += _po.y * k; if (o.swim || o.mood) o.z += _po.z * k * 0.5; }
+  if (_po.lengthSq() > 1e-6) { const k = Math.min(1, dt * 4); o.x += _po.x * k; o.y += _po.y * k; if (o.swim || o.mood) o.z += _po.z * k * 0.5;
+    if (o.hd !== undefined && Math.hypot(_po.x, _po.z) > 0.02) {   // gliders (sharks) turn away from what they brushed instead of sliding along it
+      const away = Math.atan2(-_po.x, -_po.z), dh = Math.atan2(Math.sin(away - o.hd), Math.cos(away - o.hd)); o.hd += THREE.MathUtils.clamp(dh, -1.2 * dt, 1.2 * dt); } }
   if (o.kind === 'squid') {   // squid are shy too: they ease away from Cubi and come back
     o.fl ||= new THREE.Vector3(); _pv.set(o.x + relX(dd), o.y + relY(dd), o.z).sub(fishEnv.threat); const dist = Math.hypot(_pv.x, _pv.y, _pv.z * 0.5);
     if (dist < 3) { _pv.z *= 0.25; _pv.setLength((3 - dist) * 1.2 + 0.3); } else _pv.set(0, 0, 0);

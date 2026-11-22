@@ -856,43 +856,69 @@ let _toonRef = null; function toonGradientRef() { if (!_toonRef) _toonRef = toon
 const _sm = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _sv = new THREE.Vector3(), _ss = new THREE.Vector3(), _se = new THREE.Euler();
 const _sw = new THREE.Vector3(), _sd = new THREE.Vector3(), _st = new THREE.Vector3(), _sp = new THREE.Vector3();
 export function animateSchool(g, dt) {
+  // Real swimming: every fish has a position, a velocity and a heading, and always faces where it swims.
+  // The group follows a slowly wandering leader point (so the fish follow each other), keeps formation
+  // (cohesion + alignment + a little personal space), turns with a limited rate and banks into turns.
+  // In the game (u.env) fish also steer around rock, coral heads and sand and calmly turn away from Cubi.
   const u = g.userData; u.t += dt;
   u.mats.forEach(m => { if (m.userData.sh) m.userData.sh.uniforms.uT.value = u.t; });
-  const t = u.t, env = u.env;
-  // in the game: env.threat (Cubi), env.r (shy radius) and env.push(worldPos, radius, out) keep fish out of rock and sand
-  if (env) { g.updateWorldMatrix(true, false); (u.inv ||= new THREE.Matrix4()).copy(g.matrixWorld).invert(); }
+  const t = u.t, env = u.env, n = u.fish.length, sz = Math.max(0.3, u.size);
+  if (!u.lead) {
+    const sp = u.fish.reduce((m, f) => Math.max(m, Math.hypot(f.o.x, f.o.z)), 0.4);
+    u.lead = { p: new THREE.Vector3(), v: new THREE.Vector3(), R: [0.9 + sp * 0.9, 0.25 + sp * 0.25, 0.9 + sp * 0.9], w: [0.11 + Math.random() * 0.08, 0.17 + Math.random() * 0.1, 0.09 + Math.random() * 0.08], ph: [Math.random() * 6, Math.random() * 6, Math.random() * 6] };
+    u.avg = new THREE.Vector3();
+    u.fish.forEach((f, i) => { f.p = f.o.clone(); f.v = new THREE.Vector3(0, 0, -0.2 * sz); f.hd = (Math.random() - 0.5) * 0.6; f.pt = 0; f.rl = 0; f.slot = f.o.clone().multiplyScalar(0.55); f.flee = new THREE.Vector3(); });
+  }
+  if (dt <= 0) return writeSchool(g);
+  const L = u.lead, prevL = _st.copy(L.p);
+  L.p.set(Math.sin(t * L.w[0] + L.ph[0]) * L.R[0], Math.sin(t * L.w[1] + L.ph[1]) * L.R[1], Math.sin(t * L.w[2] + L.ph[2]) * L.R[2]);
+  L.v.subVectors(L.p, prevL).divideScalar(dt);
+  if (env) { g.updateWorldMatrix(true, false); (u.inv ||= new THREE.Matrix4()).copy(g.matrixWorld).invert(); (u.rot ||= new THREE.Matrix3()).setFromMatrix4(u.inv); }
+  u.avg.set(0, 0, 0); u.fish.forEach(f => u.avg.add(f.v)); u.avg.divideScalar(n);
+  const vmax = 0.55 + 0.9 * sz, sep = 0.45 * sz + 0.15;
   u.fish.forEach((f, i) => {
-    // each fish wanders on its own little path, and now and then darts off
-    f.nextDart -= dt;
-    f.dartT ||= new THREE.Vector3(); f.vel ||= new THREE.Vector3();
-    if (f.nextDart < 0) { f.nextDart = 1.5 + Math.random() * 4; f.dartT.set((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.4).multiplyScalar(u.size); }
-    f.dartT.multiplyScalar(Math.pow(0.4, dt));
-    f.dart.lerp(f.dartT, 1 - Math.pow(0.02, dt));                  // ease into the dart instead of jumping
-    _sv.set(
-      f.o.x + Math.sin(t * f.f[0] + f.ph[0]) * f.a + Math.sin(t * f.f[3] * 1.7 + f.ph[3]) * f.a * 0.35,
-      f.o.y + Math.sin(t * f.f[1] + f.ph[1]) * f.a * 0.5,
-      f.o.z + Math.cos(t * f.f[2] + f.ph[2]) * f.a + Math.sin(t * f.f[3] + f.ph[1]) * f.a * 0.3,
-    ).addScaledVector(f.dart, -0.6);
-    if (env && dt > 0) {
-      f.fl ||= new THREE.Vector3();
-      _sw.copy(_sv).applyMatrix4(g.matrixWorld);
-      // shy: when Cubi comes close the fish ease aside (mostly sideways and up), then drift back once it has passed
-      _sd.subVectors(_sw, env.threat); const ahead = _sd.z < 0 ? 0.4 : 0.8;
-      const dist = Math.hypot(_sd.x, _sd.y, _sd.z * ahead), R = env.r * (0.75 + Math.min(1, u.size) * 0.5);
-      if (dist < R) { _sd.z *= 0.1; if (Math.hypot(_sd.x, _sd.y) < 0.4) _sd.x = (i % 2 ? 0.4 : -0.4); _st.copy(_sd).setLength((R - dist) * 1.6 + 0.4); } else _st.set(0, 0, 0);
-      f.fl.lerp(_st, 1 - Math.pow(dist < R ? 0.12 : 0.75, dt));
-      _sw.add(f.fl);
-      _sw.add(env.push(_sw, 0.1 + 0.22 * u.size, _sp));   // never inside rock, coral heads or sand
-      _sv.copy(_sw).applyMatrix4(u.inv);
+    // seek the formation slot behind the leader (arrive: slow down when close)
+    _sd.copy(L.p).add(f.slot).sub(f.p); const dl = _sd.length();
+    _sv.copy(_sd).multiplyScalar(Math.min(1.2, 0.9 + dl * 0.2)).add(_sw.copy(L.v).multiplyScalar(0.8));
+    _sv.addScaledVector(u.avg, 0.25);                                        // alignment
+    if (n > 1 && n < 40) for (let j = 0; j < n; j++) { if (j === i) continue; const q = u.fish[j]; _sw.subVectors(f.p, q.p); const d2 = _sw.lengthSq(); if (d2 < sep * sep && d2 > 1e-6) _sv.addScaledVector(_sw, (sep / Math.sqrt(d2) - 1) * 1.5); }
+    // the odd dart: a short burst in a new direction
+    f.nextDart -= dt; if (f.nextDart < 0) { f.nextDart = 3 + Math.random() * 6; f.dart.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.4, Math.random() - 0.5).setLength(vmax * 0.9); }
+    f.dart.multiplyScalar(Math.pow(0.25, dt)); _sv.add(f.dart);
+    let fleeing = false;
+    if (env) {
+      _sw.copy(f.p).applyMatrix4(g.matrixWorld);
+      _sd.subVectors(_sw, env.threat); const ahead = _sd.z < 0 ? 0.4 : 0.8, dist = Math.hypot(_sd.x, _sd.y, _sd.z * ahead), R = env.r * (0.75 + Math.min(1, sz) * 0.5);
+      if (dist < R) { fleeing = true; _sd.z *= 0.15; if (Math.hypot(_sd.x, _sd.y) < 0.4) _sd.x = (i % 2 ? 0.4 : -0.4); _sd.setLength((1 - dist / R) * vmax * 3.2).applyMatrix3(u.rot); f.flee.lerp(_sd, 1 - Math.pow(0.05, dt)); }
+      else f.flee.multiplyScalar(Math.pow(0.3, dt));
+      _sv.add(f.flee);
+      // look ahead along the swim direction and steer around solids; hard push only if already touching
+      _sp.copy(f.v).multiplyScalar(0.6).add(f.p).applyMatrix4(g.matrixWorld); const ah = env.push(_sp, 0.15 + 0.25 * sz, _sd);
+      if (ah.lengthSq() > 1e-6) _sv.addScaledVector(ah.applyMatrix3(u.rot), 4);
+      const hard = env.push(_sw, 0.1 + 0.2 * sz, _sd); if (hard.lengthSq() > 1e-6) f.p.add(hard.applyMatrix3(u.rot).multiplyScalar(Math.min(1, dt * 8)));
     }
-    if (dt > 0) {
-      f.vel.lerp(_ss.set((_sv.x - f.prev.x) / dt, (_sv.y - f.prev.y) / dt, 0), 1 - Math.pow(0.002, dt));
-      f.yaw += (THREE.MathUtils.clamp(-f.vel.x * 0.35, -0.9, 0.9) - f.yaw) * (1 - Math.pow(0.03, dt));
-      f.pitch += (THREE.MathUtils.clamp(f.vel.y * 0.3, -0.45, 0.45) - f.pitch) * (1 - Math.pow(0.03, dt));
-    }
-    f.prev.copy(_sv);
-    _sq.setFromEuler(_se.set(f.pitch, f.yaw, -f.yaw * 0.3)); _ss.setScalar(f.s);
-    _sm.compose(_sv, _sq, _ss); u.meshes.forEach(m => m.setMatrixAt(i, _sm));
+    // accelerate smoothly toward the desired velocity, limited speed
+    const top = vmax * (fleeing ? 1.7 : 1); if (_sv.length() > top) _sv.setLength(top);
+    f.v.lerp(_sv, 1 - Math.pow(fleeing ? 0.08 : 0.2, dt));
+    f.p.addScaledVector(f.v, dt);
+    // heading follows the swim direction (full turns possible), pitch and bank ease in; hovering fish keep their heading
+    const sp = Math.hypot(f.v.x, f.v.z), flow = u.flow;
+    const hx = f.v.x + (flow ? flow.x : 0), hz = f.v.z + (flow ? flow.z : 0);
+    if (Math.hypot(hx, hz) > 0.06 * sz) {
+      const want = Math.atan2(-hx, -hz), dh = Math.atan2(Math.sin(want - f.hd), Math.cos(want - f.hd));
+      const turn = THREE.MathUtils.clamp(dh, -2.6 * dt, 2.6 * dt) * Math.min(1, Math.hypot(hx, hz) / (0.25 * sz) + 0.2);
+      f.hd += turn; f.rl += (THREE.MathUtils.clamp(-turn / dt * 0.18, -0.5, 0.5) - f.rl) * (1 - Math.pow(0.05, dt));
+    } else f.rl *= Math.pow(0.2, dt);
+    f.pt += (THREE.MathUtils.clamp(Math.atan2(f.v.y, Math.max(0.05, sp)) * 0.8, -0.6, 0.6) - f.pt) * (1 - Math.pow(0.05, dt));
+  });
+  writeSchool(g);
+}
+function writeSchool(g) {
+  const u = g.userData;
+  u.fish.forEach((f, i) => {
+    const p = f.p || f.o;
+    _sq.setFromEuler(_se.set(f.pt || 0, f.hd || 0, f.rl || 0, 'YXZ')); _ss.setScalar(f.s);
+    _sm.compose(p, _sq, _ss); u.meshes.forEach(m => m.setMatrixAt(i, _sm));
   });
   u.meshes.forEach(m => m.instanceMatrix.needsUpdate = true);
 }
