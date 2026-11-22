@@ -390,9 +390,11 @@ const RESIDENTS = {
   pinnacle: [['Anthias', 0.95], ['Lunar fusilier', 0.6], ['Blue-green chromis', 0.5], ['Titan triggerfish', 0.15]],
 };
 // ---- fish stay out of rock, coral heads and sand (and big fish and sharks too); small fish are shy of Cubi
+const PERF = window.__perf = { school: 0, solids: 0, push: 0, n: 0 };
 const solids = [], _pw = new THREE.Vector3(), _po = new THREE.Vector3(), _pb = new THREE.Box3(), _pv = new THREE.Vector3();
+const shapeCache = new Map();
 function updateSolids() {
-  solids.length = 0;
+  solids.length = 0; shapeCache.clear();
   for (const o of objs) {
     if (o.z < -60 || o.z > 12) continue;
     if (BIG_ROCKS.has(o.kind) && o.kind !== 'xmas' || o.cleaning) {
@@ -404,7 +406,8 @@ function updateSolids() {
 }
 function pushOut(w, rad, out) {
   out.set(0, 0, 0);
-  const d = curD - w.z, gy = groundAt(w.x - relX(d), d) + rad;
+  const d = curD - w.z, kd = Math.round(d * 2); let sh = shapeCache.get(kd); if (!sh) { sh = [shapeAt(d), relY(d), relX(d)]; shapeCache.set(kd, sh); }
+  const gy = sh[1] + bankH(w.x - sh[2], d, sh[0]) + rad;
   if (w.y < gy) out.y = gy - w.y;
   for (const o of solids) {
     const m = o.mesh.position;
@@ -428,6 +431,10 @@ const BIG_SWIM = { blacktip: 0.75, whitetip: 0.75, hammer: 0.8, whaleshark: 1.8,
 function keepOut(o, dt) {
   const rad = BIG_SWIM[o.kind] * (o.s || 1) / (o.kind === 'whaleshark' ? 2.4 : 1), dd = curD - o.z;
   _pw.set(o.x + relX(dd), o.y + relY(dd), o.z); pushOut(_pw, rad, _po);
+  // stuck guard: pressed against something for a while -> rise over it; still stuck far ahead -> it quietly leaves
+  if (_po.lengthSq() > 4e-4) o.stuckT = (o.stuckT || 0) + dt; else o.stuckT = Math.max(0, (o.stuckT || 0) - dt * 0.5);
+  if (o.stuckT > 1) { o.y += dt * 1.4; if (o.hd !== undefined) o.hd += dt * 0.8 * (o.ph > 3 ? 1 : -1); }
+  if (o.stuckT > 5 && o.z < -14 && o !== hungry) o.gone = true;
   if (_po.lengthSq() > 1e-6) { const k = Math.min(1, dt * 4); o.x += _po.x * k; o.y += _po.y * k; if (o.swim || o.mood) o.z += _po.z * k * 0.5;
     if (o.hd !== undefined && Math.hypot(_po.x, _po.z) > 0.02) {   // gliders (sharks) turn away from what they brushed instead of sliding along it
       const away = Math.atan2(-_po.x, -_po.z), dh = Math.atan2(Math.sin(away - o.hd), Math.cos(away - o.hd)); o.hd += THREE.MathUtils.clamp(dh, -1.2 * dt, 1.2 * dt); } }
@@ -1309,7 +1316,7 @@ function step(dt) {
   if (mode !== 'over' && mode !== 'win') { nextDecor -= move; if (nextDecor <= 0) { decorRow(-SPAWN_AHEAD - 4); nextDecor = 3.5; } }
 
   // update objects
-  updateSolids(); fishEnv.threat.copy(cubi.position); if (mode !== 'play') fishEnv.threat.set(0, -99, 0);
+  { const t0 = performance.now(); updateSolids(); PERF.solids += performance.now() - t0; } fishEnv.threat.copy(cubi.position); if (mode !== 'play') fishEnv.threat.set(0, -99, 0);
   for (let i = objs.length - 1; i >= 0; i--) {
     const o = objs[i];
     o.z += move;
@@ -1343,7 +1350,7 @@ function step(dt) {
       o.mesh.rotation.y = (o.ry ?? 0) + Math.sin(t * 0.45 + o.ph) * 0.35 * w;
     }
     if (o.z > -48) {
-      if (o.kind === 'school') M.animateSchool(o.mesh, dt);
+      if (o.kind === 'school') { const t0 = performance.now(); M.animateSchool(o.mesh, dt); PERF.school += performance.now() - t0; }
       else if (o.kind === 'clam') M.animateClam(o.mesh, dt);
       else if (o.kind === 'vent') M.animateVent(o.mesh, dt);
       else if (o.kind === 'crab') RF.animateCrab(o.mesh, dt);

@@ -12,7 +12,9 @@ const _v = new THREE.Vector3(), _t = new THREE.Vector3();
 
 export function makeCleaningStation(sd = 1) {
   const g = new THREE.Group();
-  const rock = RS.makeOutcrop(Math.floor(rf(1, 9999)), 0.85, "bommie"); rock.position.set(sd * 0.8, 0, 0.4); g.add(rock);
+  const rock = RS.makeOutcrop(Math.floor(rf(1, 9999)), 0.85, "bommie"); rock.position.set(sd * 0.8, 0, 0.4); g.add(rock); rock.updateMatrix();
+  // the rock's corals live in the shared coral field: hand them to the game in the station's frame
+  g.userData.corals = (rock.userData.corals || []).map(c => ({ ...c, m: new THREE.Matrix4().multiplyMatrices(rock.matrix, c.m) }));
   // the mola: head toward the lane, leaning over on its side the way they present themselves to cleaners
   const holder = new THREE.Group(); holder.position.set(-sd * 1.1, 3.0, 0); g.add(holder);
   const lean = new THREE.Group(); lean.rotation.y = sd * Math.PI / 2; holder.add(lean);
@@ -40,7 +42,7 @@ export function makeCleaningStation(sd = 1) {
   add('Cleaner wrasse', 0.22, 'mouth', 2);
   // the bannerfish cloud around the mola (instanced school)
   const school = F3.makeSchool3D('Schooling bannerfish', 12, 0.5); school.position.copy(holder.position); g.add(school);
-  g.userData = { sd, holder, tilt, mola, cleaners, school, spotPos, pickSpot, scared: 0, away: 0, t: 0 };
+  g.userData = { corals: g.userData.corals, sd, holder, tilt, mola, cleaners, school, spotPos, pickSpot, scared: 0, away: 0, t: 0 };
   return g;
 }
 

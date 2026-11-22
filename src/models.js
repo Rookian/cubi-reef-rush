@@ -870,10 +870,15 @@ export function animateSchool(g, dt) {
     u.fish.forEach((f, i) => { f.p = f.o.clone(); f.v = new THREE.Vector3(0, 0, -0.2 * sz); f.hd = (Math.random() - 0.5) * 0.6; f.pt = 0; f.rl = 0; f.slot = f.o.clone().multiplyScalar(0.55); f.flee = new THREE.Vector3(); });
   }
   if (dt <= 0) return writeSchool(g);
-  const L = u.lead, prevL = _st.copy(L.p);
+  const L = u.lead, prevL = _st.copy(L.p);   // L.p holds last frame's (shifted) leader position
   L.p.set(Math.sin(t * L.w[0] + L.ph[0]) * L.R[0], Math.sin(t * L.w[1] + L.ph[1]) * L.R[1], Math.sin(t * L.w[2] + L.ph[2]) * L.R[2]);
+  if (env) { g.updateWorldMatrix(true, false); (u.inv ||= new THREE.Matrix4()).copy(g.matrixWorld).invert(); (u.rot ||= new THREE.Matrix3()).setFromMatrix4(u.inv);
+    // the leader never leads into rock: if its path runs into a solid, the whole route shifts out of it for good
+    u.lshift ||= new THREE.Vector3();
+    _sp.copy(L.p).add(u.lshift).applyMatrix4(g.matrixWorld); const lp = env.push(_sp, 0.35 + 0.45 * sz, _sd);
+    if (lp.lengthSq() > 1e-6) u.lshift.add(lp.applyMatrix3(u.rot).multiplyScalar(Math.min(1, dt * 4)));
+    L.p.add(u.lshift); }
   L.v.subVectors(L.p, prevL).divideScalar(dt);
-  if (env) { g.updateWorldMatrix(true, false); (u.inv ||= new THREE.Matrix4()).copy(g.matrixWorld).invert(); (u.rot ||= new THREE.Matrix3()).setFromMatrix4(u.inv); }
   u.avg.set(0, 0, 0); u.fish.forEach(f => u.avg.add(f.v)); u.avg.divideScalar(n);
   const vmax = 0.55 + 0.9 * sz, sep = 0.45 * sz + 0.15;
   u.fish.forEach((f, i) => {
@@ -895,7 +900,9 @@ export function animateSchool(g, dt) {
       // look ahead along the swim direction and steer around solids; hard push only if already touching
       _sp.copy(f.v).multiplyScalar(0.6).add(f.p).applyMatrix4(g.matrixWorld); const ah = env.push(_sp, 0.15 + 0.25 * sz, _sd);
       if (ah.lengthSq() > 1e-6) _sv.addScaledVector(ah.applyMatrix3(u.rot), 4);
-      const hard = env.push(_sw, 0.1 + 0.2 * sz, _sd); if (hard.lengthSq() > 1e-6) f.p.add(hard.applyMatrix3(u.rot).multiplyScalar(Math.min(1, dt * 8)));
+      const hard = env.push(_sw, 0.1 + 0.2 * sz, _sd);
+      if (hard.lengthSq() > 1e-6) { f.p.add(hard.applyMatrix3(u.rot).multiplyScalar(Math.min(1, dt * 8))); f.stuck = (f.stuck || 0) + dt; } else f.stuck = Math.max(0, (f.stuck || 0) - dt);
+      if (f.stuck > 1.2) { _sv.copy(L.p).add(f.slot).sub(f.p).setLength(vmax * 1.6); f.stuck = 0.6; }   // pinned against something: swim straight back to the group
     }
     // accelerate smoothly toward the desired velocity, limited speed
     const top = vmax * (fleeing ? 1.7 : 1); if (_sv.length() > top) _sv.setLength(top);
