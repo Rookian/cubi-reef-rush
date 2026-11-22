@@ -1119,9 +1119,10 @@ const PR_CAP = matchMedia('(pointer: coarse)').matches ? 1.25 : 1.5;
 scene.add(RS.fieldGroup);
 const fieldRoots = [];
 function renderFrame() { fieldRoots.length = 0; for (const o of objs) if (o.mesh.userData.corals) fieldRoots.push(o.mesh); RS.syncField(fieldRoots, camera.position); renderer.info.reset(); if (composer && hq) composer.render(); else renderer.render(scene, camera); }
+let dynRes = 1, goodN = 0;   // automatic resolution scale that keeps the game smooth on slower GPUs / big windows
 function resize() {
   const w = innerWidth, h = innerHeight;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hq ? PR_CAP : 1));
+  renderer.setPixelRatio(Math.max(0.5, Math.min(window.devicePixelRatio || 1, hq ? PR_CAP : 1) * dynRes));
   renderer.setSize(w, h, false);
   if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
   camera.aspect = w / h;
@@ -1147,7 +1148,11 @@ function countFps(now) {
   fpsN++;
   if (now - fpsT >= 500) {
     const fps = Math.round(fpsN * 1000 / (now - fpsT)); const ms = workMs / Math.max(1, fpsN); fpsN = 0; fpsT = now; workMs = 0;
-    if (fpsOn) { fpsEl.textContent = `${fps} FPS · ${ms.toFixed(1)} ms · ${hq ? 'HQ' : 'Fast'}`; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
+    if (document.visibilityState === 'visible' && (mode === 'play' || mode === 'menu')) {
+      if (fps < 42 && dynRes > 0.5) { dynRes = Math.max(0.5, +(dynRes - (fps < 25 ? 0.15 : 0.08)).toFixed(2)); goodN = 0; resize(); }
+      else if (fps >= 57 && dynRes < 1 && ++goodN >= 6) { dynRes = Math.min(1, +(dynRes + 0.05).toFixed(2)); goodN = 0; resize(); }
+    }
+    if (fpsOn) { fpsEl.textContent = `${fps} FPS · ${ms.toFixed(1)} ms · ${hq ? 'HQ' : 'Fast'}${dynRes < 1 ? ' · ' + Math.round(dynRes * 100) + '%' : ''}`; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
   }
 }
 function frame(now) {
