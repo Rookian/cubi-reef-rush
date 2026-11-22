@@ -58,7 +58,7 @@ function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, fl
 let _grad = null;
 const softGrad = () => { if (_grad) return _grad; const d = new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 236, 236, 236, 255, 255, 255, 255, 255]); _grad = new THREE.DataTexture(d, 4, 1, THREE.RGBAFormat); _grad.minFilter = _grad.magFilter = THREE.NearestFilter; _grad.needsUpdate = true; return _grad; };
 const firstPt = (svg) => { const m = /d="M\s*([\d.]+)[ ,]([\d.]+)/.exec(svg); return m ? [+m[1], +m[2]] : null; };
-const bbox = (svg) => { const d = /d="([^"]+)"/.exec(svg)[1], n = d.match(/-?[\d.]+/g).map(Number); let a = 1e9, b = 1e9, c = -1e9, e = -1e9; for (let i = 0; i + 1 < n.length; i += 2) { a = Math.min(a, n[i]); c = Math.max(c, n[i]); b = Math.min(b, n[i + 1]); e = Math.max(e, n[i + 1]); } return [a - 4, b - 4, c + 4, e + 4]; };
+const bbox = (svg) => { const d = /\sd="([^"]+)"/.exec(svg)[1], n = d.match(/-?[\d.]+/g).map(Number); let a = 1e9, b = 1e9, c = -1e9, e = -1e9; for (let i = 0; i + 1 < n.length; i += 2) { a = Math.min(a, n[i]); c = Math.max(c, n[i]); b = Math.min(b, n[i + 1]); e = Math.max(e, n[i + 1]); } return [a - 4, b - 4, c + 4, e + 4]; };
 
 const cache = {};
 function parts(d) {

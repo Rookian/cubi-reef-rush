@@ -1,5 +1,5 @@
 // Shared post-processing for the game and the review page.
-// Some GPUs/drivers (Windows ANGLE, HalfFloat + MSAA targets) produce single broken pixels:
+// Optional safety passes (?fix) for broken pixels; off by default. ?nomsaa / ?nofloat switch the main target.
 // NaN/Inf or negative values that the sRGB conversion turns into black specks, and the
 // bloom smears into patterns. The passes here make the chain robust against that.
 import * as THREE from 'three';
@@ -10,7 +10,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const Q = typeof location !== 'undefined' ? location.search : '';
-export const POST_FLAGS = { msaa: !/[?&]nomsaa/.test(Q), fix: !/[?&]nofix/.test(Q), float: !/[?&]nofloat/.test(Q) };
+export const POST_FLAGS = { msaa: !/[?&]nomsaa/.test(Q), fix: /[?&]fix/.test(Q), float: !/[?&]nofloat/.test(Q) };
 
 const VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const BAD = `
