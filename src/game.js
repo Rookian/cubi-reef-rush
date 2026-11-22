@@ -448,9 +448,9 @@ let speed = 6, s = 0, pearls = 0, lives = 3, invuln = 0, nextDecor = 0, t = 0, s
 let caught = null; // { shark, t }
 const best = {}; try { Object.assign(best, JSON.parse(localStorage.getItem('cubi_best') || '{}')); } catch (e) {}
 
-let whaleTimes = [];
+let whaleTimes = [], cleanTime = 2;
 function resetWorld() {
-  whaleTimes = [rf(0.15, 0.3), rf(0.55, 0.75)];
+  whaleTimes = [rf(0.15, 0.3), rf(0.55, 0.75)]; cleanTime = rf(0.35, 0.5); cleaningLast = -1e9;
   buildZones();
   [...objs].forEach(despawn); objs.length = 0; finishObj = null; hungry = null; hungryCD = 45;
   if (buddy) { scene.remove(buddy); buddy = null; }
@@ -673,7 +673,7 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.07) spawn('grazer', side * rf(4.3, 5.6), 0, z, { solid: false, ry: side * rf(1.0, 1.9) + (Math.random() < 0.5 ? Math.PI : 0) });
   if (Math.random() < 0.07) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (!bg) sharkLife(z, side);
-  if (!bg && Math.random() < 0.012) cleaningStation(z, side);
+  if (!bg && Math.random() < 0.005) cleaningStation(z, side);
   if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.025) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
 }
@@ -681,7 +681,7 @@ function sharedLife(z, bg) {
 // mola cleaning station beside the reef: at most one at a time, fresh (unscared) each time
 let cleaningLast = -1e9;
 function cleaningStation(z, side) {
-  if (objs.some(o => o.cleaning) || curD - cleaningLast < 220) return null;
+  if (objs.some(o => o.cleaning) || curD - cleaningLast < 400) return null;
   cleaningLast = curD;
   const o = spawn(side > 0 ? 'cleaningR' : 'cleaningL', side * rf(4.3, 5.0), 0, z, { solid: false, cleaning: true, ry: 0, noRes: true, noPool: true });
   return o;
@@ -1107,6 +1107,8 @@ function step(dt) {
   const progress = level.length ? Math.min(1, s / level.length) : 0;
   if (mode === 'play' || mode === 'caught') speed = THREE.MathUtils.lerp(level.speed, level.speedEnd, progress);
   // the whale shark visits twice per level: glides in from behind-ahead, slowly overtaken by Cubi, high off to one side
+  // the mola cleaning station shows up once per level, mid-way (unless a random one is already in view)
+  if (mode === 'play' && progress > cleanTime) { cleanTime = 2; if (!objs.some(o => o.cleaning)) { cleaningLast = -1e9; cleaningStation(-44, Math.random() < 0.5 ? -1 : 1); } }
   if (mode === 'play' && whaleTimes.length && progress > whaleTimes[0]) {
     whaleTimes.shift(); const sd = Math.random() < 0.5 ? -1 : 1;
     spawn('whaleshark', sd * rf(5.5, 6.5), rf(5.8, 6.6), -46, { solid: false, scale: rf(2.2, 2.5), ry: -sd * 0.12, swim: [-sd * 0.12, -speed * 0.7] });
