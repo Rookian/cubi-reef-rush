@@ -85,7 +85,8 @@ function parts(d) {
   const bodyTex = svgTexture((d.pattern || '') + (d.shine ? `<ellipse cx="${d.shine[0]}" cy="${d.shine[1]}" rx="${d.shine[2] || 20}" ry="5" fill="#fff" opacity=".7" transform="rotate(${d.shine[3] || -8} ${d.shine[0]} ${d.shine[1]})"/>` : '') + (d.over || '') +
     (d.blush ? `<ellipse cx="${d.blush[0]}" cy="${d.blush[1]}" rx="${(d.blushR || 7) * 1.25}" ry="${(d.blushR || 7) * 0.75}" fill="#FF8FA3" opacity=".8"/>` : '') +
     (d.mouth ? `<path d="M${d.mouth[0]},${d.mouth[1]} q${5 * (d.mouthS || 1)},${6 * (d.mouthS || 1)} ${11 * (d.mouthS || 1)},${d.mouthS || 1}" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>` : ''), d.fill);
-  const finTex = svgTexture((d.fins || []).join('') + (d.pec || ''));
+  const finTex = svgTexture((d.fins || []).join('') + (d.pecSep ? '' : (d.pec || '')), null, d.pecSep ? 1536 : 768, d.pecSep ? 1024 : 512);
+  const pecTex = d.pec && d.pecSep ? svgTexture(d.pec, null, 1536, 1024) : finTex;   // big pectoral fans (lionfish) get their own picture
   // median fins: one cut-out sheet in the centre plane
   const fins = new THREE.PlaneGeometry(300 * S, 200 * S, 60, d.flap || d.scull ? 40 : 1); fins.rotateY(-Math.PI / 2); fins.translate(0, 0, (150 - xm) * S);
   let pec = null;
@@ -93,7 +94,7 @@ function parts(d) {
     const g = new THREE.PlaneGeometry((c - a) * S, (e - b) * S); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, (a + u.getX(i) * (c - a)) / 300, 1 - (b + (1 - u.getY(i)) * (e - b)) / 200);
     g.translate(((a + c) / 2 - base[0]) * S, (base[1] - (b + e) / 2) * S, 0); g.rotateY(-Math.PI / 2);
     pec = { g, y: (100 - base[1]) * S, z: (base[0] - xm) * S, x: latAt(base[0], base[1]) * S }; }
-  return (cache[d.en] = { body, bodyLo, fins, pec, bodyTex, finTex, len, xm, latAt });
+  return (cache[d.en] = { body, bodyLo, fins, pec, bodyTex, finTex, pecTex, len, xm, latAt });
 }
 
 export function makeFish3D(d, size = 1) {
@@ -107,7 +108,7 @@ export function makeFish3D(d, size = 1) {
   const finM = swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), U, P.len, 0, null, false, mv);
   rig.add(new THREE.Mesh(P.fins, finM));
   const pecs = [];
-  if (P.pec) for (const sx of [-1, 1]) { const m = new THREE.Mesh(P.pec.g, new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide })); const piv = new THREE.Group(); piv.position.set(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); piv.add(m); rig.add(piv); pecs.push({ piv, sx }); }
+  if (P.pec) for (const sx of [-1, 1]) { const m = new THREE.Mesh(P.pec.g, new THREE.MeshBasicMaterial({ map: P.pecTex, alphaTest: 0.45, side: THREE.DoubleSide })); const piv = new THREE.Group(); piv.position.set(sx * (P.pec.x + 0.004), P.pec.y, P.pec.z); piv.add(m); rig.add(piv); pecs.push({ piv, sx }); }
   const eyes = [];
   for (const [ex, ey, er] of (d.eyes || (d.eye ? [d.eye] : []))) { const lat = P.latAt(ex, ey) * S, r3 = d.flat ? er * S * 1.3 : Math.min(er * S * 1.3, Math.max(lat * 1.25, er * S * 0.85));
     for (const sx of (d.flat ? [1] : [-1, 1])) {
@@ -127,13 +128,15 @@ export function makeFish3D(d, size = 1) {
     if (P.pec) for (const sx of [-1, 1]) { const gh = new THREE.Mesh(new THREE.CircleGeometry(r * 0.75, 14), new THREE.MeshBasicMaterial({ color: '#3A2A2C' })); gh.position.set(sx * (P.pec.x + 0.002), P.pec.y + r * 0.2, P.pec.z - r * 2.2); gh.rotation.y = sx * Math.PI / 2; gh.scale.set(0.55, 1, 1); rig.add(gh); mouth.userData.gills.push(gh); } }
   if (d.flat) { const tilt = new THREE.Group(); tilt.rotation.z = Math.PI / 2; root.remove(rig); tilt.add(rig); root.add(tilt); }
   root.scale.setScalar(size);
-  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.scull ? 3.0 : d.en.includes('shark') ? 3.2 : 6.5, scull: !!d.scull, mouth, bodyM, breath: Math.random() * 6, mood: 0, moodV: 0, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
+  root.userData = { flat: !!d.flat, U, rig, pecs, eyes, t: Math.random() * 10, blink: 2 + Math.random() * 3, speed: d.scull || d.pecOut ? 3.0 : d.en.includes('shark') ? 3.2 : 6.5, scull: !!d.scull, pecOut: d.pecOut || 0, mouth, bodyM, breath: Math.random() * 6, mood: 0, moodV: 0, stiff: d.en.includes('shark') && !d.flat };   // sharks: slow tail sweep, stiff wing-like pectorals
   return root;
 }
 export function animateFish3D(f, dt) {
   const u = f.userData; u.t += dt; u.U.value += dt * u.speed;
   if (!u.flat) { u.rig.rotation.y = -Math.sin(u.U.value) * (u.scull ? 0.03 : 0.05); u.rig.rotation.z = Math.sin(u.t * 0.9) * 0.03; } u.rig.position.y = Math.sin(u.t * 1.3) * 0.02;
-  u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (u.stiff ? 0.62 + Math.sin(u.t * 0.7 + p.sx) * 0.04 : 0.55 + Math.sin(u.t * 5 + p.sx) * 0.3); });
+  u.pecs.forEach(p => { p.piv.rotation.y = p.sx * (u.stiff ? 0.62 + Math.sin(u.t * 0.7 + p.sx) * 0.04
+    : u.pecOut ? u.pecOut + Math.sin(u.t * 1.1 + p.sx * 0.8) * 0.16 : 0.55 + Math.sin(u.t * 5 + p.sx) * 0.3);
+    if (u.pecOut) p.piv.rotation.z = p.sx * Math.sin(u.t * 1.1 + 0.6 + p.sx * 0.8) * 0.08; });   // lionfish: slow, wide fanning
   u.blink -= dt; const k = u.blink < 0.12 ? Math.max(0.1, Math.abs(u.blink - 0.06) / 0.06) : 1; if (u.blink < 0) u.blink = 2.5 + Math.random() * 3.5;
   u.eyes.forEach(e => { e.scale.y = k; });
   if (u.mouth) {   // calm: slow deep breaths, pale skin; startled (mood -> 1): fast breathing, dark bold skin
