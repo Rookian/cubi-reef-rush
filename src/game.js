@@ -353,13 +353,15 @@ function wrap3D(name, size, lift = 0) { const g = new THREE.Group(), f = F3.make
 function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), 2.1); g.add(f); g.userData = f.userData; return g; }
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
 const NOGLOW = ['turtle', 'shrimp', 'octopus', 'featherstar', 'bloodstar', 'urchin', 'stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
+// size corrections so species keep believable proportions to each other (big animals stay game-compressed, tiny critters stay visible)
+const KIND_SCALE = { dolphin: 1.3, nudi: 0.6, shrimp: 0.6, crab: 0.7, seahorse: 0.7 };
 function spawn(kind, x, y, z, opt = {}) {
   if (decorMap) x = mapX(x);
   if (kind === 'heroanem' && !opt.keepKind && Math.random() < 0.6) kind = pick(['magnifica', 'gigantea', 'mertensii']);
   const pool = (pools[kind] ||= []);
   let mesh = kind === 'school' && opt.species ? null : pool.pop();
   if (!mesh) { mesh = kind === 'school' && opt.species ? F3.makeSchool3D(opt.species, opt.n, opt.size) : KINDS[kind].make(); if (!NOGLOW.includes(kind)) glowAll(mesh); if (opt.solid === false) mesh.traverse(m => { m.castShadow = false; }); }
-  const s = opt.scale ?? 1;
+  const s = (opt.scale ?? 1) * (KIND_SCALE[kind] || 1);
   mesh.scale.setScalar(s);
   mesh.rotation.set(0, opt.ry ?? 0, 0);
   mesh.visible = true;
@@ -1811,7 +1813,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
 window.__grade = (o) => { for (const k in o) if (GRADE[k]) GRADE[k].value = o[k]; else if (k === 'fogNear') scene.fog.near = o[k]; else if (k === 'glow') glowU.uGlowK.value = o[k]; };
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
-window.__game = { turtle: (z, side, up) => turtleJourney(z, side, up), scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
+window.__game = { THREE, KINDS, F3, cubi, turtle: (z, side, up) => turtleJourney(z, side, up), scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },

@@ -16,10 +16,10 @@ export function makeCleaningStation(sd = 1) {
   // the rock's corals live in the shared coral field: hand them to the game in the station's frame
   g.userData.corals = (rock.userData.corals || []).map(c => ({ ...c, m: new THREE.Matrix4().multiplyMatrices(rock.matrix, c.m) }));
   // the mola: head toward the lane, leaning over on its side the way they present themselves to cleaners
-  const holder = new THREE.Group(); holder.position.set(-sd * 1.1, 3.0, 0); g.add(holder);
+  const holder = new THREE.Group(); holder.position.set(-sd * 1.4, 3.8, 0); g.add(holder);
   const lean = new THREE.Group(); lean.rotation.y = sd * Math.PI / 2; holder.add(lean);
   const tilt = new THREE.Group(); tilt.rotation.z = 0.5; lean.add(tilt);
-  const mola = F3.makeFish3D(F3.design('Mola mola (ocean sunfish)'), 2.3); tilt.add(mola);
+  const mola = F3.makeFish3D(F3.design('Mola mola (ocean sunfish)'), 3.45); tilt.add(mola);
   const box = new THREE.Box3().setFromObject(mola), sz = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   // spots in the mola's own frame: fin edges (angelfish), flanks (butterflyfish), mouth (wrasse)
   const L = sz.z / 2, H = sz.y / 2;
@@ -54,7 +54,7 @@ export function animateCleaningStation(g, dt, threat) {
   if (threat && !u.scared) { u.scared = 1; u.mola.userData.mood = 1; u.cleaners.forEach(cl => { cl.vel.set(rf(-1, 1), rf(0.4, 1.2), rf(-1, 1)).normalize().multiplyScalar(rf(2.5, 4)); }); }
   F3.animateFish3D(u.mola, dt);
   if (!u.scared) {
-    u.holder.position.y = 3.0 + Math.sin(u.t * 0.4) * 0.12;
+    u.holder.position.y = 3.8 + Math.sin(u.t * 0.4) * 0.12;
     u.tilt.rotation.z = 0.5 + Math.sin(u.t * 0.27) * 0.08;
     for (const cl of u.cleaners) {
       cl.t -= dt; if (cl.t < 0) u.pickSpot(cl);

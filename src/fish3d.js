@@ -152,9 +152,9 @@ export function animateFish3D(f, dt) {
 // Schools for the game: the same fish, instanced (4 draw calls per school). Works with animateSchool().
 // name: [weight, min count, max count, min size, max size]
 const SCHOOLS = { 'Palette surgeonfish': [2, 1, 4, 0.7, 0.95], 'Moorish idol': [1.5, 1, 3, 0.75, 1], 'Foxface rabbitfish': [1.5, 1, 2, 0.75, 0.95], 'Emperor angelfish': [1.2, 1, 1, 0.9, 1.1],
-  'Needlefish': [1.2, 4, 9, 0.8, 1], 'Trumpetfish': [0.9, 1, 1, 1, 1.3], 'Blue-green chromis': [3, 10, 22, 0.3, 0.4], 'Yellowtail damselfish': [2, 6, 14, 0.3, 0.4], 'Pink skunk clownfish': [1, 2, 3, 0.4, 0.5],
+  'Needlefish': [1.2, 4, 9, 1.28, 1.6], 'Trumpetfish': [0.9, 1, 1, 1.4, 1.8], 'Blue-green chromis': [3, 10, 22, 0.3, 0.4], 'Yellowtail damselfish': [2, 6, 14, 0.3, 0.4], 'Pink skunk clownfish': [1, 2, 3, 0.4, 0.5],
   'Clownfish': [0.8, 2, 2, 0.4, 0.5], 'Giant puffer': [0.5, 1, 1, 1.2, 1.5], 'Clown triggerfish': [1, 1, 1, 0.9, 1.1], 'Titan triggerfish': [0.7, 1, 1, 1.1, 1.3], 'Clown surgeonfish': [1.5, 1, 4, 0.7, 0.9],
-  'Brown sailfin tang': [1.2, 1, 3, 0.7, 0.9], 'Threadfin butterflyfish': [2, 2, 2, 0.6, 0.8], 'Orange-lined triggerfish': [1, 1, 1, 0.8, 1], 'Lunar fusilier': [2.5, 8, 18, 0.5, 0.65], 'Silversides': [2, 20, 36, 0.22, 0.3],
+  'Brown sailfin tang': [1.2, 1, 3, 0.7, 0.9], 'Threadfin butterflyfish': [2, 2, 2, 0.6, 0.8], 'Orange-lined triggerfish': [1, 1, 1, 0.8, 1], 'Lunar fusilier': [2.5, 8, 18, 0.7, 0.9], 'Silversides': [2, 20, 36, 0.22, 0.3],
   'Anthias': [3, 10, 20, 0.3, 0.4], 'Parrotfish': [1.5, 1, 3, 1.0, 1.4], 'Coral grouper': [1, 1, 1, 1.3, 1.7], 'Schooling bannerfish': [1.2, 5, 12, 0.5, 0.65] };
 const byName = Object.fromEntries(DESIGNS.map(d => [d.en, d]));
 export const design = (name) => byName[name];
