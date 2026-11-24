@@ -368,6 +368,7 @@ function spawn(kind, x, y, z, opt = {}) {
   scene.add(mesh);
   if (kind === 'school') { const ry = opt.ry ?? 0, sc = opt.scale ?? 1;   // a travelling school: its own swim direction in the school's frame, so the fish face where they go
     mesh.userData.flow = opt.swim ? new THREE.Vector3(opt.swim[0], 0, opt.swim[1]).applyAxisAngle(new THREE.Vector3(0, 1, 0), -ry).divideScalar(sc) : null; }
+  if (kind === 'school' && !mesh.userData.guestDone) { mesh.userData.guestDone = true; addGuests(mesh); }
   if (kind === 'school' && !opt.noEnv) { mesh.userData.env = fishEnv; const dd = curD - z, lift = groundAt(x, dd) - relY(dd) + 0.5 + (mesh.userData.size || 0.6); if (y < lift) y = lift; }
   const o = { kind, mesh, x, y, z, s, shapes: opt.solid === false ? [] : KINDS[kind].shape(s), hit: false, ph: Math.random() * 6, hazard: HAZARDS.includes(kind) && opt.solid !== false, grounded: y <= 0.05 && !opt.swim, ...opt };
   if (kind === 'puffer') { o.puff = 0; setPuff3D(mesh, 0); }
@@ -488,6 +489,60 @@ function stepTurtle(o, dt) {
   } else j.pitch *= Math.max(0, 1 - dt * 1.5);
   o.mesh.rotation.set(j.pitch, j.yaw, Math.sin(j.t * 0.3 + j.ph) * 0.05);
   if (j.up && j.done > 18) o.gone = true;
+}
+// ---- how loners react to Cubi, the way their real counterparts react to a diver (only when they are not hunting)
+// glide: rays lift off the sand and sail away low; flutter: flounder skims off and settles; slink: catshark wriggles aside;
+// flinch: camouflage hunters twitch and shuffle a little; flare: lionfish turn to face you, back off a bit and spread fins;
+// sink: snake eels pull back into the sand; swerve: turtles, mantas, whale sharks, dolphins calmly change course;
+// scuttle: crabs run sideways; duck: shrimp pull back; jet: octopus jets off; turn: seahorses turn away and drift
+const REACT = { stingray: ['glide', 3.4], flounder: ['flutter', 2.6], catshark: ['slink', 3.0], scorpion: ['flinch', 1.9], croco: ['flinch', 1.9], lionfish: ['flare', 3.2],
+  snakeeel: ['sink', 2.4], turtle: ['swerve', 4.2], grazer: ['swerve', 3.4], babyturtle: ['swerve', 3.0], manta: ['swerve', 5.5], whaleshark: ['swerve', 7], dolphin: ['swerve', 5],
+  crab: ['scuttle', 2.3], shrimp: ['duck', 2.0], octopus: ['jet', 2.8], seahorse: ['turn', 2.4] };
+const ease3 = (x) => x * x * (3 - 2 * x);
+function react(o, dt) {
+  const R = REACT[o.kind]; if (!R || o.sick || mode !== 'play') return;
+  const m = o.mesh.position, dx = m.x - cubi.position.x, dy = m.y - cubi.position.y, dz = m.z - cubi.position.z;
+  const dist = Math.hypot(dx, dy, dz * (dz < 0 ? 0.45 : 0.9)), big = Math.max(1, o.s || 1);
+  const r = o.rx ||= { on: false, t: 0, side: 1, yaw: 0, ry0: m.x };
+  if (!r.on && dist < R[1] * (R[0] === 'swerve' ? big : 1)) { r.on = true; r.side = Math.sign(dx) || (Math.random() < 0.5 ? -1 : 1); r.ry0 = o.mesh.rotation.y; r.rnd = 0.8 + Math.random() * 0.4; }
+  if (!r.on) return;
+  r.t += dt; const sd = r.side, k = r.rnd, fl = o.fl ||= new THREE.Vector3();
+  const go = (T) => ease3(Math.min(1, r.t / T));
+  switch (R[0]) {
+    case 'glide': { const e = go(2.2 * k); fl.set(sd * 2.6 * k * e, Math.sin(Math.PI * Math.min(1, r.t / (2.2 * k))) * 0.75, -0.8 * e); r.yaw = sd * 1.1 * Math.min(1, r.t * 2); break; }
+    case 'flutter': { const e = go(1.1 * k); fl.set(sd * 1.3 * k * e, Math.sin(Math.PI * Math.min(1, r.t / (1.1 * k))) * 0.3, 0); r.yaw = sd * 0.5 * e; break; }
+    case 'slink': { const e = go(1.8 * k); fl.set(sd * 1.8 * k * e, 0.05 * Math.sin(r.t * 9) * (1 - e), -0.4 * e); r.yaw = sd * 0.9 * Math.min(1, r.t * 2.5); break; }
+    case 'flinch': { const e = go(0.35); fl.set(sd * 0.35 * e, Math.sin(Math.PI * Math.min(1, r.t / 0.35)) * 0.18, 0); r.yaw = Math.sin(Math.min(1, r.t * 3) * Math.PI) * 0.25 * sd; break; }
+    case 'flare': { const e = go(1.2); fl.set(sd * 0.3 * e, 0.1 * e, -0.5 * e);
+      const want = Math.atan2(-(cubi.position.x - m.x), -(cubi.position.z - m.z)); r.yaw = Math.atan2(Math.sin(want - r.ry0), Math.cos(want - r.ry0)) * Math.min(1, r.t * 1.5);
+      o.mesh.traverse(c => { if (c.userData && c.userData.pecOut) c.userData.pecOut = 0.62 + 0.45 * e; }); break; }
+    case 'sink': { const e = go(0.9); fl.set(0, -0.7 * e, 0); break; }
+    case 'swerve': { const e = go(3.2 * big); fl.x = sd * 1.6 * big * e; break; }
+    case 'scuttle': { const e = go(0.55 * k); fl.set(sd * 1.3 * k * e, 0, 0); break; }
+    case 'duck': { const e = go(0.25); fl.set(0, -0.12 * e, -0.35 * e); break; }
+    case 'jet': { const e = 1 - Math.pow(1 - Math.min(1, r.t / (0.9 * k)), 3); fl.set(sd * 1.6 * e, 1.3 * e, -1.6 * e); r.yaw = sd * 0.6 * e; break; }
+    case 'turn': { const e = go(1.4); fl.set(sd * 0.35 * e, 0.1 * e, 0); r.yaw = sd * 1.4 * e; break; }
+  }
+}
+// mixed company: a few fish of another species living in or tagging along with a school, as on a real reef
+// (trumpetfish shadow schools to ambush prey, idols and bannerfish mingle, chromis and anthias share a coral head, ...)
+const GUESTS = {
+  'Anthias': [['Blue-green chromis', 2, 4], ['Yellowtail damselfish', 1, 3], ['Trumpetfish', 1, 1]],
+  'Blue-green chromis': [['Anthias', 2, 4], ['Yellowtail damselfish', 1, 2]],
+  'Yellowtail damselfish': [['Blue-green chromis', 2, 3], ['Threadfin butterflyfish', 1, 2]],
+  'Lunar fusilier': [['Schooling bannerfish', 2, 4], ['Moorish idol', 1, 2], ['Trumpetfish', 1, 1]],
+  'Silversides': [['Needlefish', 1, 2], ['Lunar fusilier', 2, 3]],
+  'Schooling bannerfish': [['Moorish idol', 1, 2], ['Threadfin butterflyfish', 1, 2]],
+  'Moorish idol': [['Schooling bannerfish', 2, 3], ['Palette surgeonfish', 1, 2]],
+  'Palette surgeonfish': [['Clown surgeonfish', 1, 2], ['Threadfin butterflyfish', 1, 1]],
+  'Clown surgeonfish': [['Brown sailfin tang', 1, 2], ['Moorish idol', 1, 1]],
+  'Needlefish': [['Silversides', 4, 8]],
+  'Parrotfish': [['Clown surgeonfish', 1, 2]] };
+function addGuests(host) {
+  const u = host.userData, opts = GUESTS[u.species];
+  if (!opts || u.n < 3 || Math.random() > 0.6) return;
+  const [sp, a, b] = opts[Math.floor(Math.random() * opts.length)], g = F3.makeSchool3D(sp, a + Math.floor(Math.random() * (b - a + 1)));
+  g.userData.guest = true; g.userData.leadMul = 1.4 + Math.random() * 0.6; host.add(g);
 }
 function residents(home) {
   if (mode === 'menu' && Math.random() < 0.5) return;
@@ -1444,7 +1499,9 @@ function step(dt) {
     if (o.kind === 'stream') { o.mesh.position.y = oy; o.chev.position.set(ox, oy, 0); }
     else if (o.kind === 'pearl') o.mesh.position.y += oy;
     else o.mesh.position.y = o.y + oy;
+    react(o, dt);
     if (o.fl) { o.mesh.position.x += o.fl.x; o.mesh.position.y += o.fl.y; o.mesh.position.z += o.fl.z; }
+    if (o.rx && o.rx.on && o.rx.yaw) o.mesh.rotation.y = (o.swim ? o.mesh.rotation.y : o.rx.ry0) + o.rx.yaw;
     if (o.clown && !o.clownTaken) { o.clownOff = [ox, oy]; }
     if (o.clown && !o.clownTaken) {
       const co = o.clownOff || [0, 0]; o.clown.position.set(o.x + co[0] + Math.sin(t * 1.2) * 0.25, 1.15 + co[1] + Math.sin(t * 2) * 0.12, o.z + Math.cos(t * 1.2) * 0.25);
@@ -1760,6 +1817,10 @@ function glide(o, tx, ty, tz, cruise, turn, dt, move) {
 const facing = (o) => { const want = Math.atan2(-(P.x - o.x), -(0 - o.z)); return Math.abs(Math.atan2(Math.sin(want - o.hd), Math.cos(want - o.hd))); };
 function updateMood(o, dt) {
   const move = (mode === 'play' || mode === 'caught') ? speed * dt : 0;
+  if ((o.mood === 'patrol' || o.mood === 'rest') && o !== hungry && mode === 'play') {   // reef sharks keep their distance from divers unless they mean business
+    const dx = o.mesh.position.x - cubi.position.x, dz = o.mesh.position.z, d = Math.hypot(dx, o.mesh.position.y - cubi.position.y, dz * 0.5);
+    if (d < 4.5) { if (o.mood === 'rest') { o.mood = 'patrol'; o.swim = [Math.sign(dx || 1) * 1.6, -0.6]; }
+      else { const sd = Math.sign(dx || 1); o.swim[0] += (sd * 2.0 - o.swim[0]) * Math.min(1, dt * 1.2); } } }
   if (o.mood === 'patrol') { o.mesh.rotation.y = Math.atan2(-o.swim[0], -o.swim[1]) + Math.sin(t * 0.6 + o.ph) * 0.06; o.tail = 0.9; return; }
   if (o.mood === 'rest') { o.mesh.rotation.z = Math.sin(t * 0.8 + o.ph) * 0.03; o.tail = 0.25; return; }
   if (o.mood === 'curious') {                                                           // glides in, passes alongside, peels away

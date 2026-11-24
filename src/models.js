@@ -876,7 +876,8 @@ export function animateSchool(g, dt) {
   const t = u.t, env = u.env, n = u.fish.length, sz = Math.max(0.3, u.size);
   if (!u.lead) {
     const sp = u.fish.reduce((m, f) => Math.max(m, Math.hypot(f.o.x, f.o.z)), 0.4);
-    u.lead = { p: new THREE.Vector3(), v: new THREE.Vector3(), R: [0.9 + sp * 0.9, 0.25 + sp * 0.25, 0.9 + sp * 0.9], w: [0.11 + Math.random() * 0.08, 0.17 + Math.random() * 0.1, 0.09 + Math.random() * 0.08], ph: [Math.random() * 6, Math.random() * 6, Math.random() * 6] };
+    const lm = u.leadMul || 1;
+    u.lead = { p: new THREE.Vector3(), v: new THREE.Vector3(), R: [(0.9 + sp * 0.9) * lm, (0.25 + sp * 0.25) * lm, (0.9 + sp * 0.9) * lm], w: [0.11 + Math.random() * 0.08, 0.17 + Math.random() * 0.1, 0.09 + Math.random() * 0.08], ph: [Math.random() * 6, Math.random() * 6, Math.random() * 6] };
     u.avg = new THREE.Vector3();
     u.fish.forEach((f, i) => { f.p = f.o.clone(); f.v = new THREE.Vector3(0, 0, -0.2 * sz); f.hd = (Math.random() - 0.5) * 0.6; f.pt = 0; f.rl = 0; f.slot = f.o.clone().multiplyScalar(0.55); f.flee = new THREE.Vector3(); });
   }
@@ -941,6 +942,7 @@ export function animateSchool(g, dt) {
     f.pt += (THREE.MathUtils.clamp(Math.atan2(f.v.y, Math.max(0.05, sp)) * 0.8, -0.6, 0.6) - f.pt) * (1 - Math.pow(0.05, dt));
   });
   writeSchool(g);
+  for (const c of g.children) if (c.userData.guest) { c.userData.env = env; c.userData.flow = u.flow; animateSchool(c, dt); }   // the guests in this school
 }
 function writeSchool(g) {
   const u = g.userData;
