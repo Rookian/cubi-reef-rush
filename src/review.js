@@ -8,18 +8,42 @@ import { CORALS3D } from './corals3d.js';
 import { SOFT3D } from './softcorals3d.js';
 const fishItem = d => ({ en: d.en, de: d.de, flat: d.flat, make: () => makeFish3D(d, 1), anim: animateFish3D });
 const LATE = ['Mola mola (ocean sunfish)', 'Schooling bannerfish', 'Cleaner wrasse'];   // added after the review numbers were set: appended so earlier numbers stay the same
-const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem));
+// models the game still uses that were never on this page: shown scaled to a common size (this page judges design, not size)
+function fitted(make) { const inner = make(), g = new THREE.Group(); g.add(inner); const b = new THREE.Box3().setFromObject(inner), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  const k = 1.7 / Math.max(sz.x, sz.y, sz.z, 0.01); inner.scale.multiplyScalar(k); inner.position.sub(c.multiplyScalar(k)); g.userData.inner = inner; return g; }
+const leg = (en, de, make, anim) => ({ en, de, legacy: true, make: () => fitted(make), anim: anim ? (m, dt) => anim(m.userData.inner, dt) : null });
+const LEGACY = [
+  leg('Seahorse', 'Seepferdchen', () => RF.makeSeahorse(), RF.animateSeahorse),
+  leg('Crab', 'Krabbe', () => RF.makeCrab('#FF6B4A'), RF.animateCrab),
+  leg('Nudibranchs (6 kinds)', 'Nacktschnecken (6 Arten)', () => { const g = new THREE.Group(); for (let i = 0; i < 6; i++) { const n = RF.makeNudibranch(i); n.position.set((i % 3 - 1) * 0.9, 0, Math.floor(i / 3) * 0.9 - 0.45); g.add(n); } return g; },
+    (g, dt) => g.children.forEach(n => RF.animateNudi(n, dt))),
+  leg('Baby sea turtle', 'Baby-Meeresschildkröte', () => M.makeTurtle(true), M.animateTurtle),
+  leg('Jellyfish', 'Qualle', () => M.makeJelly(), M.animateJelly),
+  leg('Starfish', 'Seestern', () => M.makeStarfish(), null),
+  leg('Giant clam', 'Riesenmuschel', () => M.makeClam(), M.animateClam),
+  leg('Moray eel in its rock (game)', 'Muräne im Fels (Spiel)', () => RF.makeMoray('rock'), (m, dt) => { m.userData.rt = (m.userData.rt || 0) + dt; const k = Math.max(0, Math.sin(m.userData.rt * 0.7)); RF.setMoray(m, 0.15 + 0.85 * k, k > 0.6 ? 1 : 0.1); }),
+  leg('Moray eel in its tube (game)', 'Muräne in der Röhre (Spiel)', () => RF.makeMoray('tube'), (m, dt) => { m.userData.rt = (m.userData.rt || 0) + dt; const k = Math.max(0, Math.sin(m.userData.rt * 0.7)); RF.setMoray(m, 0.15 + 0.85 * k, k > 0.6 ? 1 : 0.1); }),
+  leg('Eel in a rock hole', 'Aal im Felsloch', () => RF.makeEelRock(), RF.animateEel),
+  leg('Sea snake', 'Seeschlange', () => CR.makeSeaSnake(), CR.animateSeaSnake),
+  leg('Grazing turtle', 'Grasende Schildkröte', () => CR.makeGrazer(0), (g, dt) => CR.animateGrazer(g, dt, false)),
+  leg('Whale shark', 'Walhai', () => CR.makeWhaleShark(), CR.animateWhaleShark),
+  leg('Whale', 'Wal', () => RF.makeWhale(), RF.animateWhale),
+  leg('Kraken', 'Krake', () => RF.makeKraken(), RF.animateKraken)];
+const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem), LEGACY);
 // groups for the list and the gallery (review numbers stay as they were, so earlier feedback still matches)
 const GROUPS = [
   ['reef', 'Reef fish', 'Rifffische'], ['open', 'Open water & schools', 'Freiwasser & Schwärme'], ['sharks', 'Sharks & rays', 'Haie & Rochen'],
   ['bottom', 'Bottom dwellers & eels', 'Bodenbewohner & Aale'], ['critters', 'Turtles & invertebrates', 'Schildkröten & Wirbellose'],
-  ['hard', 'Hard corals', 'Steinkorallen'], ['soft', 'Soft corals & anemones', 'Weichkorallen & Anemonen']];
+  ['hard', 'Hard corals', 'Steinkorallen'], ['soft', 'Soft corals & anemones', 'Weichkorallen & Anemonen'], ['legacy', 'Not reviewed yet (older game models)', 'Noch nicht geprüft (ältere Spielmodelle)']];
 const FISH_GROUP = { open: ['Needlefish', 'Trumpetfish', 'Lunar fusilier', 'Silversides', 'Bigfin reef squid', 'Dolphin', 'Mola mola (ocean sunfish)'],
   sharks: ['Blacktip reef shark', 'Whitetip reef shark', 'Coral catshark', 'Blue-spotted stingray', 'Bluespotted stingray', 'Manta ray'],
   bottom: ['Moray eel', 'Banded snake eel', 'Scorpionfish', 'Lionfish', 'Crocodilefish', 'Peacock flounder'] };
 ITEMS.forEach((d, i) => { d.no = i + 1;
-  d.group = CRITTERS3D.includes(d) ? 'critters' : CORALS3D.includes(d) ? 'hard' : SOFT3D.includes(d) ? 'soft' : Object.keys(FISH_GROUP).find(k => FISH_GROUP[k].includes(d.en)) || 'reef'; });
+  d.group = d.legacy ? 'legacy' : CRITTERS3D.includes(d) ? 'critters' : CORALS3D.includes(d) ? 'hard' : SOFT3D.includes(d) ? 'soft' : Object.keys(FISH_GROUP).find(k => FISH_GROUP[k].includes(d.en)) || 'reef'; });
 import { makeComposer } from './post.js';
+import * as M from './models.js';
+import * as RF from './reef.js';
+import * as CR from './critters.js';
 
 const $ = (id) => document.getElementById(id);
 const renderer = makeRenderer($('c'), 2);

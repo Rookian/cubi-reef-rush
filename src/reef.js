@@ -608,7 +608,7 @@ export function animateNudi(n, dt) { const u = n.userData; u.t += dt; u.rig.scal
 // MORAY EEL — hides in a rock at the lane edge and lunges at Cubi
 // ------------------------------------------------------------------
 export function makeMoray(home = 'rock') {
-  const g = new THREE.Group(); const edge = '#22522A';
+  const g = new THREE.Group(); const edge = '#3B2614';   // colours follow the reviewed moray design: olive-gold with dark leopard spots
   const eel = new THREE.Group(); g.add(eel);
   if (home === 'tube') {
     // a big pipe coral; the eel hides inside and shoots out of the opening
@@ -626,9 +626,9 @@ export function makeMoray(home = 'rock') {
     eel.position.set(0, 1.05, 0.9);
   }
   // eel body: a chain of segments that slides out of the hole
-  const skin = toon('#8FD46A'); const spotM = basic('#4E8A30');
+  const skin = toon('#9A8A3E'); const spotM = basic('#5A4A1E');
   const segs = [];
-  for (let i = 0; i < 9; i++) { const r = 0.26 - i * 0.012; const s = outline(new THREE.Mesh(smooth(new THREE.SphereGeometry(r, 16, 10)), skin), 0.025, edge); s.scale.z = 1.4; const sp = new THREE.Mesh(new THREE.CircleGeometry(0.05, 8), spotM); sp.position.set(0, r * 0.98, 0); sp.rotation.x = -Math.PI / 2; s.add(sp); eel.add(s); segs.push(s); }
+  for (let i = 0; i < 9; i++) { const r = 0.26 - i * 0.012; const s = outline(new THREE.Mesh(smooth(new THREE.SphereGeometry(r, 16, 10)), skin), 0.025, edge); s.scale.z = 1.4; for (let k = 0; k < 6; k++) { const a = -1.6 + k * 0.65 + (i % 2) * 0.3, sp = new THREE.Mesh(new THREE.CircleGeometry(0.03 + (k % 3) * 0.012, 8), spotM); sp.position.set(Math.cos(a + Math.PI / 2) * r * 0.99, Math.sin(a + Math.PI / 2) * r * 0.99, (k % 2 ? 0.12 : -0.1) * r); sp.lookAt(sp.position.clone().multiplyScalar(2)); s.add(sp); } eel.add(s); segs.push(s); }
   const head = segs[0];
   // jaw + teeth, eyes
   const jaw = outline(new THREE.Mesh(smooth(new THREE.SphereGeometry(0.2, 14, 10)), skin), 0.022, edge); jaw.scale.set(1, 0.45, 1.6); jaw.position.set(0, -0.14, 0.12); head.add(jaw);

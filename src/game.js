@@ -192,7 +192,7 @@ let party = null;   // { clown, t, own }
 function startParty() {
   let clown, own = false;
   if (buddy) { clown = buddy; buddy = null; }
-  else { clown = M.makeClown(); scene.add(clown); own = true; clown.position.set(P.x + 4.5, P.y + 0.6, 0.3); }
+  else { clown = makeClown3D(); scene.add(clown); own = true; clown.position.set(P.x + 4.5, P.y + 0.6, 0.3); }
   clown.scale.setScalar(1.15);
   party = { clown, t: 0, own, lastHeart: 0 };
 }
@@ -791,6 +791,12 @@ function cleaningStation(z, side) {
   const o = spawn(side > 0 ? 'cleaningR' : 'cleaningL', side * rf(4.3, 5.0), 0, z, { solid: false, cleaning: true, ry: 0, noRes: true, noPool: true });
   return o;
 }
+// the anemone clownfish (and Cubi's clownfish buddy): the reviewed clownfish design, swimming head-first like Cubi
+function makeClown3D() {
+  const g = new THREE.Group(), f = F3.makeFish3D(F3.design('Clownfish'), 0.5); g.add(f);
+  g.userData = { f3: f }; return g;
+}
+function animClown(c, dt, effort) { if (c.userData.f3) F3.animateFish3D(c.userData.f3, dt * (0.5 + effort)); else M.animateFish(c, dt, effort); }
 function spawnItem(it, z) {
   const x = THREE.MathUtils.clamp(+it.x || 0, -3.6, 3.6) * LANE_K, y = +it.y || LANE.mid;
   switch (it.t) {
@@ -830,7 +836,7 @@ function spawnItem(it, z) {
     }
     case 'anemone': {
       const a = spawn('anemone', x, 0, z, { scale: 1.3, solid: false });
-      const clown = M.makeClown(); clown.scale.setScalar(0.9); scene.add(clown); a.clown = clown; break;
+      const clown = makeClown3D(); scene.add(clown); a.clown = clown; break;
     }
   }
 }
@@ -1361,7 +1367,7 @@ function step(dt) {
     if (tmpV.distanceTo(cubi.position) < 0.95) tmpV.copy(cubi.position).add(_cv.copy(tmpV).sub(cubi.position).normalize().multiplyScalar(0.95));
     buddy.position.lerp(tmpV, 1 - Math.pow(0.002, dt));
     buddy.rotation.set(0, -P.vx * 0.06, -P.vx * 0.06);
-    M.animateFish(buddy, dt, 0.7);
+    animClown(buddy, dt, 0.7);
   }
 
   // decor
@@ -1441,7 +1447,7 @@ function step(dt) {
     if (o.clown && !o.clownTaken) { o.clownOff = [ox, oy]; }
     if (o.clown && !o.clownTaken) {
       const co = o.clownOff || [0, 0]; o.clown.position.set(o.x + co[0] + Math.sin(t * 1.2) * 0.25, 1.15 + co[1] + Math.sin(t * 2) * 0.12, o.z + Math.cos(t * 1.2) * 0.25);
-      o.clown.rotation.y = t * 0.8; M.animateFish(o.clown, dt, 0.4);
+      o.clown.rotation.y = t * 0.8; animClown(o.clown, dt, 0.4);
       if (mode === 'play' && Math.abs(o.z) < 1.6 && Math.abs(P.x - o.x) < 1.8 && P.y < 3.0) {
         o.clownTaken = true;
         if (!buddy) { buddy = o.clown; buddy.rotation.set(0, 0, 0); toast('Clownfish buddy!'); }
@@ -1571,7 +1577,7 @@ function updateParty(dt) {
   steerFace(c, st.v, st, dt, 0.4);
   const wig = party.happy && pt - party.happy < 0.5 ? Math.sin((pt - party.happy) * 30) * 0.2 : 0;
   c.rotation.z += wig;
-  M.animateFish(c, dt, 0.4 + Math.min(0.6, st.v.length() * 0.25));
+  animClown(c, dt, 0.4 + Math.min(0.6, st.v.length() * 0.25));
 }
 function updateHearts(dt) {
   hearts.forEach(h => {
