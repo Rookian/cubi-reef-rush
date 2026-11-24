@@ -219,16 +219,16 @@ const F = [
  ['Lionfish', 'Rotfeuerfisch', (() => {
    // Red lionfish (Pterois volitans): zebra stripes in maroon and cream, a crown of long separate venomous spines,
    // huge feathery pectoral fans, leafy tentacles above the eyes, clear spotted soft fins. Pectorals: own texture (pecSep).
-   const RED = '#C9662B', DK = '#5C3420', CR = '#F2E3C6';
-   const band = (x0, y0, x1, y1, w, segs) => { const L = Math.hypot(x1 - x0, y1 - y0), d = `M${x0},${y0} L${x1},${y1}`;
-     return `<path d="${d}" stroke="${O}" stroke-width="${w + 3.5}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${CR}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${RED}" stroke-width="${w}" fill="none" stroke-dasharray="${L / segs / 2} ${L / segs / 2}"/>`; };
-   const cband = (x0, y0, x1, y1, w, segs, bend) => { const mx = (x0 + x1) / 2 - (y1 - y0) / Math.hypot(x1 - x0, y1 - y0) * bend, my = (y0 + y1) / 2 + (x1 - x0) / Math.hypot(x1 - x0, y1 - y0) * bend, L = Math.hypot(x1 - x0, y1 - y0) * 1.02, d = `M${x0},${y0} Q${mx},${my} ${x1},${y1}`;
+   const OR = '#E27A2C', RO = '#D04A26', BR = '#7B4424', BK = '#1E1612', RED = RO, DK = BK, CR = '#F6EDDA', CYC = [OR, RO, BR];
+   const band = (x0, y0, x1, y1, w, segs, col = RED) => { const L = Math.hypot(x1 - x0, y1 - y0), d = `M${x0},${y0} L${x1},${y1}`;
+     return `<path d="${d}" stroke="${O}" stroke-width="${w + 3.5}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${CR}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${col}" stroke-width="${w}" fill="none" stroke-dasharray="${L / segs / 2} ${L / segs / 2}"/>`; };
+   const cband = (x0, y0, x1, y1, w, segs, bend, col = RED) => { const mx = (x0 + x1) / 2 - (y1 - y0) / Math.hypot(x1 - x0, y1 - y0) * bend, my = (y0 + y1) / 2 + (x1 - x0) / Math.hypot(x1 - x0, y1 - y0) * bend, L = Math.hypot(x1 - x0, y1 - y0) * 1.02, d = `M${x0},${y0} Q${mx},${my} ${x1},${y1}`;
      return `<path d="${d}" stroke="${O}" stroke-width="${w + 3.5}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${CR}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${RED}" stroke-width="${w}" fill="none" stroke-dasharray="${L / segs / 2} ${L / segs / 2}"/>`; };
    // dorsal spines: 13, tallest at the front-middle, swept back, banded, membrane only at the base
    const spines = [...Array(13)].map((_, i) => { const x0 = 84 + i * 9.5, base = 70 - Math.sin((x0 - 84) / 240 * Math.PI) * 4 + (i > 9 ? (i - 9) * 3 : 0);
      const h = [52, 62, 68, 70, 68, 64, 58, 52, 46, 40, 32, 26, 22][i]; return [x0, base, x0 + 10 + i * 0.8, base - h]; });
    const memb = `<path d="M${spines.map(([x0, y0, x1, y1]) => `${x0},${y0 + 2} ${x0 + (x1 - x0) * 0.42},${y0 + (y1 - y0) * 0.42}`).join(' ')} L${spines[12][0]},${spines[12][1] + 2}Z" fill="#E9C49A" opacity=".9"/>`;
-   const dorsal = memb + spines.map(([x0, y0, x1, y1]) => band(x0, y0, x1, y1, 3.2, 5) + `<path d="M${x1},${y1} q-6,4 -4,10" stroke="${RED}" stroke-width="2.4" fill="none" opacity=".8"/>`).join('');
+   const dorsal = memb + spines.map(([x0, y0, x1, y1], i) => band(x0, y0, x1, y1, 3.2, 5, CYC[i % 3]) + `<path d="M${x1},${y1} q-6,4 -4,10" stroke="${RED}" stroke-width="2.4" fill="none" opacity=".8"/>`).join('');
    const spots = (pts) => pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 ? 1.8 : 2.4}" fill="${i % 2 ? RED : DK}"/>`).join('');
    const grid = (x0, x1, y0, y1, nx, ny, inside) => { const out = []; for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const x = x0 + (x1 - x0) * (i + 0.5) / nx, y = y0 + (y1 - y0) * (j + 0.5) / ny; if (inside(x, y)) out.push([x, y]); } return out; };
    const softD = fin('M196,82 C206,60 228,58 240,74 C242,84 240,92 236,98 C224,92 210,86 196,82Z', '#F5EAD5', spots(grid(198, 242, 58, 96, 5, 4, (x, y) => y > 62 + (x - 220) * (x - 220) * 0.012 && y < 96 - (x - 196) * 0.1)));
@@ -243,12 +243,12 @@ const F = [
    const rays = [...Array(15)].map((_, i) => { const ang = (14 + i * 7.4) * Math.PI / 180, L = 150 - Math.abs(i - 6) * 4.5 + [0, 8, -6, 4, -10, 6, 0, 9, -4, 5, -8, 3, 7, -5, 2][i]; return [PB[0] + Math.cos(ang) * L, PB[1] + Math.sin(ang) * L * 0.62, ang, L]; });
    const fanEdge = (k) => rays.map(([x, y]) => `${PB[0] + (x - PB[0]) * k},${PB[1] + (y - PB[1]) * k}`).join(' ');
    const pecFan = `<path d="M${PB[0]},${PB[1]} L${fanEdge(1.1)} ${PB[0] + 160},${PB[1] + 6}Z" fill="none"/>` + `<path d="M${PB[0]},${PB[1]} L${fanEdge(0.66)}Z" fill="${CR}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/>`
-     + [0.18, 0.3, 0.42, 0.54].map((k, j) => `<path d="M${fanEdge(k).split(' ').join(' L')}" stroke="${j % 2 ? DK : RED}" stroke-width="${j % 2 ? 3 : 6}" fill="none" stroke-linejoin="round" opacity=".95"/>`).join('')
-     + rays.map(([x, y], i) => cband(PB[0], PB[1], x, y, 2.8, 6, i % 2 ? 5 : -4) + `<path d="M${x},${y} q4,-3 7,1" stroke="${RED}" stroke-width="2" fill="none"/>`).join('');
+     + [0.18, 0.3, 0.42, 0.54].map((k, j) => `<path d="M${fanEdge(k).split(' ').join(' L')}" stroke="${j % 2 ? BK : [RO, OR][j / 2]}" stroke-width="${j % 2 ? 3 : 6}" fill="none" stroke-linejoin="round" opacity=".95"/>`).join('')
+     + rays.map(([x, y], i) => cband(PB[0], PB[1], x, y, 2.8, 6, i % 2 ? 5 : -4, CYC[i % 3]) + `<path d="M${x},${y} q4,-3 7,1" stroke="${RED}" stroke-width="2" fill="none"/>`).join('');
    // body: cream with bold maroon bars and thin brown pinstripes, radiating bars on the head, a dark bar through the eye
-   const bars = [...Array(14)].map((_, i) => { const x = 86 + i * 11.5, w = i % 2 ? 3 : 7.5 - i * 0.25, c = i % 2 ? DK : RED;
+   const bars = [...Array(14)].map((_, i) => { const x = 86 + i * 11.5, w = i % 2 ? 2.4 : 7.5 - i * 0.25, c = i % 2 ? BK : CYC[(i / 2) % 3];
      return `<path d="M${x + 8},52 C${x + 2},84 ${x + 4},112 ${x - 6},150" stroke="${c}" stroke-width="${w}" fill="none"/>`; }).join('');
-   const headBars = [[54, 78, 44, 116, 6, RED], [62, 74, 54, 128, 3, DK], [86, 70, 70, 134, 7, RED], [96, 70, 84, 136, 3, DK]].map(([x0, y0, x1, y1, w, c]) => `<path d="M${x0},${y0} Q${(x0 + x1) / 2 - 8},${(y0 + y1) / 2} ${x1},${y1}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`).join('')
+   const headBars = [[54, 78, 44, 116, 6, OR], [62, 74, 54, 128, 2.4, BK], [86, 70, 70, 134, 7, BR], [96, 70, 84, 136, 2.4, BK]].map(([x0, y0, x1, y1, w, c]) => `<path d="M${x0},${y0} Q${(x0 + x1) / 2 - 8},${(y0 + y1) / 2} ${x1},${y1}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`).join('')
      + `<path d="M74,72 L74,128" stroke="${RED}" stroke-width="7" stroke-linecap="round"/>`;
    return fish({ thick: 0.65, pecSep: 1, pecOut: 0.62, body: 'M36,110 C38,94 56,76 90,68 C130,62 176,72 212,88 C226,94 234,98 240,100 C232,106 222,110 210,114 C176,128 130,138 96,136 C64,134 42,126 36,110Z', fill: CR,
      fins: [dorsal, softD, tail, anal, pelvic, headTent, chinTent],
