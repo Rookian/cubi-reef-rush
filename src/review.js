@@ -13,12 +13,12 @@ function fitted(make) { const inner = make(), g = new THREE.Group(); g.add(inner
   const k = 1.7 / Math.max(sz.x, sz.y, sz.z, 0.01); inner.scale.multiplyScalar(k); inner.position.sub(c.multiplyScalar(k)); g.userData.inner = inner; return g; }
 const leg = (en, de, make, anim) => ({ en, de, legacy: true, make: () => fitted(make), anim: anim ? (m, dt) => anim(m.userData.inner, dt) : null });
 const LEGACY = [
-  leg('Seahorse', 'Seepferdchen', () => RF.makeSeahorse(), RF.animateSeahorse),
-  leg('Crab', 'Krabbe', () => RF.makeCrab('#FF6B4A'), RF.animateCrab),
-  leg('Nudibranchs (6 kinds)', 'Nacktschnecken (6 Arten)', () => { const g = new THREE.Group(); for (let i = 0; i < 6; i++) { const n = RF.makeNudibranch(i); n.position.set((i % 3 - 1) * 0.9, 0, Math.floor(i / 3) * 0.9 - 0.45); g.add(n); } return g; },
-    (g, dt) => g.children.forEach(n => RF.animateNudi(n, dt))),
-  leg('Baby sea turtle', 'Baby-Meeresschildkröte', () => M.makeTurtle(true), M.animateTurtle),
-  leg('Jellyfish', 'Qualle', () => M.makeJelly(), M.animateJelly),
+  leg('Seahorse', 'Seepferdchen', () => { const g = new THREE.Group(); ['kuda', 'dusky', 'thorny'].forEach((k, i) => { const h = KO.makeSeahorse3D(k); h.position.x = (i - 1) * 0.75; h.rotation.y = -0.5; g.add(h); }); return g; }, (g, dt) => g.children.forEach(h => KO.animateSeahorse3D(h, dt))),
+  leg('Crab', 'Krabbe', () => { const g = new THREE.Group(); const a = KO.makeKomodoCrab('orangutan'), b = KO.makeKomodoCrab('guard'); a.position.x = -0.75; b.position.x = 0.75; g.add(a, b); return g; }, (g, dt) => g.children.forEach(c => KO.animateKomodoCrab(c, dt))),
+  leg('Nudibranchs (6 kinds)', 'Nacktschnecken (6 Arten)', () => { const g = new THREE.Group(); for (let i = 0; i < 6; i++) { const n = KO.makeNudi3D(i); n.position.set((i % 3 - 1) * 0.55, 0, Math.floor(i / 3) * 0.75 - 0.375); g.add(n); } return g; },
+    (g, dt) => g.children.forEach(n => KO.animateNudi3D(n, dt))),
+  leg('Baby sea turtle', 'Baby-Meeresschildkröte', () => KO.makeBabyTurtle3D(), KO.animateBabyTurtle3D),
+  leg('Jellyfish', 'Qualle', () => KO.makeMoonJelly(0), KO.animateMoonJelly),
   leg('Starfish', 'Seestern', () => M.makeStarfish(), null),
   leg('Giant clam', 'Riesenmuschel', () => M.makeClam(), M.animateClam),
   leg('Moray eel in its rock (game)', 'Muräne im Fels (Spiel)', () => RF.makeMoray('rock'), (m, dt) => { m.userData.rt = (m.userData.rt || 0) + dt; const k = Math.max(0, Math.sin(m.userData.rt * 0.7)); RF.setMoray(m, 0.15 + 0.85 * k, k > 0.6 ? 1 : 0.1); }),
@@ -26,8 +26,7 @@ const LEGACY = [
   leg('Eel in a rock hole', 'Aal im Felsloch', () => RF.makeEelRock(), RF.animateEel),
   leg('Sea snake', 'Seeschlange', () => CR.makeSeaSnake(), CR.animateSeaSnake),
   leg('Grazing turtle', 'Grasende Schildkröte', () => CR.makeGrazer(0), (g, dt) => CR.animateGrazer(g, dt, false)),
-  leg('Whale shark', 'Walhai', () => CR.makeWhaleShark(), CR.animateWhaleShark),
-  leg('Whale', 'Wal', () => RF.makeWhale(), RF.animateWhale),
+  leg('Whale shark', 'Walhai', () => KO.makeWhaleShark3D(), KO.animateWhaleShark3D),
   leg('Kraken', 'Krake', () => RF.makeKraken(), RF.animateKraken)];
 const ITEMS = FISH3D.filter(d => !LATE.includes(d.en)).map(fishItem).concat(CRITTERS3D, CORALS3D, SOFT3D, FISH3D.filter(d => LATE.includes(d.en)).map(fishItem), LEGACY);
 // groups for the list and the gallery (review numbers stay as they were, so earlier feedback still matches)
@@ -44,6 +43,7 @@ import { makeComposer } from './post.js';
 import * as M from './models.js';
 import * as RF from './reef.js';
 import * as CR from './critters.js';
+import * as KO from './komodo.js';
 
 const $ = (id) => document.getElementById(id);
 const renderer = makeRenderer($('c'), 2);

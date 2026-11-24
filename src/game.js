@@ -9,6 +9,7 @@ import * as K from './corals3d.js';
 import * as SK from './softcorals3d.js';
 import * as RS from './reefscape.js';
 import * as CL from './cleaning.js';
+import * as KO from './komodo.js';
 setLite(true);   // game-weight corals (the review page keeps full detail)
 import { glowAll, glowU } from './materials.js';
 import { sound } from './audio.js';
@@ -269,7 +270,7 @@ const KINDS = {
   bank: { make: () => RF.makeBank(ri(1, 9999)), shape: () => [] },
   kelp: { make: () => M.makeSeaweed(pick(['#2FB070', '#3FC27F', '#5AD08A']), rf(2.2, 3.4)), shape: () => [] },
   patch: { make: () => RS.makeOutcrop(ri(1, 9999), 0.5, 'carpet'), shape: () => [] },
-  whaleshark: { make: () => CR.makeWhaleShark(), shape: () => [] },
+  whaleshark: { make: () => KO.makeWhaleShark3D(), shape: () => [] },
   cleaningL: { make: () => CL.makeCleaningStation(-1), shape: () => [] },
   cleaningR: { make: () => CL.makeCleaningStation(1), shape: () => [] },
   hammer: { make: () => shark3D('Blacktip reef shark'), shape: () => [] },
@@ -287,7 +288,7 @@ const KINDS = {
   gorgonian: { make: () => CR.makeGorgonian(ri(0, 9)), shape: () => [] },
   rubble: { make: () => CR.makeRubble(ri(0, 99)), shape: () => [] },
   seasnake: { make: () => CR.makeSeaSnake(), shape: () => [] },
-  babyturtle: { make: () => M.makeTurtle(true), shape: () => [] },
+  babyturtle: { make: () => KO.makeBabyTurtle3D(), shape: () => [] },
   debris: { make: () => RF.makeDebris(ri(0, 89)), shape: () => [] },
   seagrass: { make: () => RF.makeSeagrass(ri(0, 50), rf(1.1, 1.8), ri(110, 170)), shape: () => [] },
   grazer: { make: () => CR.makeGrazer(ri(0, 7)), shape: () => [] },
@@ -312,14 +313,13 @@ const KINDS = {
   hump: { make: () => RS.makeSlabSeg(ri(1, 9999), -0.3, 1.65, -1.4, 1.4), shape: () => [] },
   roof: { make: () => RS.makeSlabSeg(ri(1, 9999), 2.9, 5.6, -3.6, 3.6), shape: () => [] },
   wallfar: { make: () => RS.makeCoralWall(ri(1, 999), true), shape: () => [] },
-  crab: { make: () => RF.makeCrab(pick(['#FF6B4A', '#FF8A3D', '#FF5C7A'])), shape: () => [] },
-  seahorse: { make: () => pick([() => RF.makeSeahorse(), () => RF.makeSeahorse('#FF7FB8', '#FFD0EA'), () => RF.makeSeahorse('#9B6BE8', '#E2D4FF')])(), shape: () => [] },
+  crab: { make: () => KO.makeKomodoCrab(Math.random() < 0.6 ? 'orangutan' : 'guard'), shape: () => [] },
+  seahorse: { make: () => KO.makeSeahorse3D(pick(['kuda', 'kuda', 'dusky', 'thorny'])), shape: () => [] },
   manta: { make: () => wrap3D('Manta ray', 2.4), shape: () => [] },
   eel: { make: () => RF.makeEelRock(), shape: () => [] },
-  whale: { make: () => RF.makeWhale(), shape: () => [] },
   wreck: { make: () => RF.makeShipwreck(), shape: () => [] },
   xmas: { make: () => RF.makeXmasRock(ri(1, 99)), shape: () => [] },
-  nudi: { make: () => RF.makeNudibranch(Math.random() < 0.35 ? 0 : ri(1, 5)), shape: () => [] },
+  nudi: { make: () => KO.makeNudi3D(Math.random() < 0.35 ? 0 : ri(1, 5)), shape: () => [] },
   moray: { make: () => RF.makeMoray('rock'), shape: () => [] },
   moraytube: { make: () => RF.makeMoray('tube'), shape: () => [] },
   kraken: { make: () => RF.makeKraken(), shape: () => [] },
@@ -327,7 +327,7 @@ const KINDS = {
   grass: { make: () => M.makeGrass(pick(['#4FCB7A', '#7FDB6A', '#3FBF9A'])), shape: () => [] },
   star: { make: () => M.makeStarfish(), shape: () => [] },
   anemone: { make: () => { const c = pick([['#9B6BE8', '#D9B8FF', '#3E2370'], ['#FF7FB8', '#FFD0EA', '#7A1F3D'], ['#5FCF8A', '#D4FFE4', '#1F5A3A']]); return M.makeAnemone(...c); }, shape: () => [] },
-  jelly: { make: () => pick([() => M.makeJelly(), () => M.makeJelly('#C7A4FF', '#3E2370', '#E9DCFF')])(), shape: () => [sph(0.15, 0.55), cap(-0.15, -1.0, 0.25)] },
+  jelly: { make: () => KO.makeMoonJelly(ri(0, 2)), shape: () => [sph(0.15, 0.55), cap(-0.15, -1.0, 0.25)] },
   puffer: { make: () => puffer3D(), shape: () => [] },
   urchin: { make: () => wrapC(C3.makeLongSpineUrchin(), C3.animateLongSpineUrchin, 0.62, 0, 30), shape: s => [sph(0.3 * s, 0.5 * s)] },
   pearl: { make: () => M.makePearl(), shape: () => [] },
@@ -352,7 +352,7 @@ function wrapC(m, anim, size = 1, lift = 0, far = 45) { const g = new THREE.Grou
 function wrap3D(name, size, lift = 0) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), size); f.position.y = lift; g.add(f); g.userData.f3 = f; return g; }
 function shark3D(name) { const g = new THREE.Group(), f = F3.makeFish3D(F3.design(name), 2.1); g.add(f); g.userData = f.userData; return g; }
 function anemK(a) { const g = new THREE.Group(); g.add(a); g.userData.anem = a.userData.anem; return g; }
-const NOGLOW = ['turtle', 'shrimp', 'octopus', 'featherstar', 'bloodstar', 'urchin', 'stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
+const NOGLOW = ['jelly', 'nudi', 'seahorse', 'crab', 'babyturtle', 'whaleshark', 'turtle', 'shrimp', 'octopus', 'featherstar', 'bloodstar', 'urchin', 'stingray', 'manta', 'scorpion', 'croco', 'flounder', 'snakeeel', 'catshark', 'lionfish', 'dolphin', 'squid', 'puffer', 'school', 'hammer', 'blacktip', 'whitetip', 'rubble', 'debris', 'seagrass', 'bank', 'wallfar', 'rock', 'arch', 'wreck', 'wreckgate', 'pearl', 'stream', 'finish'];
 // size corrections so species keep believable proportions to each other (big animals stay game-compressed, tiny critters stay visible)
 const KIND_SCALE = { dolphin: 1.3, nudi: 0.6, shrimp: 0.6, crab: 0.7, seahorse: 0.7 };
 function spawn(kind, x, y, z, opt = {}) {
@@ -832,7 +832,6 @@ function sharedLife(z, bg) {
   if (Math.random() < 0.07) spawn('shrimp', side * rf(3.7, 5.2), 0, z + rf(-2, 2), { solid: false, scale: rf(1.5, 2.0), ry: rf(0, 6) });
   if (!bg) sharkLife(z, side);
   if (!bg && Math.random() < 0.005) cleaningStation(z, side);
-  if (Math.random() < 0.006) { const dir = Math.random() < 0.5 ? 1 : -1; spawn('whale', -dir * 34, rf(9, 11), z - 4, { solid: false, scale: 1.4, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.6, 0], maxX: 40 }); }
   if (Math.random() < 0.03) { const dir = Math.random() < 0.5 ? 1 : -1, r = Math.random();
     if (r < 0.8 && !objs.some(o => o.tj && o.z < -20)) turtleJourney(z - 6, dir, r < 0.4);
     else spawn('turtle', -dir * 13, rf(7.6, 9), z - 8, { solid: false, scale: 1.3, ry: dir * Math.PI / 2 + Math.PI, swim: [dir * 1.3, 0] }); }
@@ -1434,7 +1433,7 @@ function step(dt) {
   for (let i = objs.length - 1; i >= 0; i--) {
     const o = objs[i];
     o.z += move;
-    if (o.kind === 'jelly') { o.y0 ??= o.y; o.y = o.y0 + Math.sin(t * 1.4 + o.ph) * o.bob; M.animateJelly(o.mesh, dt); }
+    if (o.kind === 'jelly') { o.y0 ??= o.y; o.y = o.y0 + Math.sin(t * 1.4 + o.ph) * o.bob; KO.animateMoonJelly(o.mesh, dt); }
     if (o.kind === 'puffer') {
       o.z += o.vz * dt;
       // puffs up when Cubi comes close, slowly goes flat again afterwards
@@ -1452,7 +1451,7 @@ function step(dt) {
     if (o.mesh.userData.f3 && o.z > -45 && o.z < 12) F3.animateFish3D(o.mesh.userData.f3, dt);
     if (o.mesh.userData.anem && o.z > -40 && o.z < 10) RF.animateAnemone(o.mesh, dt, Math.abs(o.z) < 3.2 && Math.abs(o.x - P.x) < 2.8 && P.y < 3.2);
     if (o.xmas && o.z > -30) RF.animateXmas(o.mesh, dt, Math.abs(o.z) < 4.5 && Math.abs(o.x - P.x) < 3.6 && P.y < 3.4);
-    if (o.kind === 'nudi' && o.z > -30) RF.animateNudi(o.mesh, dt);
+    if (o.kind === 'nudi' && o.z > -30) KO.animateNudi3D(o.mesh, dt);
     if (o.crosser) updateCrosser(o, dt);
     if (o.gate) updateGate(o, dt);
     if (o.moray) updateMoray(o, dt);
@@ -1467,17 +1466,16 @@ function step(dt) {
       if (o.kind === 'school') { const t0 = performance.now(); M.animateSchool(o.mesh, dt); PERF.school += performance.now() - t0; }
       else if (o.kind === 'clam') M.animateClam(o.mesh, dt);
       else if (o.kind === 'vent') M.animateVent(o.mesh, dt);
-      else if (o.kind === 'crab') RF.animateCrab(o.mesh, dt);
-      else if (o.kind === 'seahorse') RF.animateSeahorse(o.mesh, dt);
+      else if (o.kind === 'crab') KO.animateKomodoCrab(o.mesh, dt);
+      else if (o.kind === 'seahorse') KO.animateSeahorse3D(o.mesh, dt);
       else if (o.kind === 'eel') RF.animateEel(o.mesh, dt);
-      else if (o.kind === 'whale') RF.animateWhale(o.mesh, dt);
-      else if (o.kind === 'whaleshark') CR.animateWhaleShark(o.mesh, dt);
+      else if (o.kind === 'whaleshark') KO.animateWhaleShark3D(o.mesh, dt);
       else if (o.cleaning) {
         const mp = CL.moloPos(o.mesh, _clv), near = o.seen && mp.distanceTo(cubi.position) < 2.8 || (hungry && hungry.mesh.position.distanceTo(mp) < 9);
         if (!o.told && o.z > -26 && mode === 'play') { o.told = true; toast('A sunfish at the cleaning station!', 1); }
         CL.animateCleaningStation(o.mesh, dt, near); o.seen = true;
       }
-      else if (o.kind === 'babyturtle') M.animateTurtle(o.mesh, dt);
+      else if (o.kind === 'babyturtle') KO.animateBabyTurtle3D(o.mesh, dt);
       else if (o.kind === 'grazer' && o.z > -30) CR.animateGrazer(o.mesh, dt, Math.abs(o.z) < 4 && Math.abs(o.x - P.x) < 3.5);
       else if (o.kind === 'hammer' || o.kind === 'blacktip' || o.kind === 'whitetip') F3.animateFish3D(o.mesh, dt * (o.tail || 1));
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
