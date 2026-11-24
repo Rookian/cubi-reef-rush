@@ -1208,14 +1208,15 @@ function countFps(now) {
     if (fpsOn) { fpsEl.textContent = `${fps} FPS · ${ms.toFixed(1)} ms · ${hq ? 'HQ' : 'Fast'}${dynRes < 1 ? ' · ' + Math.round(dynRes * 100) + '%' : ''}`; fpsEl.style.color = fps >= 50 ? '#1F7A3A' : fps >= 30 ? '#9A6A00' : '#C0282A'; }
   }
 }
+let frameErrs = 0;
 function frame(now) {
+  requestAnimationFrame(frame);   // keep the loop alive even if something below throws: one bad frame must never freeze the game
   countFps(now);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const w0 = performance.now();
-  step(dt);
-  renderFrame();
+  try { step(dt); renderFrame(); }
+  catch (e) { if (frameErrs++ < 5) console.error('frame error (game continues):', e); }
   workMs += performance.now() - w0;
-  requestAnimationFrame(frame);
 }
 function step(dt) {
   glowU.uGlowT.value += dt; causticClock.value += dt;
@@ -1427,7 +1428,7 @@ function step(dt) {
       else if (o.kind === 'seasnake') CR.animateSeaSnake(o.mesh, dt);
     }
     if (o.kind === 'pearl') { o.mesh.children[0].rotation.y += dt * 2; o.mesh.position.y = o.y + Math.sin(t * 2 + o.ph) * 0.08; }
-    if (o.kind === 'flee') { o.x += o.flee * 7 * dt; o.y += 2 * dt; o.mesh.rotation.y = o.flee * 1.3; M.animateFish(o.mesh, dt, 1); }
+    if (o.kind === 'flee') { o.x += o.flee * 7 * dt; o.y += 2 * dt; o.mesh.rotation.y = o.flee * 1.3; animClown(o.mesh, dt, 1); }
     if (o.kind === 'stream') updateStream(o);
     if (o.kind === 'finish') o.mesh.children.forEach((m, k) => { m.position.z = Math.sin(t * 3 + k) * 0.1; });
 
@@ -1819,7 +1820,7 @@ resetWorld();
 if (!/[?&]test/.test(location.search)) requestAnimationFrame(frame); else renderFrame();
 window.__grade = (o) => { for (const k in o) if (GRADE[k]) GRADE[k].value = o[k]; else if (k === 'fogNear') scene.fog.near = o[k]; else if (k === 'glow') glowU.uGlowK.value = o[k]; };
 window.__glowSet = (k, b) => { glowU.uGlowK.value = k; if (bloomPass) bloomPass.strength = b ?? bloomPass.strength; };
-window.__game = { THREE, KINDS, F3, cubi, turtle: (z, side, up) => turtleJourney(z, side, up), scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
+window.__game = { THREE, KINDS, F3, cubi, item: (it, z) => spawnItem(it, z), turtle: (z, side, up) => turtleJourney(z, side, up), scene, camera, dbg: () => ({ cam: camera.position.toArray().map(v => +v.toFixed(2)), P: [+P.x.toFixed(2), +P.y.toFixed(2)], ground: +groundAt(camera.position.x, curD - camera.position.z).toFixed(2), slabs: objs.filter(o => o.shapes && o.shapes[0] && o.shapes[0].t === "b").map(o => [+o.z.toFixed(1), +(o.shapes[0].y0 + relY(curD - o.z)).toFixed(2), o.mesh.visible]) }), hungry: (x) => hungryShark(-30, x || 3), get shark() { return hungry; },
   get mode() { return mode; }, P, objs, get s() { return s; }, get lives() { return lives; }, get pearls() { return pearls; }, get buddy() { return !!buddy; },
   start: (i) => start(STARTER_LEVELS[i || 0], i || 0), spawn: (k, x, y, z, o) => spawn(k, x, y, z, o || {}), item: (it, z) => spawnItem(it, z), forceWin: () => win(), forceOver: () => { lives = 0; gameOver(); }, toxin: useToxin,
   sim(n) { for (let i = 0; i < n; i++) step(1 / 60); renderFrame(); },

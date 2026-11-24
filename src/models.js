@@ -137,7 +137,7 @@ export function makeCubi(opts = {}) {
   return root;
 }
 export function animateFish(f, dt, effort = 0.5) {
-  const u = f.userData;
+  const u = f.userData; if (!u.tail) return;   // not one of these cartoon fish (e.g. a design fish): nothing to animate here
   u.t += dt * (3 + effort * 9);
   u.tail.rotation.y = Math.sin(u.t) * (0.35 + effort * 0.35);
   u.pecs.forEach((p, i) => { p.rotation.y = (i ? -1 : 1) * Math.sin(u.t * 1.3 + i) * 0.45; p.rotation.z = Math.sin(u.t * 1.3) * 0.2; });
