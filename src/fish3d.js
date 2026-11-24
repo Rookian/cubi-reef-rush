@@ -32,13 +32,15 @@ const GLOW = { 'Palette surgeonfish': [0.6, '#1670FF'], 'Emperor angelfish': [0.
 const METAL = { 'Lunar fusilier': 0.6, 'Silversides': 1.2 };
 function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, flap: 0, scull: 0 }) {
   mat.onBeforeCompile = (sh) => {
-    if (inst) { sh.uniforms.uT = { value: 0 }; mat.userData.sh = sh; } else sh.uniforms.uT = U;
-    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    if (inst) { sh.uniforms.uT = { value: 0 }; sh.uniforms.uSw = { value: mat.userData.swTex }; mat.userData.sh = sh; } else sh.uniforms.uT = U;
+    // schools: every fish has its own tail phase and stroke size (x, y of its texel), driven by how fast it swims and accelerates
+    sh.vertexShader = 'uniform float uT;\n' + (inst ? 'uniform sampler2D uSw;\n' : '') + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      ${inst ? 'vec4 sw = texelFetch(uSw, ivec2(gl_InstanceID, 0), 0); float fph = sw.x, famp = sw.y;' : ''}
       ${push ? `transformed += normalize(normal) * ${push.toFixed(4)};` : ''}
       float zn = position.z / ${len.toFixed(4)};
-      float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2 * mv.wave).toFixed(4)};
-      ${mv.flap ? `transformed.x += sin(${inst ? 'uT * 6.5' : 'uT'} * 0.55 - abs(position.y) * 5.0) * abs(position.y) * ${mv.flap.toFixed(2)} * 0.45;` : ''}
-      transformed.x += sin(${inst ? 'uT * 6.5 + float(gl_InstanceID) * 1.37' : 'uT'} - zn * 3.0) * env;
+      float env = pow(max(0.0, zn + 0.22), 2.0) * ${(len * 0.2 * mv.wave).toFixed(4)}${inst ? ' * famp' : ''};
+      ${mv.flap ? `transformed.x += sin(${inst ? 'fph' : 'uT'} * 0.55 - abs(position.y) * 5.0) * abs(position.y) * ${mv.flap.toFixed(2)} * 0.45;` : ''}
+      transformed.x += sin(${inst ? 'fph' : 'uT'} - zn * 3.0) * env;
       ${mv.scull ? `transformed.x += sin(uT) * max(0.0, abs(position.y) - ${(len * 0.27).toFixed(4)}) * ${(mv.scull * 0.75).toFixed(2)};   // ocean sunfish: dorsal + anal fin stroke together to the same side, like a pair of vertical wings` : ''}`);
     if (mat.isMeshToonMaterial) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
       { vec3 nn = normalize(vNormal); vec3 vv = normalize(vViewPosition);
@@ -52,7 +54,7 @@ function swim(mat, U, len, push = 0, fx = null, inst = false, mv = { wave: 1, fl
           outgoingLight = mix(outgoingLight, outgoingLight * 1.15 + vec3(0.75, 0.9, 1.0) * (sp2 * 0.6 + band * 0.16 + fr * 0.3), ${Math.min(1, fx.metal * 0.75).toFixed(2)}); }` : ''} }
       #include <opaque_fragment>`).replace('void main() {', 'uniform float uT;\nvoid main() {');
   };
-  mat.customProgramCacheKey = () => 'f3d' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst + mv.wave + '_' + mv.flap + '_' + (mv.scull || 0);
+  mat.customProgramCacheKey = () => 'f3d2' + len.toFixed(4) + push + mat.type + (fx ? fx.key : '') + inst + mv.wave + '_' + mv.flap + '_' + (mv.scull || 0);
   return mat;
 }
 let _grad = null;
@@ -187,15 +189,18 @@ export function makeSchool3D(name, n, size) {
   const mats = [swim(new THREE.MeshBasicMaterial({ color: OUT, side: THREE.BackSide }), null, P.len, 0.014, null, true),
     swim(new THREE.MeshToonMaterial({ map: P.bodyTex, gradientMap: softGrad() }), null, P.len, 0, fx, true),
     swim(new THREE.MeshBasicMaterial({ map: P.finTex, alphaTest: 0.45, side: THREE.DoubleSide }), null, P.len, 0, null, true)];
+  const swData = new Float32Array(n * 4); for (let i = 0; i < n; i++) { swData[i * 4] = Rn() * 6.28; swData[i * 4 + 1] = 0.8; }
+  const swTex = new THREE.DataTexture(swData, n, 1, THREE.RGBAFormat, THREE.FloatType); swTex.needsUpdate = true;
+  mats.forEach(m => m.userData.swTex = swTex);
   const meshes = [new THREE.InstancedMesh(P.bodyLo, mats[0], tiny ? 0 : n), new THREE.InstancedMesh(P.bodyLo, mats[1], n), new THREE.InstancedMesh(P.inst.fins, mats[2], n)];
   if (tiny) meshes[0].visible = false;
-  if (P.inst.eyes) { const em = swim(new THREE.MeshBasicMaterial({ vertexColors: true }), null, P.len, 0, null, true); mats.push(em); meshes.push(new THREE.InstancedMesh(P.inst.eyes, em, n)); }
+  if (P.inst.eyes) { const em = swim(new THREE.MeshBasicMaterial({ vertexColors: true }), null, P.len, 0, null, true); em.userData.swTex = swTex; mats.push(em); meshes.push(new THREE.InstancedMesh(P.inst.eyes, em, n)); }
   const g = new THREE.Group(); meshes.forEach(m => { m.frustumCulled = false; g.add(m); });
   const spread = 0.55 + Math.sqrt(n) * 0.5 * Math.max(size, 0.5), fish = [];
   for (let i = 0; i < n; i++) fish.push({
     o: new THREE.Vector3((Rn() - 0.5) * spread * 1.4, (Rn() - 0.5) * spread * 0.7, (Rn() - 0.5) * spread * 1.4),
     f: [0.25 + Rn() * 0.9, 0.3 + Rn() * 1.1, 0.2 + Rn() * 0.8, 0.5 + Rn() * 1.5], ph: [Rn() * 6, Rn() * 6, Rn() * 6, Rn() * 6],
     a: (0.25 + Rn() * 0.5) * Math.max(0.6, size), s: size * (0.85 + Rn() * 0.3), dart: new THREE.Vector3(), nextDart: Rn() * 4, prev: new THREE.Vector3(), yaw: 0, pitch: 0 });
-  g.userData = { meshes, fish, mats, t: Rn() * 10, n, size, species: name, small: size < 0.6 };
+  g.userData = { meshes, fish, mats, swTex, t: Rn() * 10, n, size, species: name, small: size < 0.6 };
   return g;
 }

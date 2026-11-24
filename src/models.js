@@ -855,6 +855,17 @@ function fishGradient() { if (_fishGrad) return _fishGrad; const d = new Uint8Ar
 let _toonRef = null; function toonGradientRef() { if (!_toonRef) _toonRef = toon('#fff').gradientMap; return _toonRef; }
 const _sm = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _sv = new THREE.Vector3(), _ss = new THREE.Vector3(), _se = new THREE.Euler();
 const _sw = new THREE.Vector3(), _sd = new THREE.Vector3(), _st = new THREE.Vector3(), _sp = new THREE.Vector3();
+// How each species gets out of Cubi's way. r: how early it reacts, acc: how quickly it picks up speed (smaller = snappier),
+// top: how fast it flees, burst: an instant startle flick (small reef fish), 0 = no flick (big, calm fish)
+const ESCAPE = {
+  darter: { r: 1.0, acc: 0.006, top: 1.5, burst: 1.5 },    // chromis, damsels, anthias, silversides, clownfish, cleaner wrasse
+  cruiser: { r: 1.15, acc: 0.015, top: 1.4, burst: 0.9 },  // fusiliers, needlefish: fast open-water swimmers
+  reef: { r: 0.9, acc: 0.05, top: 1.0, burst: 0.4 },       // surgeonfish, tangs, butterflyfish, bannerfish, idols, rabbitfish
+  calm: { r: 0.7, acc: 0.16, top: 0.75, burst: 0 } };      // angelfish, groupers, parrotfish, big triggerfish, puffers, trumpetfish
+const ESCAPE_OF = { 'Blue-green chromis': 'darter', 'Yellowtail damselfish': 'darter', 'Anthias': 'darter', 'Silversides': 'darter', 'Clownfish': 'darter', 'Pink skunk clownfish': 'darter', 'Cleaner wrasse': 'darter',
+  'Lunar fusilier': 'cruiser', 'Needlefish': 'cruiser',
+  'Emperor angelfish': 'calm', 'Coral grouper': 'calm', 'Parrotfish': 'calm', 'Titan triggerfish': 'calm', 'Clown triggerfish': 'calm', 'Giant puffer': 'calm', 'Trumpetfish': 'calm' };
+function escapeTrait(species, sz) { return ESCAPE[ESCAPE_OF[species] || (sz < 0.45 ? 'darter' : sz > 1.1 ? 'calm' : 'reef')]; }
 export function animateSchool(g, dt) {
   // Real swimming: every fish has a position, a velocity and a heading, and always faces where it swims.
   // The group follows a slowly wandering leader point (so the fish follow each other), keeps formation
@@ -894,8 +905,13 @@ export function animateSchool(g, dt) {
     if (env) {
       _sw.copy(f.p).applyMatrix4(g.matrixWorld);
       _sd.subVectors(_sw, env.threat); const ahead = _sd.z < 0 ? 0.4 : 0.8, dist = Math.hypot(_sd.x, _sd.y, _sd.z * ahead), R = env.r * (0.75 + Math.min(1, sz) * 0.5);
-      if (dist < R) { fleeing = true; _sd.z *= 0.15; if (Math.hypot(_sd.x, _sd.y) < 0.4) _sd.x = (i % 2 ? 0.4 : -0.4); _sd.setLength((1 - dist / R) * vmax * 3.2).applyMatrix3(u.rot); f.flee.lerp(_sd, 1 - Math.pow(0.05, dt)); }
-      else f.flee.multiplyScalar(Math.pow(0.3, dt));
+      const tr = u.trait ||= escapeTrait(u.species, sz), ag = (f.agil ||= 0.8 + Math.random() * 0.45);   // species temperament x a bit of personality
+      const Rs = R * tr.r;
+      if (dist < Rs) { fleeing = true; _sd.z *= 0.15; if (Math.hypot(_sd.x, _sd.y) < 0.4) _sd.x = (i % 2 ? 0.4 : -0.4);
+        _sd.setLength((1 - dist / Rs) * vmax * 3.2 * tr.top).applyMatrix3(u.rot); f.flee.lerp(_sd, 1 - Math.pow(Math.pow(tr.acc, ag), dt));
+        if (!f.startled && tr.burst > 0) { f.v.addScaledVector(_sw.copy(_sd).setLength(1), vmax * tr.burst * ag); }   // startle dart: small fish flick away in an instant
+        f.startled = true; }
+      else { f.flee.multiplyScalar(Math.pow(0.3, dt)); if (dist > Rs * 1.3) f.startled = false; }
       _sv.add(f.flee);
       // look ahead along the swim direction and steer around solids; hard push only if already touching
       _sp.copy(f.v).multiplyScalar(0.6).add(f.p).applyMatrix4(g.matrixWorld); const ah = env.push(_sp, 0.15 + 0.25 * sz, _sd);
@@ -905,8 +921,14 @@ export function animateSchool(g, dt) {
       if (f.stuck > 1.2) { _sv.copy(L.p).add(f.slot).sub(f.p).setLength(vmax * 1.6); f.stuck = 0.6; }   // pinned against something: swim straight back to the group
     }
     // accelerate smoothly toward the desired velocity, limited speed
-    const top = vmax * (fleeing ? 1.7 : 1); if (_sv.length() > top) _sv.setLength(top);
-    f.v.lerp(_sv, 1 - Math.pow(fleeing ? 0.08 : 0.2, dt));
+    const tr = u.trait, top = vmax * (fleeing && tr ? 1 + 0.7 * tr.top * (f.agil || 1) : fleeing ? 1.7 : 1); if (_sv.length() > top) _sv.setLength(top);
+    _sw.copy(f.v);
+    f.v.lerp(_sv, 1 - Math.pow(fleeing && tr ? Math.pow(tr.acc, f.agil || 1) * 1.6 : fleeing ? 0.08 : 0.2, dt));
+    // body and fins follow the effort: hovering = soft sculling, cruising = easy beats, a dash = fast, wide tail strokes
+    const q = f.v.length() / vmax, acc = _sw.sub(f.v).length() / Math.max(dt, 1e-3) / vmax;
+    f.eff = (f.eff ?? 0.5) + (Math.min(1.6, q) + Math.min(1.2, acc * 0.12) - (f.eff ?? 0.5)) * (1 - Math.pow(0.02, dt));
+    f.tph = (f.tph ?? Math.random() * 6.28) + dt * (2.6 + 7.5 * f.eff); if (f.tph > 628.3) f.tph -= 628.3;
+    f.amp = 0.3 + 0.55 * Math.min(1.5, f.eff);
     f.p.addScaledVector(f.v, dt);
     // heading follows the swim direction (full turns possible), pitch and bank ease in; hovering fish keep their heading
     const sp = Math.hypot(f.v.x, f.v.z), flow = u.flow;
@@ -922,6 +944,7 @@ export function animateSchool(g, dt) {
 }
 function writeSchool(g) {
   const u = g.userData;
+  if (u.swTex) { const a = u.swTex.image.data; u.fish.forEach((f, i) => { if (f.tph !== undefined) { a[i * 4] = f.tph; a[i * 4 + 1] = f.amp; } }); u.swTex.needsUpdate = true; }
   u.fish.forEach((f, i) => {
     const p = f.p || f.o;
     _sq.setFromEuler(_se.set(f.pt || 0, f.hd || 0, f.rl || 0, 'YXZ')); _ss.setScalar(f.s);
