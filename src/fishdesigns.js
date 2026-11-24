@@ -219,7 +219,7 @@ const F = [
  ['Lionfish', 'Rotfeuerfisch', (() => {
    // Red lionfish (Pterois volitans): zebra stripes in maroon and cream, a crown of long separate venomous spines,
    // huge feathery pectoral fans, leafy tentacles above the eyes, clear spotted soft fins. Pectorals: own texture (pecSep).
-   const RED = '#B3302A', DK = '#6E1E1A', CR = '#FFF2E2';
+   const RED = '#C9662B', DK = '#5C3420', CR = '#F2E3C6';
    const band = (x0, y0, x1, y1, w, segs) => { const L = Math.hypot(x1 - x0, y1 - y0), d = `M${x0},${y0} L${x1},${y1}`;
      return `<path d="${d}" stroke="${O}" stroke-width="${w + 3.5}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${CR}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${RED}" stroke-width="${w}" fill="none" stroke-dasharray="${L / segs / 2} ${L / segs / 2}"/>`; };
    const cband = (x0, y0, x1, y1, w, segs, bend) => { const mx = (x0 + x1) / 2 - (y1 - y0) / Math.hypot(x1 - x0, y1 - y0) * bend, my = (y0 + y1) / 2 + (x1 - x0) / Math.hypot(x1 - x0, y1 - y0) * bend, L = Math.hypot(x1 - x0, y1 - y0) * 1.02, d = `M${x0},${y0} Q${mx},${my} ${x1},${y1}`;
@@ -227,14 +227,14 @@ const F = [
    // dorsal spines: 13, tallest at the front-middle, swept back, banded, membrane only at the base
    const spines = [...Array(13)].map((_, i) => { const x0 = 84 + i * 9.5, base = 70 - Math.sin((x0 - 84) / 240 * Math.PI) * 4 + (i > 9 ? (i - 9) * 3 : 0);
      const h = [52, 62, 68, 70, 68, 64, 58, 52, 46, 40, 32, 26, 22][i]; return [x0, base, x0 + 10 + i * 0.8, base - h]; });
-   const memb = `<path d="M${spines.map(([x0, y0, x1, y1]) => `${x0},${y0 + 2} ${x0 + (x1 - x0) * 0.42},${y0 + (y1 - y0) * 0.42}`).join(' ')} L${spines[12][0]},${spines[12][1] + 2}Z" fill="#F7C7BA" opacity=".9"/>`;
+   const memb = `<path d="M${spines.map(([x0, y0, x1, y1]) => `${x0},${y0 + 2} ${x0 + (x1 - x0) * 0.42},${y0 + (y1 - y0) * 0.42}`).join(' ')} L${spines[12][0]},${spines[12][1] + 2}Z" fill="#E9C49A" opacity=".9"/>`;
    const dorsal = memb + spines.map(([x0, y0, x1, y1]) => band(x0, y0, x1, y1, 3.2, 5) + `<path d="M${x1},${y1} q-6,4 -4,10" stroke="${RED}" stroke-width="2.4" fill="none" opacity=".8"/>`).join('');
    const spots = (pts) => pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i % 3 ? 1.8 : 2.4}" fill="${i % 2 ? RED : DK}"/>`).join('');
    const grid = (x0, x1, y0, y1, nx, ny, inside) => { const out = []; for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const x = x0 + (x1 - x0) * (i + 0.5) / nx, y = y0 + (y1 - y0) * (j + 0.5) / ny; if (inside(x, y)) out.push([x, y]); } return out; };
-   const softD = fin('M196,82 C206,60 228,58 240,74 C242,84 240,92 236,98 C224,92 210,86 196,82Z', '#FDEFE6', spots(grid(198, 242, 58, 96, 5, 4, (x, y) => y > 62 + (x - 220) * (x - 220) * 0.012 && y < 96 - (x - 196) * 0.1)));
-   const tail = fin('M236,100 C252,80 278,72 292,78 C298,92 298,108 292,122 C278,128 252,120 236,100Z', '#FDEFE6', spots(grid(246, 294, 78, 122, 5, 5, (x, y) => Math.abs(y - 100) < (x - 236) * 0.8)) + [84, 92, 100, 108, 116].map(y => `<path d="M240,100 L292,${y}" stroke="#E8C9B8" stroke-width="1.6"/>`).join(''));
-   const anal = fin('M176,124 C186,146 204,154 220,146 C222,134 218,122 212,114 C200,120 188,124 176,124Z', '#FDEFE6', spots(grid(180, 220, 120, 152, 4, 3, (x, y) => y < 150 - Math.abs(x - 200) * 0.4)) + band(178, 124, 186, 144, 2.6, 3) + band(184, 123, 194, 148, 2.6, 3));
-   const pelvic = fin('M104,128 C108,146 118,160 130,164 C132,150 128,138 122,128Z', '#F7D2C6', band(110, 130, 120, 160, 2.4, 4));
+   const softD = fin('M196,82 C206,60 228,58 240,74 C242,84 240,92 236,98 C224,92 210,86 196,82Z', '#F5EAD5', spots(grid(198, 242, 58, 96, 5, 4, (x, y) => y > 62 + (x - 220) * (x - 220) * 0.012 && y < 96 - (x - 196) * 0.1)));
+   const tail = fin('M236,100 C252,80 278,72 292,78 C298,92 298,108 292,122 C278,128 252,120 236,100Z', '#F5EAD5', spots(grid(246, 294, 78, 122, 5, 5, (x, y) => Math.abs(y - 100) < (x - 236) * 0.8)) + [84, 92, 100, 108, 116].map(y => `<path d="M240,100 L292,${y}" stroke="#D9BF98" stroke-width="1.6"/>`).join(''));
+   const anal = fin('M176,124 C186,146 204,154 220,146 C222,134 218,122 212,114 C200,120 188,124 176,124Z', '#F5EAD5', spots(grid(180, 220, 120, 152, 4, 3, (x, y) => y < 150 - Math.abs(x - 200) * 0.4)) + band(178, 124, 186, 144, 2.6, 3) + band(184, 123, 194, 148, 2.6, 3));
+   const pelvic = fin('M104,128 C108,146 118,160 130,164 C132,150 128,138 122,128Z', '#EBD3AE', band(110, 130, 120, 160, 2.4, 4));
    const tent = (x, y, h, lean) => `<path d="M${x},${y} C${x + lean - 6},${y - h * 0.4} ${x + lean - 8},${y - h * 0.8} ${x + lean},${y - h} C${x + lean + 8},${y - h * 0.7} ${x + lean + 6},${y - h * 0.3} ${x + 4},${y}Z" fill="${CR}" stroke="${O}" stroke-width="2.6"/><path d="M${x + 2},${y - 4} L${x + lean},${y - h + 4}" stroke="${RED}" stroke-width="3" stroke-dasharray="4 4"/>`;
    const headTent = tent(70, 74, 26, -6) + tent(78, 72, 18, -2);
    const chinTent = `<path d="M46,118 c-4,6 -4,12 0,16 c4,-4 4,-10 0,-16Z" fill="${CR}" stroke="${O}" stroke-width="2"/>`;
@@ -252,7 +252,7 @@ const F = [
      + `<path d="M74,72 L74,128" stroke="${RED}" stroke-width="7" stroke-linecap="round"/>`;
    return fish({ thick: 0.65, pecSep: 1, pecOut: 0.62, body: 'M36,110 C38,94 56,76 90,68 C130,62 176,72 212,88 C226,94 234,98 240,100 C232,106 222,110 210,114 C176,128 130,138 96,136 C64,134 42,126 36,110Z', fill: CR,
      fins: [dorsal, softD, tail, anal, pelvic, headTent, chinTent],
-     pattern: bars + headBars + `<path d="M20,128 C80,142 180,128 250,104 L250,180 L20,180Z" fill="#FFE9DA" opacity=".55"/>`,
+     pattern: bars + headBars + `<path d="M20,128 C80,142 180,128 250,104 L250,180 L20,180Z" fill="#F6E9CF" opacity=".55"/>`,
      over: `<path d="M38,114 C46,118 56,118 64,114" stroke="${O}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M72,80 L74,106" stroke="${DK}" stroke-width="5" opacity=".7"/>`,
      eye: [74, 94, 10], blush: [84, 114], blushR: 4.5, pec: pecFan }); })()],
  ['Crocodilefish', 'Krokodilfisch', fish({ thick: 1.7, wide: 2.3, body: 'M14,108 C30,100 60,92 100,88 C160,84 220,90 262,100 C220,110 160,116 100,116 C60,116 30,114 14,108Z', fill: '#C4AE7C',
