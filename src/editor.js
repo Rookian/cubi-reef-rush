@@ -243,7 +243,7 @@ $('shareBtn').onclick = async () => {
   b.disabled = false; b.textContent = '🌍 Share online';
 };
 $('pasteBtn').onclick = () => openModal('Paste a level', '', true);
-$('newBtn').onclick = () => { lv = normalizeLevel({ name: 'My level', length: 200, speed: 6, speedEnd: 7.5, items: [] }); sel = null; scrollZ = 0; save(); bindSettings(); panel(); draw(); };
+$('newBtn').onclick = () => { lv = normalizeLevel({ name: 'My level', length: 200, speed: 5, speedEnd: 6.2, items: [] }); sel = null; scrollZ = 0; save(); bindSettings(); panel(); draw(); };
 $('tplSel').onchange = (e) => { const i = +e.target.value; if (i >= 0) { lv = normalizeLevel(JSON.parse(JSON.stringify(STARTER_LEVELS[i]))); lv.name += ' (copy)'; sel = null; scrollZ = 0; save(); bindSettings(); panel(); draw(); } e.target.value = '-1'; };
 function openModal(title, text, editable) {
   $('mTitle').textContent = title; $('mText').value = text; $('mText').readOnly = !editable;

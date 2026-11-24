@@ -12,7 +12,7 @@ const line = (z, x, y, n = 5, gap = 3, dx = 0, dy = 0) => ({ t: 'pearls', z, x, 
 
 const BASE_LEVELS = [
   {
-    name: 'Sunny Shallows', length: 230, speed: 5.5, speedEnd: 6.5,
+    name: 'Sunny Shallows', length: 230, speed: 4.6, speedEnd: 5.4,
     items: [
       { t: 'seasnake', z: 65, x: 2 }, { t: 'hammer', z: 200, x: -2, y: L.mid },
       line(15, 0, L.mid, 5),
@@ -37,7 +37,7 @@ const BASE_LEVELS = [
     ],
   },
   {
-    name: 'Jelly Garden', length: 300, speed: 6, speedEnd: 7.5,
+    name: 'Jelly Garden', length: 300, speed: 5, speedEnd: 6.2,
     items: [
       { t: 'seasnake', z: 95, x: -2 }, { t: 'hammer', z: 186, x: 2, y: L.high },
       line(15, 0, L.mid, 5),
@@ -67,7 +67,7 @@ const BASE_LEVELS = [
     ],
   },
   {
-    name: 'Current Canyon', length: 360, speed: 6.5, speedEnd: 8.5,
+    name: 'Current Canyon', length: 360, speed: 5.4, speedEnd: 7,
     items: [
       { t: 'seasnake', z: 55, x: 2 }, { t: 'hammer', z: 158, x: -2, y: L.mid }, { t: 'seasnake', z: 226, x: -2 }, { t: 'hammer', z: 307, x: 2, y: L.low },
       line(15, 0, L.mid, 5),
@@ -116,8 +116,8 @@ export function normalizeLevel(lv) {
   const out = {
     name: String(lv?.name || 'My level').slice(0, 40),
     length: Math.max(60, Math.min(2000, +lv?.length || 200)),
-    speed: Math.max(3, Math.min(14, +lv?.speed || 6)),
-    speedEnd: Math.max(3, Math.min(16, +lv?.speedEnd || +lv?.speed || 7)),
+    speed: Math.max(3, Math.min(14, +lv?.speed || 5)),
+    speedEnd: Math.max(3, Math.min(16, +lv?.speedEnd || +lv?.speed || 5.8)),
     items: Array.isArray(lv?.items) ? lv.items.filter(i => i && typeof i.t === 'string' && isFinite(+i.z)).map(i => ({ ...i, z: +i.z, x: +i.x || 0 })) : [],
   };
   if (Number.isInteger(+lv?.cid) && +lv.cid > 0) { out.cid = +lv.cid; out.author = String(lv.author || '').slice(0, 16); }
